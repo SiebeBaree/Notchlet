@@ -9,5 +9,5 @@
 ## Checklist
 
 - [ ] `xcodebuild test -scheme Notchlet -destination 'platform=macOS'` passes
-- [ ] `swiftformat .` produces no changes
+- [ ] `swiftformat --lint .` passes
 - [ ] Title follows conventional commit style, e.g. `feat(usage): codex provider`

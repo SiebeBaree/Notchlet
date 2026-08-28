@@ -31,4 +31,4 @@ body:
     id: extra
     attributes:
       label: Anything else
-      description: Screenshots, logs or a screen recording help a lot.
+      description: Screenshots, logs or a screen recording help a lot. Issues are public, so redact credentials, tokens and any other sensitive details first.

@@ -4,13 +4,20 @@ import SwiftUI
 /// Creates the notch panel, pins it over the notch and repositions it when
 /// display configuration changes.
 final class NotchWindowController: NSWindowController {
+    private let store: UsageStore
+    private let hostingView: NSHostingView<NotchView>
+    private var notchSize: CGSize
+
     init(store: UsageStore) {
         let panel = NotchPanel()
-        super.init(window: panel)
+        let notchSize = Self.targetScreen.map(Self.notchSize(of:)) ?? NotchGeometry.fallbackNotchSize
 
-        let screen = Self.targetScreen
-        let notchSize = screen.map(Self.notchSize(of:)) ?? NotchGeometry.fallbackNotchSize
-        panel.contentView = NSHostingView(rootView: NotchView(store: store, notchSize: notchSize))
+        self.store = store
+        self.notchSize = notchSize
+        hostingView = NSHostingView(rootView: NotchView(store: store, notchSize: notchSize))
+
+        super.init(window: panel)
+        panel.contentView = hostingView
 
         reposition()
         NotificationCenter.default.addObserver(
@@ -44,8 +51,16 @@ final class NotchWindowController: NSWindowController {
         return CGSize(width: screen.frame.width - left.width - right.width, height: topInset)
     }
 
+    /// Moves the panel onto the current target screen. The notch size is
+    /// recomputed here too: unplugging a display can switch us between a
+    /// physical notch and the virtual fallback, and the content has to follow.
     @objc private func reposition() {
         guard let screen = Self.targetScreen, let window else { return }
         window.setFrame(NotchGeometry.panelFrame(screenFrame: screen.frame), display: true)
+
+        let currentNotchSize = Self.notchSize(of: screen)
+        guard currentNotchSize != notchSize else { return }
+        notchSize = currentNotchSize
+        hostingView.rootView = NotchView(store: store, notchSize: currentNotchSize)
     }
 }
