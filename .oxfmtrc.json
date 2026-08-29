@@ -1,0 +1,11 @@
+{
+    "$schema": "./node_modules/oxfmt/configuration_schema.json",
+    "tabWidth": 4,
+    "printWidth": 120,
+    "sortImports": true,
+    "sortTailwindcss": {
+        "stylesheet": "./src/app/globals.css",
+        "functions": ["cn", "cva"]
+    },
+    "ignorePatterns": []
+}
