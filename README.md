@@ -39,6 +39,14 @@ xcodebuild build -scheme Notchlet -destination 'platform=macOS'
 
 Notchlet never consumes usage to measure it. Each provider reads the same data the CLI itself shows you: the endpoint behind Claude Code's `/usage` and the rate-limit data behind Codex's `/status`. Credentials stay on your machine and Notchlet talks to nothing else. Both providers are unimplemented today; the plan lives in the doc comments of `Notchlet/Usage/`.
 
+## Analytics
+
+Notchlet sends anonymous usage stats to PostHog (EU cloud): a random UUID, hardware and app version context and events like "the notch was opened". It never sends your usage numbers, credentials, IP or anything that identifies you or your machine. The complete catalog of what leaves the machine is [`AnalyticsEvent.swift`](Notchlet/Analytics/AnalyticsEvent.swift). Turn it off with the "Share anonymous usage stats" toggle in the notch's settings. Debug builds send nothing.
+
+## Updates
+
+Notchlet checks for updates once a day through Sparkle. When one exists, a small download icon appears in the expanded notch and one click installs it. Updates are EdDSA-signed; the app refuses anything else.
+
 ## Roadmap
 
 - [ ] Claude Code provider

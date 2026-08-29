@@ -7,10 +7,15 @@ enum NotchGeometry {
     /// developable and usable on external monitors.
     static let fallbackNotchSize = CGSize(width: 200, height: 32)
 
+    /// Radius of the outward fillet where the notch meets the menu bar. The
+    /// panel is drawn this much wider on each side so the straight edges stay
+    /// aligned with the physical cutout.
+    static let notchTopCornerRadius: CGFloat = 6
+
     /// The panel is a fixed-size, transparent window pinned to the top center
     /// of the screen. The SwiftUI content inside animates between the
     /// collapsed notch shape and the expanded card.
-    static let panelSize = CGSize(width: 640, height: 260)
+    static let panelSize = CGSize(width: 640, height: 400)
 
     /// Frame for the panel in screen coordinates (origin at bottom-left,
     /// like AppKit): horizontally centered, flush with the top edge.

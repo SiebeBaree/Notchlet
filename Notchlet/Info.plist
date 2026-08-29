@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Partial Info.plist, merged into the generated one at build time.
+	     Only holds the Sparkle keys, which have no INFOPLIST_KEY_ build
+	     setting equivalents. -->
+	<key>SUFeedURL</key>
+	<string>https://siebebaree.github.io/Notchlet/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>ADRdfxZSvrNN5UGOxzI3h1n8n9yKeb+WkXdqTtLHPxA=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+</dict>
+</plist>

@@ -22,9 +22,38 @@ struct NotchGeometryTests {
 }
 
 struct UsageWindowTests {
+    private func window(id: String = "session", usedFraction: Double) -> UsageWindow {
+        UsageWindow(id: id, label: "5h", duration: 5 * 3600, usedFraction: usedFraction, resetsAt: nil)
+    }
+
     @Test func remainingFractionIsClamped() {
-        #expect(UsageWindow(usedFraction: 0.25).remainingFraction == 0.75)
-        #expect(UsageWindow(usedFraction: 1.3).remainingFraction == 0)
-        #expect(UsageWindow(usedFraction: -0.1).remainingFraction == 1)
+        #expect(window(usedFraction: 0.25).remainingFraction == 0.75)
+        #expect(window(usedFraction: 1.3).remainingFraction == 0)
+        #expect(window(usedFraction: -0.1).remainingFraction == 1)
+    }
+
+    @Test func labelsDeriveFromDuration() {
+        #expect(UsageWindow.label(forDuration: 5 * 3600) == "5h")
+        #expect(UsageWindow.label(forDuration: 7 * 24 * 3600) == "Weekly")
+        #expect(UsageWindow.label(forDuration: 30 * 24 * 3600) == "Monthly")
+    }
+
+    @Test func labelsTolerateNearMisses() {
+        // The Codex CLI matches known windows with ±5% tolerance; mirror it.
+        #expect(UsageWindow.label(forDuration: 29 * 24 * 3600) == "Monthly")
+        #expect(UsageWindow.label(forDuration: 5 * 3600 + 300) == "5h")
+        #expect(UsageWindow.label(forDuration: 3 * 24 * 3600) == "3d")
+    }
+
+    @Test func tightestWindowHasLeastRemaining() {
+        let snapshot = UsageSnapshot(
+            windows: [
+                window(id: "a", usedFraction: 0.2),
+                window(id: "b", usedFraction: 0.7),
+                window(id: "c", usedFraction: 0.5),
+            ],
+            fetchedAt: .now
+        )
+        #expect(snapshot.tightestWindow?.id == "b")
     }
 }
