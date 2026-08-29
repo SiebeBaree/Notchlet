@@ -10,8 +10,13 @@ import PostHog
 /// no-op until `bootstrap()` runs.
 enum Analytics {
     /// Public write-only project key from the PostHog project settings.
-    /// Safe to commit; it can only ingest events.
-    private static let apiKey = "phc_REPLACE_WITH_POSTHOG_PROJECT_KEY"
+    /// Substituted into Info.plist at build time from Config/Secrets.xcconfig
+    /// so it never lives in source. Empty in checkouts without that file,
+    /// which leaves analytics off.
+    private static var apiKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "POSTHOG_API_KEY") as? String ?? ""
+    }
+
     private static let host = "https://eu.i.posthog.com"
 
     private static let optOutKey = "analyticsOptOut"
@@ -49,7 +54,7 @@ enum Analytics {
         #if DEBUG
         // Development builds never send analytics.
         #else
-            guard !apiKey.contains("REPLACE") else { return }
+            guard !apiKey.isEmpty else { return }
 
             let distinctID = stableDistinctID()
             let config = PostHogConfig(apiKey: apiKey, host: host)

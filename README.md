@@ -41,7 +41,7 @@ Notchlet never consumes usage to measure it. Each provider reads the same data t
 
 ## Analytics
 
-Notchlet sends anonymous usage stats to PostHog (EU cloud): a random UUID, hardware and app version context and events like "the notch was opened". It never sends your usage numbers, credentials, IP or anything that identifies you or your machine. The complete catalog of what leaves the machine is [`AnalyticsEvent.swift`](Notchlet/Analytics/AnalyticsEvent.swift). Turn it off with the "Share anonymous usage stats" toggle in the notch's settings. Debug builds send nothing.
+Notchlet sends anonymous usage stats to PostHog (EU cloud): a random UUID, hardware and app version context and events like "the notch was opened". It never sends your usage numbers, credentials, IP or anything that identifies you or your machine. The complete catalog of what leaves the machine is [`AnalyticsEvent.swift`](Notchlet/Analytics/AnalyticsEvent.swift). Turn it off with the "Share anonymous usage stats" toggle in the notch's settings. Debug builds send nothing, and so do builds from source: the project key is injected at build time from a gitignored `Config/Secrets.xcconfig`, so your own builds never report into our project.
 
 ## Updates
 

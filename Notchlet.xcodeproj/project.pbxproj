@@ -24,6 +24,7 @@
 /* Begin PBXFileReference section */
 		AA0000000000000000000020 /* Notchlet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Notchlet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000021 /* NotchletTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotchletTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000022 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Base.xcconfig; path = Config/Base.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -77,6 +78,7 @@
 			children = (
 				AA0000000000000000000030 /* Notchlet */,
 				AA0000000000000000000031 /* NotchletTests */,
+				AA0000000000000000000022 /* Base.xcconfig */,
 				AA0000000000000000000051 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -228,6 +230,7 @@
 /* Begin XCBuildConfiguration section */
 		AA00000000000000000000A0 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000000000000000000022 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -295,6 +298,7 @@
 		};
 		AA00000000000000000000A1 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000000000000000000022 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
