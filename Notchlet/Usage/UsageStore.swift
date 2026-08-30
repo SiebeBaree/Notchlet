@@ -137,6 +137,10 @@ final class UsageStore {
                         return (index, .notAvailable)
                     } catch let UsageProviderError.rateLimited(retryAfter) {
                         return (index, .rateLimited(retryAfter: retryAfter))
+                    } catch is CancellationError {
+                        return (index, .cancelled)
+                    } catch let error as URLError where error.code == .cancelled {
+                        return (index, .cancelled)
                     } catch {
                         return (index, .failed)
                     }
@@ -161,6 +165,8 @@ final class UsageStore {
         case notAvailable
         case rateLimited(retryAfter: TimeInterval?)
         case failed
+        /// The refresh loop was restarted mid-flight, not a provider fault.
+        case cancelled
     }
 
     private func apply(_ outcome: FetchOutcome, at index: Int) {
@@ -180,6 +186,11 @@ final class UsageStore {
         case .failed:
             entries[index].schedule.recordError()
             transition(at: index, to: .error)
+        case .cancelled:
+            // We cancelled this fetch ourselves by rescheduling, so the
+            // provider learns nothing: no state change and no backoff. The
+            // attempt recorded before the fetch still holds the 30s spacing.
+            break
         }
     }
 

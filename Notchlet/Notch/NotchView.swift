@@ -6,10 +6,9 @@ import SwiftUI
 /// per provider (its primary window), and hovering a gauge unfolds that
 /// provider's breakdown below.
 ///
-/// Known limitation of the skeleton: the hosting window is always
-/// `NotchGeometry.panelSize`, so the transparent area around the collapsed
-/// shape still swallows clicks. Fixing hit-testing (click-through for
-/// transparent pixels) is on the roadmap.
+/// The hosting window is always `NotchGeometry.panelSize`, but only the
+/// notch shape is drawn: the panel is non-opaque and nothing else paints a
+/// background, so clicks in the transparent area go to the window below.
 struct NotchView: View {
     /// What the expanded panel shows: usage, or in-notch settings behind the
     /// small gear in the corner.
