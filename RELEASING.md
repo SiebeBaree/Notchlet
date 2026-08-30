@@ -131,7 +131,20 @@ key sits underneath it, export again.
 **notarytool returns 403.** The App Store Connect key's role is too narrow.
 Regenerate it as App Manager.
 
-**notarytool returns Invalid.** Ask Apple what it objected to:
+**notarytool returns Invalid right after the archive.** Most likely something
+in the bundle is still ad-hoc signed. Sparkle ships its XPC services,
+`Updater.app` and `Autoupdate` ad-hoc, and Xcode signs the framework bundle
+without recursing into them, so `Scripts/sign-sparkle.sh` re-signs them before
+notarization. Check with:
+
+```sh
+codesign -dvv <path> 2>&1 | grep flags
+```
+
+`flags=0x10000(runtime)` is correct. Anything containing `adhoc` will be
+rejected, and Apple's response names no file.
+
+**notarytool returns Invalid for anything else.** Ask Apple what it objected to:
 
 ```sh
 xcrun notarytool log <submission-id> --key AuthKey.p8 \
