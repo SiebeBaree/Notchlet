@@ -19,6 +19,13 @@ Native macOS notch app (Swift 6, SwiftUI, AppKit for windowing) that shows remai
 - `BurnProjection` is the pace model, mirrored from CodexBar: average burn since the window started (elapsed derives from `resetsAt` and the window duration), no run-out verdict until 8% of the window has elapsed. Stateless; don't reintroduce sample history.
 - Providers never refresh OAuth tokens: refresh tokens rotate, and rotating behind the CLI's back can invalidate its session. Expired login means no data until the user runs that CLI.
 
+## Releases
+
+- Tagging is the release. `git push origin vX.Y.Z` runs `.github/workflows/release.yml`, which archives, notarizes, builds a DMG, publishes the GitHub release and deploys the Sparkle appcast to Pages. Nothing is built from a laptop. See `RELEASING.md`.
+- Never hand-edit `MARKETING_VERSION` or `CURRENT_PROJECT_VERSION`; CI injects both from the tag and the run number. Sparkle compares `CURRENT_PROJECT_VERSION`, so a stale value hides the update from everyone.
+- `SUFeedURL` is compiled into every shipped binary and can never change. Front it with a redirect if a custom domain is ever wanted.
+- The app icon is generated: `Scripts/AppIcon.svg` (the website icon, viewBox widened to inset it to the macOS icon grid) rendered by `Scripts/make-appicon.sh`. Edit the SVG and re-run the script, never the PNGs.
+
 ## Constraints
 
 - The pbxproj uses file-system-synced groups (objectVersion 77). New files under `Notchlet/` or `NotchletTests/` join the target automatically; never hand-edit the pbxproj to add files.

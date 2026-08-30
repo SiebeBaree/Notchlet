@@ -1,0 +1,191 @@
+name: Release
+
+# Tagging is the whole release trigger: the tag decides the version, so nothing
+# has to be bumped by hand. Run the workflow manually to rehearse the signing
+# and notarisation steps without publishing anything.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  SIGNING_IDENTITY: "Developer ID Application: Siebe Baree (DW92YAHZVK)"
+  TEAM_ID: DW92YAHZVK
+  SPARKLE_VERSION: 2.9.6
+
+jobs:
+  build:
+    name: Build, notarize and publish
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve the version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            # Rehearsal build. Keep it a plain numeric version so notarization
+            # cannot fail for a reason the real run would not hit.
+            echo "VERSION=0.0.0" >> "$GITHUB_ENV"
+          fi
+
+      - name: Import the Developer ID certificate
+        env:
+          CERT_P12_BASE64: ${{ secrets.CERT_P12_BASE64 }}
+          CERT_P12_PASSWORD: ${{ secrets.CERT_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo -n "$CERT_P12_BASE64" | base64 --decode -o "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$CERT_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN"
+          rm "$RUNNER_TEMP/cert.p12"
+          # Fail here rather than three steps later with a confusing codesign error.
+          security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "$SIGNING_IDENTITY"
+
+      - name: Write the analytics key
+        env:
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          # An empty key builds and runs fine, it just silently reports nothing,
+          # so treat a missing secret as a failure instead of shipping a blind build.
+          test -n "$POSTHOG_API_KEY" || { echo "POSTHOG_API_KEY secret is empty"; exit 1; }
+          printf 'POSTHOG_API_KEY = %s\n' "$POSTHOG_API_KEY" > Config/Secrets.xcconfig
+
+      - name: Archive
+        run: |
+          # Sparkle compares CFBundleVersion, not the marketing version, so the
+          # build number has to rise on every release. github.run_number does
+          # that on its own. Renaming this workflow file would reset it.
+          xcodebuild archive \
+            -project Notchlet.xcodeproj \
+            -scheme Notchlet \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -archivePath build/Notchlet.xcarchive \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp"
+          cp -R build/Notchlet.xcarchive/Products/Applications/Notchlet.app build/
+
+      - name: Notarize the app and staple the ticket into it
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          ditto -c -k --keepParent build/Notchlet.app build/Notchlet.zip
+          xcrun notarytool submit build/Notchlet.zip \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait
+          # Stapling the bundle itself is what lets a Sparkle-installed copy
+          # pass Gatekeeper with no network.
+          xcrun stapler staple build/Notchlet.app
+
+      - name: Build the DMG and notarize that too
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          # hdiutil rather than create-dmg: create-dmg positions the icons by
+          # driving Finder over AppleScript, which is unreliable on a headless
+          # runner. The Applications symlink is what makes the drag target
+          # obvious, and that is the only part of the layout that carries
+          # meaning. Revisit if the DMG ever gets a designed background.
+          mkdir -p build/dmg
+          cp -R build/Notchlet.app build/dmg/
+          ln -s /Applications build/dmg/Applications
+          hdiutil create \
+            -volname Notchlet \
+            -srcfolder build/dmg \
+            -format UDZO \
+            -ov "build/Notchlet-$VERSION.dmg"
+          codesign --sign "$SIGNING_IDENTITY" --timestamp "build/Notchlet-$VERSION.dmg"
+          # A second ticket, for the disk image itself, so the download opens
+          # without a Gatekeeper warning.
+          xcrun notarytool submit "build/Notchlet-$VERSION.dmg" \
+            --key "$RUNNER_TEMP/AuthKey.p8" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "build/Notchlet-$VERSION.dmg"
+
+      - name: Check what a stranger's Mac will decide
+        run: |
+          spctl --assess --type execute --verbose=4 build/Notchlet.app
+          xcrun stapler validate "build/Notchlet-$VERSION.dmg"
+
+      - name: Publish the GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The appcast points at this download URL, so the release has to exist
+          # before the feed goes live.
+          gh release create "$GITHUB_REF_NAME" "build/Notchlet-$VERSION.dmg" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
+
+      - name: Sign the update and build the appcast
+        if: github.ref_type == 'tag'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          curl -fsSL -o sparkle.tar.xz \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          mkdir -p sparkle releases site
+          tar -xJf sparkle.tar.xz -C sparkle
+          generate_appcast=$(find sparkle -name generate_appcast -type f | head -1)
+          # generate_appcast rewrites every entry with the same URL prefix and
+          # GitHub download URLs carry the tag, so the folder holds exactly one
+          # release. A single-item feed is all Sparkle needs.
+          cp "build/Notchlet-$VERSION.dmg" releases/
+          echo "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/SiebeBaree/Notchlet/releases/download/$GITHUB_REF_NAME/" \
+            --link "https://github.com/SiebeBaree/Notchlet" \
+            --full-release-notes-url "https://github.com/SiebeBaree/Notchlet/releases" \
+            releases
+          cp releases/appcast.xml site/appcast.xml
+
+      - name: Upload the appcast for Pages
+        if: github.ref_type == 'tag'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Publish the appcast
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
