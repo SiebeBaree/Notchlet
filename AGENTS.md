@@ -1,6 +1,8 @@
 # notchlet-website
 
-<TODO: write a one or two paragraph description of the app here, including what it does and what problem it solves.>
+The marketing site for Notchlet, a macOS app that lives in the notch and shows your usage of AI tools like Claude Code, Codex, Cursor and OpenCode. Hover over the notch and it expands to show how much of your plan you have used.
+
+Right now this is a single landing page counting down to launch. A login system arrives in a few weeks, which is why the database, rate limiting and the `(app)` route group are wired up but unused.
 
 ## Principles
 
@@ -37,4 +39,4 @@ Test the things that can be wrong in interesting ways. Zod schema edges, real lo
 - Formatting is oxfmt's job, including import order and Tailwind class order. Never hand-format or reorder imports.
 - shadcn components under `components/ui` are generated. Add or update them with the shadcn CLI, do not hand-edit beyond what a change genuinely requires.
 - There is no auth by design (the provider choice varies per project). The `(app)` route group marks where it slots in.
-- The e2e todos suite needs `DATABASE_URL`, skips itself without it and deletes its own `e2e %` rows.
+- E2e suites need `DATABASE_URL`, must skip themselves without it and must delete their own `e2e %` rows. None exist right now; the harness stays for the login work.

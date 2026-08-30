@@ -6,6 +6,8 @@ import { env } from "@/lib/env/server";
 
 import * as schema from "./schema";
 
+export * from "./schema";
+
 let cached: ReturnType<typeof createDb> | undefined;
 
 function createDb() {
@@ -20,5 +22,3 @@ export function getDb() {
     cached ??= createDb();
     return cached;
 }
-
-export * from "./schema";

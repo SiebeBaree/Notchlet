@@ -1,11 +1,11 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-// Column names derive from the property names via `casing: "snake_case"`, set in lib/db/index.ts and drizzle.config.ts.
-export const todos = pgTable("todos", {
+/**
+ * Launch waitlist. One row per address: the unique constraint turns a repeat submit into a no-op instead of a
+ * duplicate, which is why the action can use onConflictDoNothing and still report success.
+ */
+export const signups = pgTable("signups", {
     id: uuid().primaryKey().defaultRandom(),
-    title: text().notNull(),
-    completed: boolean().notNull().default(false),
+    email: text().notNull().unique(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
-
-export type Todo = typeof todos.$inferSelect;

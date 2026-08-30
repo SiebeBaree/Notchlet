@@ -6,9 +6,22 @@
    falls back to the OS media query and they activate on their own. */
 @custom-variant dark (&:is(.dark *));
 
+/* Landing palette: ink text scale, violet brand, hairline borders. */
+@theme {
+    --color-ink: #17151f;
+    --color-ink-2: #262233;
+    --color-ink-3: #7b7788;
+    --color-brand: #7145f5;
+    --color-brand-bright: #9f7cff;
+    --color-brand-soft: #efeafd;
+    --color-line: #eceaf2;
+}
+
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
+    --font-display: var(--font-display);
+    --font-mono: var(--font-mono);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -82,6 +95,53 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* The menu bar tabs. Each tab is a single element and the silhouette is carved with a mask rather than an extra
+   span, because a span sitting outside the tab gets no backdrop-filter and that unblurred patch was the visible
+   seam. Two mask layers: the flat body, then the swoop as an SVG image pinned to the inner edge.
+
+   The swoop is one cubic with horizontal tangents at both ends and both control points at the midpoint, so it
+   leaves the tab's bottom edge flat, runs diagonally through the middle and lands flat against the screen edge.
+   Two arcs meeting tangentially cannot do this: they meet vertically, which is why the earlier version read as a
+   rounded rectangle rather than an angle. Width is fixed at 80px so the diagonal never stretches with the tab. */
+.menu-tab {
+    --swoop: 80px;
+    mask-repeat: no-repeat;
+    mask-size:
+        calc(100% - var(--swoop)) 100%,
+        var(--swoop) 100%;
+}
+
+.menu-tab-start {
+    mask-image:
+        linear-gradient(#000, #000),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 46' preserveAspectRatio='none'%3E%3Cpath d='M0,0 H80 C40,0 40,46 0,46 Z'/%3E%3C/svg%3E");
+    /* Four value form on purpose: mask-position rejects the three value shorthand and silently drops the whole
+       declaration, which stacks every layer in the top left corner. */
+    mask-position:
+        left 0 top 0,
+        right 0 top 0;
+}
+
+.menu-tab-end {
+    mask-image:
+        linear-gradient(#000, #000),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 46' preserveAspectRatio='none'%3E%3Cpath d='M80,0 H0 C40,0 40,46 80,46 Z'/%3E%3C/svg%3E");
+    mask-position:
+        right 0 top 0,
+        left 0 top 0;
+}
+
+/* Gentle bob for the hero scroll hint. Transform-only so it stays on the compositor. */
+@keyframes hint-bob {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(7px);
+    }
 }
 
 @layer base {

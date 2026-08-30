@@ -7,10 +7,8 @@ import posthog from "posthog-js";
  * Keep properties anonymous and small: counts and flags, not user content.
  */
 type AnalyticsEvents = {
-    todo_created: { title_length: number };
-    todo_completed: Record<string, never>;
-    todo_reopened: Record<string, never>;
-    todo_deleted: { was_completed: boolean };
+    /** Someone joined the launch waitlist from the download dialog. No properties: the email must not reach PostHog. */
+    launch_signup: Record<string, never>;
 };
 
 export function track<Name extends keyof AnalyticsEvents>(
