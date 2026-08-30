@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AA0000000000000000000100 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000102 /* PostHog */; };
+		AA0000000000000000000101 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000103 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		AA0000000000000000000090 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -19,11 +24,25 @@
 /* Begin PBXFileReference section */
 		AA0000000000000000000020 /* Notchlet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Notchlet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000021 /* NotchletTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotchletTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000022 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Base.xcconfig; path = Config/Base.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		AA0000000000000000000120 /* Exceptions for "Notchlet" folder in "Notchlet" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA0000000000000000000010 /* Notchlet */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA0000000000000000000030 /* Notchlet */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA0000000000000000000120 /* Exceptions for "Notchlet" folder in "Notchlet" target */,
+			);
 			path = Notchlet;
 			sourceTree = "<group>";
 		};
@@ -39,6 +58,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA0000000000000000000100 /* PostHog in Frameworks */,
+				AA0000000000000000000101 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,6 +78,7 @@
 			children = (
 				AA0000000000000000000030 /* Notchlet */,
 				AA0000000000000000000031 /* NotchletTests */,
+				AA0000000000000000000022 /* Base.xcconfig */,
 				AA0000000000000000000051 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +112,8 @@
 			);
 			name = Notchlet;
 			packageProductDependencies = (
+				AA0000000000000000000102 /* PostHog */,
+				AA0000000000000000000103 /* Sparkle */,
 			);
 			productName = Notchlet;
 			productReference = AA0000000000000000000020 /* Notchlet.app */;
@@ -146,6 +170,10 @@
 			);
 			mainGroup = AA0000000000000000000050;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA0000000000000000000110 /* XCRemoteSwiftPackageReference "posthog-ios" */,
+				AA0000000000000000000111 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AA0000000000000000000051 /* Products */;
 			projectDirPath = "";
@@ -202,6 +230,7 @@
 /* Begin XCBuildConfiguration section */
 		AA00000000000000000000A0 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000000000000000000022 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -269,6 +298,7 @@
 		};
 		AA00000000000000000000A1 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000000000000000000022 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -338,6 +368,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Notchlet/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -363,6 +394,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Notchlet/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -439,6 +471,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AA0000000000000000000110 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.0;
+			};
+		};
+		AA0000000000000000000111 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA0000000000000000000102 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000110 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
+		};
+		AA0000000000000000000103 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000111 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = AA0000000000000000000001 /* Project object */;
 }

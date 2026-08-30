@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 @testable import Notchlet
 import Testing
 
@@ -22,9 +23,48 @@ struct NotchGeometryTests {
 }
 
 struct UsageWindowTests {
+    private func window(id: String = "session", usedFraction: Double) -> UsageWindow {
+        UsageWindow(id: id, label: "5h", duration: 5 * 3600, usedFraction: usedFraction, resetsAt: nil)
+    }
+
     @Test func remainingFractionIsClamped() {
-        #expect(UsageWindow(usedFraction: 0.25).remainingFraction == 0.75)
-        #expect(UsageWindow(usedFraction: 1.3).remainingFraction == 0)
-        #expect(UsageWindow(usedFraction: -0.1).remainingFraction == 1)
+        #expect(window(usedFraction: 0.25).remainingFraction == 0.75)
+        #expect(window(usedFraction: 1.3).remainingFraction == 0)
+        #expect(window(usedFraction: -0.1).remainingFraction == 1)
+    }
+
+    @Test func labelsDeriveFromDuration() {
+        #expect(UsageWindow.label(forDuration: 5 * 3600) == "5h")
+        #expect(UsageWindow.label(forDuration: 7 * 24 * 3600) == "Weekly")
+        #expect(UsageWindow.label(forDuration: 30 * 24 * 3600) == "Monthly")
+    }
+
+    @Test func labelsTolerateNearMisses() {
+        // The Codex CLI matches known windows with ±5% tolerance; mirror it.
+        #expect(UsageWindow.label(forDuration: 29 * 24 * 3600) == "Monthly")
+        #expect(UsageWindow.label(forDuration: 5 * 3600 + 300) == "5h")
+        #expect(UsageWindow.label(forDuration: 3 * 24 * 3600) == "3d")
+    }
+
+    @Test func primaryWindowIsTheShortestRegardlessOfUsage() {
+        // The 5h session wins even when a longer window is far more used.
+        let snapshot = UsageSnapshot(
+            windows: [
+                UsageWindow(id: "weekly", label: "Weekly", duration: 7 * 24 * 3600, usedFraction: 0.99, resetsAt: nil),
+                UsageWindow(id: "session", label: "5h", duration: 5 * 3600, usedFraction: 0.0, resetsAt: nil),
+            ],
+            fetchedAt: .now
+        )
+        #expect(snapshot.primaryWindow?.id == "session")
+    }
+
+    @Test func expectedRemainingTracksTimeUntilReset() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let halfway = UsageWindow(
+            id: "weekly", label: "Weekly", duration: 7 * 24 * 3600,
+            usedFraction: 0.3, resetsAt: now.addingTimeInterval(3.5 * 24 * 3600)
+        )
+        #expect(halfway.expectedRemainingFraction(now: now) == 0.5)
+        #expect(window(usedFraction: 0.3).expectedRemainingFraction(now: now) == nil)
     }
 }

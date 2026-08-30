@@ -2,15 +2,117 @@ import Foundation
 
 /// Usage for Claude Code.
 ///
-/// Planned data source: the OAuth usage endpoint Claude Code itself calls to
-/// render `/usage` (5-hour and weekly windows, with reset times). Credentials
-/// live in the macOS keychain or `~/.claude/.credentials.json` depending on
-/// how the user logged in.
-struct ClaudeCodeUsageProvider: UsageProvider {
+/// Reads the OAuth access token Claude Code stored at login (macOS keychain,
+/// with `~/.claude/.credentials.json` as fallback) and calls the same usage
+/// endpoint Claude Code's `/usage` screen calls. Tokens are never refreshed
+/// here: rotating the refresh token behind Claude Code's back would break its
+/// session, so an expired token just reports `notAvailable` until the user
+/// runs Claude Code again.
+struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     let id = "claude-code"
-    let name = "Claude Code"
+    let name = "Claude"
+    let logoAssetName = "ClaudeLogo"
+    let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
-    func fetchUsage() async throws -> UsageSnapshot {
-        throw UsageProviderError.notImplemented
+    var isInstalled: Bool {
+        CredentialSupport.homePathExists(".claude")
+    }
+
+    private static let sessionDuration: TimeInterval = 5 * 3600
+    private static let weekDuration: TimeInterval = 7 * 24 * 3600
+
+    func authHeaders() throws -> [String: String] {
+        let candidates: [Credentials?] = [
+            CredentialSupport.keychainJSON(service: "Claude Code-credentials"),
+            CredentialSupport.homeJSON(".claude/.credentials.json"),
+        ]
+        guard let token = candidates.compactMap(\.self)
+            .first(where: { $0.expiresAt > .now })?.accessToken
+        else {
+            throw UsageProviderError.notAvailable
+        }
+        return [
+            "Authorization": "Bearer \(token)",
+            "anthropic-beta": "oauth-2025-04-20",
+        ]
+    }
+
+    /// Maps the endpoint's `limits` array to usage windows: the rolling
+    /// session, the weekly all-models window and any model-scoped weekly
+    /// window (currently "Fable").
+    func parseWindows(from data: Data) throws -> [UsageWindow] {
+        struct Response: Decodable {
+            struct Limit: Decodable {
+                struct Scope: Decodable {
+                    struct Model: Decodable { var displayName: String? }
+                    var model: Model?
+                }
+
+                var kind: String
+                var percent: Double
+                var resetsAt: String?
+                var scope: Scope?
+            }
+
+            var limits: [Limit]
+        }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let response = try decoder.decode(Response.self, from: data)
+
+        return response.limits.compactMap { limit in
+            let resetsAt = limit.resetsAt.flatMap(Self.parseDate)
+            let usedFraction = min(max(limit.percent / 100, 0), 1)
+            switch limit.kind {
+            case "session":
+                return UsageWindow(
+                    id: "session",
+                    label: UsageWindow.label(forDuration: Self.sessionDuration),
+                    duration: Self.sessionDuration,
+                    usedFraction: usedFraction,
+                    resetsAt: resetsAt
+                )
+            case "weekly_all":
+                return UsageWindow(
+                    id: "weekly",
+                    label: UsageWindow.label(forDuration: Self.weekDuration),
+                    duration: Self.weekDuration,
+                    usedFraction: usedFraction,
+                    resetsAt: resetsAt
+                )
+            case "weekly_scoped":
+                guard let model = limit.scope?.model?.displayName else { return nil }
+                return UsageWindow(
+                    id: "weekly-\(model.lowercased())",
+                    label: model,
+                    duration: Self.weekDuration,
+                    usedFraction: usedFraction,
+                    resetsAt: resetsAt
+                )
+            default:
+                return nil
+            }
+        }
+    }
+
+    /// The endpoint sends ISO 8601 with microseconds, which
+    /// `ISO8601DateFormatter` refuses. Sub-second precision is irrelevant
+    /// here, so strip the fraction before parsing.
+    static func parseDate(_ string: String) -> Date? {
+        let stripped = string.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
+        return ISO8601DateFormatter().date(from: stripped)
+    }
+
+    private struct Credentials: Decodable {
+        struct OAuth: Decodable {
+            var accessToken: String
+            var expiresAt: Double // milliseconds since epoch
+        }
+
+        var claudeAiOauth: OAuth
+
+        var accessToken: String { claudeAiOauth.accessToken }
+        var expiresAt: Date { Date(timeIntervalSince1970: claudeAiOauth.expiresAt / 1000) }
     }
 }

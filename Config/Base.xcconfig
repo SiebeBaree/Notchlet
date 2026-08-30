@@ -1,0 +1,10 @@
+// Build settings shared by every configuration.
+//
+// POSTHOG_API_KEY is substituted into the app's Info.plist and read back at
+// runtime by Analytics.swift, so the key never lives in source. It is empty
+// by default, which keeps analytics off. Real builds get the value from
+// Config/Secrets.xcconfig, which is gitignored. See Secrets.example.xcconfig.
+
+POSTHOG_API_KEY =
+
+#include? "Secrets.xcconfig"

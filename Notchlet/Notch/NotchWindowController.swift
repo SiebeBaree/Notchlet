@@ -5,16 +5,18 @@ import SwiftUI
 /// display configuration changes.
 final class NotchWindowController: NSWindowController {
     private let store: UsageStore
+    private let updater: UpdateController
     private let hostingView: NSHostingView<NotchView>
     private var notchSize: CGSize
 
-    init(store: UsageStore) {
+    init(store: UsageStore, updater: UpdateController) {
         let panel = NotchPanel()
         let notchSize = Self.targetScreen.map(Self.notchSize(of:)) ?? NotchGeometry.fallbackNotchSize
 
         self.store = store
+        self.updater = updater
         self.notchSize = notchSize
-        hostingView = NSHostingView(rootView: NotchView(store: store, notchSize: notchSize))
+        hostingView = NSHostingView(rootView: NotchView(store: store, updater: updater, notchSize: notchSize))
 
         super.init(window: panel)
         panel.contentView = hostingView
@@ -61,6 +63,6 @@ final class NotchWindowController: NSWindowController {
         let currentNotchSize = Self.notchSize(of: screen)
         guard currentNotchSize != notchSize else { return }
         notchSize = currentNotchSize
-        hostingView.rootView = NotchView(store: store, notchSize: currentNotchSize)
+        hostingView.rootView = NotchView(store: store, updater: updater, notchSize: currentNotchSize)
     }
 }

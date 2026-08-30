@@ -10,3 +10,9 @@ build/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Code coverage artifacts
+*.profraw
+
+# Local build secrets
+Config/Secrets.xcconfig
