@@ -3,7 +3,7 @@ import SwiftUI
 /// Root view of the panel. The collapsed notch shape shows nothing; hovering
 /// expands it into the usage card. With one active provider the card shows
 /// its full breakdown directly. With two or three it shows one summary gauge
-/// per provider (its tightest window), and hovering a gauge unfolds that
+/// per provider (its primary window), and hovering a gauge unfolds that
 /// provider's breakdown below.
 ///
 /// Known limitation of the skeleton: the hosting window is always
@@ -29,7 +29,7 @@ struct NotchView: View {
     @State private var openDebounce: Task<Void, Never>?
 
     private var activeEntries: [UsageStore.Entry] {
-        store.entries.filter { $0.snapshot != nil }
+        store.entries.filter { store.isEnabled($0.id) && $0.snapshot != nil }
     }
 
     private var expandedWidth: CGFloat {
@@ -47,6 +47,7 @@ struct NotchView: View {
                             pane = .usage
                         }
                     }
+                    store.setPanelOpen(hovering)
                     trackOpenClose(hovering: hovering)
                 }
             Spacer(minLength: 0)
@@ -97,9 +98,10 @@ struct NotchView: View {
             Spacer().frame(height: notchSize.height)
 
             if pane == .settings {
-                NotchSettingsView(updater: updater)
+                NotchSettingsView(store: store, updater: updater)
             } else {
                 usageContent
+                freshnessFooter
             }
         }
         .padding(.horizontal, 20)
@@ -128,6 +130,28 @@ struct NotchView: View {
         }
         .frame(height: notchSize.height)
         .padding(.trailing, 14)
+    }
+
+    /// Fresh data shows nothing here. Data older than a couple of minutes
+    /// gets a quiet age line, and a rate-limited provider gets an amber line
+    /// naming it and its next retry, so stale numbers never pass as live.
+    @ViewBuilder
+    private var freshnessFooter: some View {
+        let limited = store.entries
+            .filter { store.isEnabled($0.id) && $0.state == .rateLimited }
+            .compactMap { entry in entry.schedule.retryAt.map { (name: entry.provider.name, retryAt: $0) } }
+            .min { $0.retryAt < $1.retryAt }
+        if let limited {
+            Text(UsageCopy.rateLimitText(providerName: limited.name, retryAt: limited.retryAt))
+                .font(.system(size: 10))
+                .foregroundStyle(Color(red: 0.85, green: 0.64, blue: 0.26))
+        } else if let oldest = activeEntries.compactMap(\.snapshot?.fetchedAt).min(),
+                  let text = UsageCopy.freshnessText(fetchedAt: oldest)
+        {
+            Text(text)
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.4))
+        }
     }
 
     @ViewBuilder
@@ -218,9 +242,8 @@ private struct BrandRow: View {
     }
 }
 
-/// One provider's at-a-glance gauge: brand on top, then the tightest window
-/// with its label and pace, so a glance still tells you which limit is
-/// squeezed.
+/// One provider's at-a-glance gauge: brand on top, then the primary window
+/// with its label and pace.
 private struct ProviderSummary: View {
     let entry: UsageStore.Entry
     let isFocused: Bool
@@ -229,10 +252,11 @@ private struct ProviderSummary: View {
     var body: some View {
         VStack(spacing: 6) {
             BrandRow(provider: entry.provider)
-            if let window = entry.snapshot?.tightestWindow {
+            if let window = entry.snapshot?.primaryWindow {
                 let projection = BurnProjection.project(window)
                 UsageRing(
                     remainingFraction: window.remainingFraction,
+                    expectedRemainingFraction: window.expectedRemainingFraction(),
                     color: paceColor(projection?.verdict),
                     diameter: 62
                 )
@@ -285,6 +309,7 @@ private struct WindowColumn: View {
                 .foregroundStyle(.white)
             UsageRing(
                 remainingFraction: window.remainingFraction,
+                expectedRemainingFraction: window.expectedRemainingFraction(),
                 color: paceColor(projection?.verdict),
                 diameter: ringDiameter
             )
@@ -304,9 +329,12 @@ private struct WindowColumn: View {
 }
 
 /// Circular gauge of what's left, with the percentage and a tiny "left"
-/// inside.
+/// inside. The small tick across the track marks where the remaining arc
+/// should end right now at an even burn: halfway through the window puts it
+/// at the bottom of the ring.
 private struct UsageRing: View {
     let remainingFraction: Double
+    var expectedRemainingFraction: Double?
     let color: Color
     let diameter: CGFloat
 
@@ -318,6 +346,13 @@ private struct UsageRing: View {
                 .trim(from: 0, to: remainingFraction)
                 .stroke(color, style: StrokeStyle(lineWidth: diameter / 12, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+            if let expectedRemainingFraction {
+                Capsule()
+                    .fill(.white.opacity(0.55))
+                    .frame(width: 1.5, height: diameter / 12 + 4)
+                    .offset(y: -diameter / 2)
+                    .rotationEffect(.degrees(expectedRemainingFraction * 360))
+            }
             VStack(spacing: -2) {
                 Text("\(Int((remainingFraction * 100).rounded()))%")
                     .font(.system(size: diameter * 0.23, weight: .semibold))

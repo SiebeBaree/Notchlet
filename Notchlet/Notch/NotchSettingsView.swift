@@ -1,21 +1,87 @@
 import SwiftUI
 
 /// Settings, rendered inside the expanded notch. There is no settings
-/// window and no menu bar item; the notch is the whole surface.
+/// window and no menu bar item; the notch is the whole surface. The
+/// providers row opens a sub-page with one visibility toggle per provider.
 struct NotchSettingsView: View {
+    let store: UsageStore
     let updater: UpdateController
 
-    // Same key Analytics uses; @AppStorage keeps the toggle in sync with it.
+    /// Same key Analytics uses; @AppStorage keeps the toggle in sync with it.
     @AppStorage("analyticsOptOut") private var analyticsOptOut = false
+    // Same key UsageStore reads for its closed-panel poll cadence.
+    @AppStorage(UsageStore.intervalDefaultsKey) private var refreshMinutes = 10
     @State private var autoChecksForUpdates: Bool
+    @State private var showingProviders = false
 
-    init(updater: UpdateController) {
+    init(store: UsageStore, updater: UpdateController) {
+        self.store = store
         self.updater = updater
         _autoChecksForUpdates = State(initialValue: updater.automaticallyChecksForUpdates)
     }
 
     var body: some View {
+        if showingProviders {
+            providersPage
+        } else {
+            mainPage
+        }
+    }
+
+    private var providersPage: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HoverTextButton("Back") {
+                withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
+                    showingProviders = false
+                }
+            }
+            ForEach(store.entries) { entry in
+                HStack(spacing: 7) {
+                    Image(entry.provider.logoAssetName)
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 12, height: 12)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(entry.provider.name)
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.white.opacity(0.85))
+                    Spacer()
+                    Toggle(entry.provider.name, isOn: Binding(
+                        get: { store.isEnabled(entry.id) },
+                        set: { enabled in
+                            store.setEnabled(entry.id, enabled)
+                            Analytics.capture(.settingChanged(
+                                key: "provider_\(entry.id)_enabled",
+                                value: String(enabled)
+                            ))
+                        }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                }
+            }
+        }
+    }
+
+    private var mainPage: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Providers")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+            }
+            .contentShape(.rect)
+            .onTapGesture {
+                withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
+                    showingProviders = true
+                }
+            }
             toggleRow(
                 "Share anonymous usage stats",
                 isOn: Binding(
@@ -34,6 +100,25 @@ struct NotchSettingsView: View {
                     }
                 )
             )
+            HStack {
+                Text("Refresh every")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                Picker("Refresh every", selection: $refreshMinutes) {
+                    ForEach(UsageStore.intervalChoicesMinutes, id: \.self) { minutes in
+                        Text("\(minutes) min").tag(minutes)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
+                .onChange(of: refreshMinutes) { _, minutes in
+                    store.reschedule()
+                    Analytics.capture(.settingChanged(key: "refresh_interval_minutes", value: String(minutes)))
+                }
+            }
 
             Rectangle()
                 .fill(.white.opacity(0.15))

@@ -3,6 +3,7 @@ import AppKit
 /// Owns the notch panel, the updater and analytics for the lifetime of the
 /// app.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var store: UsageStore?
     private var notchController: NotchWindowController?
     private var updateController: UpdateController?
 
@@ -15,7 +16,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ClaudeCodeUsageProvider(),
             CodexUsageProvider(),
         ])
+        self.store = store
         store.startRefreshing()
+        // Refetch whatever came due during sleep instead of trusting a
+        // slept-through timer.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(didWake),
+            name: NSWorkspace.didWakeNotification,
+            object: nil
+        )
 
         let updater = UpdateController()
         updateController = updater
@@ -24,5 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         Analytics.bootstrap()
         Analytics.startDailyHeartbeat { store.usagePressure }
+    }
+
+    @objc private func didWake() {
+        store?.reschedule()
     }
 }

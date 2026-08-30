@@ -57,6 +57,26 @@ struct UsageCopyTests {
         )
     }
 
+    @Test func freshDataShowsNoAgeLine() {
+        #expect(UsageCopy.freshnessText(fetchedAt: now.addingTimeInterval(-90), now: now) == nil)
+        #expect(UsageCopy.freshnessText(fetchedAt: nil, now: now) == nil)
+    }
+
+    @Test func staleDataNamesItsAge() {
+        #expect(UsageCopy.freshnessText(fetchedAt: now.addingTimeInterval(-7 * 60), now: now) == "Updated 7m ago")
+    }
+
+    @Test func rateLimitCopyNamesProviderAndRetry() {
+        #expect(
+            UsageCopy.rateLimitText(providerName: "Claude", retryAt: now.addingTimeInterval(180), now: now)
+                == "Claude rate limited, retrying in 3m"
+        )
+        #expect(
+            UsageCopy.rateLimitText(providerName: "Claude", retryAt: now.addingTimeInterval(-5), now: now)
+                == "Claude rate limited, retrying soon"
+        )
+    }
+
     @Test func shortDurationNeverSaysZero() {
         #expect(UsageCopy.shortDuration(20) == "1m")
     }

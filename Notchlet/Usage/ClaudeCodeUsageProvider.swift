@@ -14,6 +14,10 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     let logoAssetName = "ClaudeLogo"
     let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
+    var isInstalled: Bool {
+        CredentialSupport.homePathExists(".claude")
+    }
+
     private static let sessionDuration: TimeInterval = 5 * 3600
     private static let weekDuration: TimeInterval = 7 * 24 * 3600
 

@@ -39,6 +39,25 @@ enum UsageCopy {
         }
     }
 
+    /// Footer line for data old enough to mention; under 2 minutes counts as
+    /// fresh and shows nothing.
+    static func freshnessText(fetchedAt: Date?, now: Date = .now) -> String? {
+        guard let fetchedAt else { return nil }
+        let age = now.timeIntervalSince(fetchedAt)
+        guard age > 120 else { return nil }
+        return "Updated \(shortDuration(age)) ago"
+    }
+
+    /// Footer line while a provider is rate limited: names the provider and
+    /// when the next attempt happens.
+    static func rateLimitText(providerName: String, retryAt: Date, now: Date = .now) -> String {
+        let wait = retryAt.timeIntervalSince(now)
+        guard wait > 0 else {
+            return "\(providerName) rate limited, retrying soon"
+        }
+        return "\(providerName) rate limited, retrying in \(shortDuration(wait))"
+    }
+
     /// "51m", "3h 10m" or "4d 16h", never "0m" for a positive interval.
     /// Two units at most; day-scale durations drop the minutes.
     static func shortDuration(_ interval: TimeInterval) -> String {

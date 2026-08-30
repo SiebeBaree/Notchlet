@@ -11,7 +11,9 @@ import Foundation
 /// the auth headers and the response mapping. Adopt this base protocol
 /// directly only for a provider that is not HTTP-shaped (say, one that reads
 /// session logs).
-protocol UsageProvider {
+/// Sendable so the store can fetch several providers concurrently;
+/// implementations are stateless structs.
+protocol UsageProvider: Sendable {
     /// Stable identifier, used as a dictionary key and for settings.
     var id: String { get }
     /// Display name shown in the UI.
@@ -19,6 +21,10 @@ protocol UsageProvider {
     /// Asset catalog name of the provider's logo, a template image so the UI
     /// can tint it.
     var logoAssetName: String { get }
+    /// Whether the CLI appears to be installed on this machine. Only decides
+    /// the default of the provider's settings toggle; a stored user choice
+    /// always wins.
+    var isInstalled: Bool { get }
 
     func fetchUsage() async throws -> UsageSnapshot
 }
@@ -48,7 +54,16 @@ extension HTTPUsageProvider {
             request.setValue(value, forHTTPHeaderField: header)
         }
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+        guard let http = response as? HTTPURLResponse else {
+            throw UsageProviderError.requestFailed
+        }
+        if http.statusCode == 429 {
+            // Retry-After can also be an HTTP-date; the scheduler's own
+            // backoff covers that case, so only the seconds form is parsed.
+            let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
+            throw UsageProviderError.rateLimited(retryAfter: retryAfter)
+        }
+        guard http.statusCode == 200 else {
             throw UsageProviderError.requestFailed
         }
         return try UsageSnapshot(
@@ -64,4 +79,7 @@ enum UsageProviderError: Error {
     case notAvailable
     /// The usage endpoint returned a non-success response.
     case requestFailed
+    /// The usage endpoint returned 429; `retryAfter` is its Retry-After
+    /// header in seconds, when present and parseable.
+    case rateLimited(retryAfter: TimeInterval?)
 }

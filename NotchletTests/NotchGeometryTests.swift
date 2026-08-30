@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 @testable import Notchlet
 import Testing
 
@@ -45,15 +46,25 @@ struct UsageWindowTests {
         #expect(UsageWindow.label(forDuration: 3 * 24 * 3600) == "3d")
     }
 
-    @Test func tightestWindowHasLeastRemaining() {
+    @Test func primaryWindowIsTheShortestRegardlessOfUsage() {
+        // The 5h session wins even when a longer window is far more used.
         let snapshot = UsageSnapshot(
             windows: [
-                window(id: "a", usedFraction: 0.2),
-                window(id: "b", usedFraction: 0.7),
-                window(id: "c", usedFraction: 0.5),
+                UsageWindow(id: "weekly", label: "Weekly", duration: 7 * 24 * 3600, usedFraction: 0.99, resetsAt: nil),
+                UsageWindow(id: "session", label: "5h", duration: 5 * 3600, usedFraction: 0.0, resetsAt: nil),
             ],
             fetchedAt: .now
         )
-        #expect(snapshot.tightestWindow?.id == "b")
+        #expect(snapshot.primaryWindow?.id == "session")
+    }
+
+    @Test func expectedRemainingTracksTimeUntilReset() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let halfway = UsageWindow(
+            id: "weekly", label: "Weekly", duration: 7 * 24 * 3600,
+            usedFraction: 0.3, resetsAt: now.addingTimeInterval(3.5 * 24 * 3600)
+        )
+        #expect(halfway.expectedRemainingFraction(now: now) == 0.5)
+        #expect(window(usedFraction: 0.3).expectedRemainingFraction(now: now) == nil)
     }
 }

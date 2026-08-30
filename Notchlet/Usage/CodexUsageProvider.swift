@@ -16,6 +16,10 @@ struct CodexUsageProvider: HTTPUsageProvider {
     let logoAssetName = "OpenAILogo"
     let usageURL = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
 
+    var isInstalled: Bool {
+        CredentialSupport.homePathExists(".codex")
+    }
+
     func authHeaders() throws -> [String: String] {
         struct Auth: Decodable {
             struct Tokens: Decodable {

@@ -5,6 +5,14 @@ import Security
 /// directory, keychain items and JWT expiry claims. Providers compose these
 /// instead of each rewriting them.
 enum CredentialSupport {
+    /// Whether a path relative to the home directory exists. Providers use
+    /// this to tell if their CLI is installed at all (its state directory
+    /// exists), independent of whether the login is still valid.
+    static func homePathExists(_ relativePath: String) -> Bool {
+        let url = FileManager.default.homeDirectoryForCurrentUser.appending(path: relativePath)
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
     /// Decodes a JSON file at a path relative to the user's home directory.
     static func homeJSON<T: Decodable>(_ relativePath: String) -> T? {
         let url = FileManager.default.homeDirectoryForCurrentUser.appending(path: relativePath)

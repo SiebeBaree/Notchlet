@@ -18,6 +18,14 @@ struct UsageWindow: Equatable, Identifiable {
         min(max(1 - usedFraction, 0), 1)
     }
 
+    /// Where the gauge should sit right now if usage were spread evenly over
+    /// the window: 1 at the window start, 0 at the reset. Nil when the reset
+    /// time is missing or already past (stale data).
+    func expectedRemainingFraction(now: Date = .now) -> Double? {
+        guard let resetsAt, resetsAt > now else { return nil }
+        return min(max(resetsAt.timeIntervalSince(now) / duration, 0), 1)
+    }
+
     /// Label for a window known only by its length. Which windows exist is
     /// decided server-side per plan (Codex plans variously get 5h+weekly,
     /// weekly only, or monthly), so this mirrors the Codex CLI: match the
@@ -45,9 +53,11 @@ struct UsageSnapshot: Equatable {
     /// used for anonymous analytics breakdowns, never shown in the UI.
     var planTier: String?
 
-    /// The window closest to running out; what a provider's summary gauge
-    /// shows.
-    var tightestWindow: UsageWindow? {
-        windows.min { $0.remainingFraction < $1.remainingFraction }
+    /// What a provider's summary gauge shows: the shortest window, because
+    /// that is the one that runs out in normal use (the 5h session when the
+    /// plan has one, else the plan's only window). Static per plan, never
+    /// swayed by which window currently has the lowest percentage.
+    var primaryWindow: UsageWindow? {
+        windows.min { $0.duration < $1.duration }
     }
 }

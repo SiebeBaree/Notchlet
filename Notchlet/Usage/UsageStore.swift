@@ -1,15 +1,19 @@
 import Foundation
 import Observation
 
-/// Holds the latest snapshot for every configured provider and refreshes them
-/// on a fixed interval.
+/// Holds the latest snapshot for every configured provider and schedules
+/// refreshes: a slow heartbeat while the panel is closed, a fast one while it
+/// is open (which also refetches stale data the moment the user looks), and
+/// per-provider backoff when an endpoint rate limits us. A failing provider
+/// keeps its previous snapshot; the panel labels its age instead.
 @Observable
 final class UsageStore {
-    /// Whether a provider's last refresh worked, found no usable login, or
-    /// failed outright.
+    /// Whether a provider's last refresh worked, found no usable login,
+    /// hit a rate limit, or failed outright.
     enum ProviderState: String {
         case ok
         case notAvailable = "not_available"
+        case rateLimited = "rate_limited"
         case error
     }
 
@@ -17,51 +21,166 @@ final class UsageStore {
         let provider: any UsageProvider
         var snapshot: UsageSnapshot?
         var state: ProviderState?
+        var schedule = RefreshSchedule()
 
         var id: String { provider.id }
     }
 
+    /// Closed-panel poll interval in minutes; the settings picker writes the
+    /// same key. Unset or out-of-catalog values fall back to 10.
+    static let intervalDefaultsKey = "refreshIntervalMinutes"
+    static let intervalChoicesMinutes = [3, 5, 10, 15, 30]
+
+    /// Poll interval while the panel is open, and the age past which opening
+    /// it triggers an immediate refetch.
+    private static let openInterval: TimeInterval = 60
+
     private(set) var entries: [Entry]
+    /// Per-provider visibility from settings. Unset means "on when the CLI
+    /// is installed", so a fresh launch shows exactly the agents present on
+    /// this machine; a stored user choice always wins. Disabled providers
+    /// keep their entry (and last snapshot) but are neither polled nor shown.
+    private var providerEnabled: [String: Bool]
+    private var isPanelOpen = false
     private var refreshTask: Task<Void, Never>?
 
     init(providers: [any UsageProvider]) {
         entries = providers.map { Entry(provider: $0, snapshot: nil) }
+        providerEnabled = providers.reduce(into: [:]) { enabled, provider in
+            let stored = UserDefaults.standard.object(forKey: Self.enabledDefaultsKey(provider.id)) as? Bool
+            enabled[provider.id] = stored ?? provider.isInstalled
+        }
     }
 
-    /// Refreshes now and keeps refreshing on an interval. The loop ends on
-    /// its own once the store goes away.
-    func startRefreshing(every interval: Duration = .seconds(60)) {
+    static func enabledDefaultsKey(_ providerID: String) -> String {
+        "providerEnabled.\(providerID)"
+    }
+
+    func isEnabled(_ providerID: String) -> Bool {
+        providerEnabled[providerID] ?? true
+    }
+
+    func setEnabled(_ providerID: String, _ enabled: Bool) {
+        providerEnabled[providerID] = enabled
+        UserDefaults.standard.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
+        // Re-enabling fetches right away if the data is due; disabling just
+        // drops the provider from the loop.
+        reschedule()
+    }
+
+    /// Fetches now and keeps the scheduling loop alive for the lifetime of
+    /// the store.
+    func startRefreshing() {
+        reschedule()
+    }
+
+    /// Panel visibility drives the cadence. Opening shrinks the interval to
+    /// `openInterval`, which makes any provider older than that due
+    /// immediately, so the user sees fresh numbers at the moment they look.
+    /// Backoff cooldowns still hold: a rate-limited provider is not poked.
+    func setPanelOpen(_ open: Bool) {
+        guard open != isPanelOpen else { return }
+        isPanelOpen = open
+        reschedule()
+    }
+
+    /// Restarts the scheduling loop so a changed input (interval setting,
+    /// wake from sleep) takes effect now: anything overdue fetches right
+    /// away, everything else just gets its next due time recomputed.
+    func reschedule() {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self else { break }
-                await refresh()
-                try? await Task.sleep(for: interval)
+                guard let self else { return }
+                await refreshDueProviders()
+                guard !Task.isCancelled, let delay = timeUntilNextDue() else { return }
+                try? await Task.sleep(for: .seconds(delay))
             }
         }
     }
 
-    /// Refreshes every provider. A failing provider keeps its previous
-    /// snapshot; surfacing errors in the UI comes later.
-    func refresh() async {
-        for index in entries.indices {
-            do {
-                entries[index].snapshot = try await entries[index].provider.fetchUsage()
-                transition(at: index, to: .ok)
-            } catch UsageProviderError.notAvailable {
-                transition(at: index, to: .notAvailable)
-            } catch {
-                transition(at: index, to: .error)
+    private var pollInterval: TimeInterval {
+        if isPanelOpen {
+            return Self.openInterval
+        }
+        let minutes = UserDefaults.standard.integer(forKey: Self.intervalDefaultsKey)
+        return TimeInterval(Self.intervalChoicesMinutes.contains(minutes) ? minutes : 10) * 60
+    }
+
+    private func timeUntilNextDue() -> TimeInterval? {
+        let interval = pollInterval
+        let nextDue = entries.filter { isEnabled($0.id) }
+            .map { $0.schedule.nextDue(interval: interval) }.min()
+        return nextDue.map { max($0.timeIntervalSinceNow, 1) }
+    }
+
+    /// Fetches every provider that has come due, concurrently so one slow
+    /// endpoint doesn't hold up the others.
+    private func refreshDueProviders() async {
+        let interval = pollInterval
+        let now = Date.now
+        let due = entries.indices.filter {
+            isEnabled(entries[$0].id) && entries[$0].schedule.nextDue(interval: interval) <= now
+        }
+        guard !due.isEmpty else { return }
+
+        for index in due {
+            entries[index].schedule.recordAttempt(now: now)
+        }
+        await withTaskGroup(of: (Int, FetchOutcome).self) { group in
+            for index in due {
+                let provider = entries[index].provider
+                group.addTask {
+                    do {
+                        return try await (index, .success(provider.fetchUsage()))
+                    } catch UsageProviderError.notAvailable {
+                        return (index, .notAvailable)
+                    } catch let UsageProviderError.rateLimited(retryAfter) {
+                        return (index, .rateLimited(retryAfter: retryAfter))
+                    } catch {
+                        return (index, .failed)
+                    }
+                }
+            }
+            for await (index, outcome) in group {
+                apply(outcome, at: index)
             }
         }
         Analytics.updateProviderContext(
-            activeProviders: entries.filter { $0.state == .ok }.map(\.id),
+            activeProviders: entries.filter { isEnabled($0.id) && $0.state == .ok }.map(\.id),
             planTiers: entries.reduce(into: [:]) { tiers, entry in
                 if let tier = entry.snapshot?.planTier {
                     tiers[entry.id] = tier
                 }
             }
         )
+    }
+
+    private enum FetchOutcome {
+        case success(UsageSnapshot)
+        case notAvailable
+        case rateLimited(retryAfter: TimeInterval?)
+        case failed
+    }
+
+    private func apply(_ outcome: FetchOutcome, at index: Int) {
+        switch outcome {
+        case let .success(snapshot):
+            entries[index].snapshot = snapshot
+            entries[index].schedule.recordSuccess()
+            transition(at: index, to: .ok)
+        case .notAvailable:
+            // A local credentials check, no request was made, so nothing to
+            // back off from.
+            entries[index].schedule.recordSuccess()
+            transition(at: index, to: .notAvailable)
+        case let .rateLimited(retryAfter):
+            entries[index].schedule.recordRateLimit(retryAfter: retryAfter)
+            transition(at: index, to: .rateLimited)
+        case .failed:
+            entries[index].schedule.recordError()
+            transition(at: index, to: .error)
+        }
     }
 
     /// Bucketed usage pressure per provider, sent with the daily heartbeat.
