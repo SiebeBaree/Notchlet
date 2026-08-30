@@ -9,9 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: release
@@ -20,12 +18,13 @@ concurrency:
 env:
   SIGNING_IDENTITY: "Developer ID Application: Siebe Baree (DW92YAHZVK)"
   TEAM_ID: DW92YAHZVK
-  SPARKLE_VERSION: 2.9.6
 
 jobs:
   build:
     name: Build, notarize and publish
     runs-on: macos-26
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,7 +32,7 @@ jobs:
 
       - name: Resolve the version
         run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           else
             # Rehearsal build. Keep it a plain numeric version so notarization
@@ -81,6 +80,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=macOS' \
             -archivePath build/Notchlet.xcarchive \
+            -derivedDataPath build/DerivedData \
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGN_STYLE=Manual \
@@ -133,6 +133,7 @@ jobs:
             --issuer "$APPLE_API_ISSUER_ID" \
             --wait
           xcrun stapler staple "build/Notchlet-$VERSION.dmg"
+          rm "$RUNNER_TEMP/AuthKey.p8"
 
       - name: Check what a stranger's Mac will decide
         run: |
@@ -140,7 +141,7 @@ jobs:
           xcrun stapler validate "build/Notchlet-$VERSION.dmg"
 
       - name: Publish the GitHub release
-        if: github.ref_type == 'tag'
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -151,18 +152,22 @@ jobs:
             --generate-notes
 
       - name: Sign the update and build the appcast
-        if: github.ref_type == 'tag'
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          curl -fsSL -o sparkle.tar.xz \
-            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
-          mkdir -p sparkle releases site
-          tar -xJf sparkle.tar.xz -C sparkle
-          generate_appcast=$(find sparkle -name generate_appcast -type f | head -1)
+          # Sparkle's CLI ships inside the same binary artifact as the framework,
+          # so it is pinned by Package.resolved and cannot drift from the version
+          # the app links against. Downloading a release tarball here would mean
+          # running an unverified binary with the signing key on its stdin.
+          mkdir -p releases site
+          generate_appcast=$(find build/DerivedData/SourcePackages/artifacts \
+            -name generate_appcast -type f | head -1)
+          test -x "$generate_appcast" || { echo "Sparkle CLI not found"; exit 1; }
           # generate_appcast rewrites every entry with the same URL prefix and
           # GitHub download URLs carry the tag, so the folder holds exactly one
-          # release. A single-item feed is all Sparkle needs.
+          # release. A single-item feed is all Sparkle needs. On a rehearsal
+          # GITHUB_REF_NAME is a branch, which makes the prefix meaningless, but
+          # the feed is thrown away because only the deploy job publishes.
           cp "build/Notchlet-$VERSION.dmg" releases/
           echo "$SPARKLE_PRIVATE_KEY" | "$generate_appcast" \
             --ed-key-file - \
@@ -173,7 +178,6 @@ jobs:
           cp releases/appcast.xml site/appcast.xml
 
       - name: Upload the appcast for Pages
-        if: github.ref_type == 'tag'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
@@ -181,8 +185,11 @@ jobs:
   deploy:
     name: Publish the appcast
     needs: build
-    if: github.ref_type == 'tag'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

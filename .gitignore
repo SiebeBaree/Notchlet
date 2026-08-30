@@ -19,4 +19,3 @@ Config/Secrets.xcconfig
 
 # Release artifacts, produced by the release workflow
 releases/
-sparkle/
