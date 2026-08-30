@@ -89,6 +89,9 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--timestamp"
           cp -R build/Notchlet.xcarchive/Products/Applications/Notchlet.app build/
 
+      - name: Re-sign Sparkle's nested executables
+        run: ./Scripts/sign-sparkle.sh build/Notchlet.app "$SIGNING_IDENTITY"
+
       - name: Notarize the app and staple the ticket into it
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
