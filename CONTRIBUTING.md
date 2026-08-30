@@ -1,7 +1,5 @@
 # Contributing to Notchlet
 
-Thanks for helping out. The project is young, so this is short.
-
 ## Setup
 
 You need Xcode 26 or newer. Clone, open `Notchlet.xcodeproj`, run the `Notchlet` scheme. That's it, there are no dependencies.
