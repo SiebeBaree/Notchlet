@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 
 import { githubUrl, sponsorUrl } from "../links";
-import { DownloadDialog } from "./download-dialog";
+import { DownloadLink } from "./download-link";
 
 const plans = [
     {
@@ -73,7 +73,7 @@ export function Pricing() {
                                     </li>
                                 ))}
                             </ul>
-                            {/* The source card leaves the site, the other two open the launch dialog. */}
+                            {/* The source card leaves the site, the other two start the download. */}
                             <div className="mt-auto">
                                 {"href" in plan ? (
                                     <a
@@ -85,11 +85,9 @@ export function Pricing() {
                                         {plan.button}
                                     </a>
                                 ) : (
-                                    <DownloadDialog>
-                                        <button type="button" className={`${buttonBase} w-full ${plan.buttonClass}`}>
-                                            {plan.button}
-                                        </button>
-                                    </DownloadDialog>
+                                    <DownloadLink className={`${buttonBase} ${plan.buttonClass}`}>
+                                        {plan.button}
+                                    </DownloadLink>
                                 )}
                             </div>
                         </div>

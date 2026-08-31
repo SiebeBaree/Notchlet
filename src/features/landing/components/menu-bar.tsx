@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 
-import { DownloadDialog } from "./download-dialog";
+import { DownloadLink } from "./download-link";
 
 // The swoop silhouette lives in globals.css (.menu-tab). Keeping it one element per tab is what keeps the backdrop
 // blur uniform across the curve.
@@ -38,14 +38,9 @@ export function MenuBar() {
                 </span>
             </div>
             <div className={`${segmentClass} menu-tab-end pr-4 pl-[58px] sm:pr-6`}>
-                <DownloadDialog>
-                    <button
-                        type="button"
-                        className="cursor-pointer font-medium opacity-85 transition-opacity hover:opacity-100"
-                    >
-                        Download
-                    </button>
-                </DownloadDialog>
+                <DownloadLink className="font-medium opacity-85 transition-opacity hover:opacity-100">
+                    Download
+                </DownloadLink>
             </div>
         </nav>
     );

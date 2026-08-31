@@ -4,8 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { motion, useScroll, useTransform } from "motion/react";
 import Image from "next/image";
 
-import { Countdown } from "./countdown";
-import { SignupForm } from "./signup-form";
+import { DownloadLink } from "./download-link";
 
 const providers = [
     { name: "Claude Code", icon: "/claude-ai-icon.svg" },
@@ -35,16 +34,12 @@ export function HeroCopy() {
                 <p className="mt-6 text-xs font-semibold tracking-[0.16em] text-white/90 uppercase [text-shadow:0_1px_12px_rgba(5,15,45,0.5)] sm:mt-8">
                     Free and open source
                 </p>
-                <div className="mt-4">
-                    <Countdown />
-                </div>
+                <DownloadLink className="mt-6 rounded-lg bg-white px-6 py-3 text-[15px] font-medium text-black transition-opacity hover:opacity-90">
+                    Download for macOS
+                </DownloadLink>
                 <p className="mt-3.5 text-[13px] text-white/85 [text-shadow:0_1px_10px_rgba(5,15,45,0.5)]">
-                    Launches Monday August 31, 13:00 CEST
+                    macOS 14 or later
                 </p>
-
-                <div className="mt-7 w-full max-w-sm">
-                    <SignupForm />
-                </div>
 
                 <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:mt-12 sm:flex-col sm:gap-4">
                     <p className="text-sm text-white/80 [text-shadow:0_1px_10px_rgba(5,15,45,0.5)]">Works with</p>

@@ -7,8 +7,8 @@ import posthog from "posthog-js";
  * Keep properties anonymous and small: counts and flags, not user content.
  */
 type AnalyticsEvents = {
-    /** Someone joined the launch waitlist from the download dialog. No properties: the email must not reach PostHog. */
-    launch_signup: Record<string, never>;
+    /** Someone clicked a Download button. No properties: /download resolves the build, so there is nothing to pass. */
+    download_started: Record<string, never>;
 };
 
 export function track<Name extends keyof AnalyticsEvents>(

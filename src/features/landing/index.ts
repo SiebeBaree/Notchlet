@@ -6,3 +6,4 @@ export { Footer } from "./components/footer";
 export { MenuBar } from "./components/menu-bar";
 export { Pricing } from "./components/pricing";
 export { Roadmap } from "./components/roadmap";
+export { latestDownloadUrl } from "./download";

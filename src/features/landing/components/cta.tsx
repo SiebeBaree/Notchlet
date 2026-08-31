@@ -1,5 +1,4 @@
-import { Countdown } from "./countdown";
-import { DownloadDialog } from "./download-dialog";
+import { DownloadLink } from "./download-link";
 
 export function Cta() {
     return (
@@ -8,17 +7,10 @@ export function Cta() {
                 <h2 className="font-display text-[42px] leading-[1.08] tracking-[-0.005em] text-balance text-ink sm:text-[56px]">
                     Stop finding out you are rate limited the hard way.
                 </h2>
-                <div className="mt-12">
-                    <Countdown surface="light" />
-                </div>
-                <DownloadDialog>
-                    <button
-                        type="button"
-                        className="mt-12 cursor-pointer rounded-md bg-ink px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-ink-2"
-                    >
-                        Get Notchlet
-                    </button>
-                </DownloadDialog>
+                <DownloadLink className="mt-12 rounded-md bg-ink px-6 py-3 text-[15px] font-medium text-white transition-colors hover:bg-ink-2">
+                    Download for macOS
+                </DownloadLink>
+                <p className="mt-4 text-[13px] text-ink-3">Free and open source. macOS 14 or later.</p>
             </div>
         </section>
     );
