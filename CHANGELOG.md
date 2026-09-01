@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1
+
+- No more keychain password prompts. Claude Code rotates its token every 8
+  hours and rewrites its keychain item, which reset the permission each time.
+  Notchlet now reads the item the same way Claude Code writes it.
+- A Quit button in settings. There was no way to stop the app short of
+  Activity Monitor.
+- Picking a refresh interval no longer bounces you back to the usage view.
+
 ## 0.1.0
 
 First release.
