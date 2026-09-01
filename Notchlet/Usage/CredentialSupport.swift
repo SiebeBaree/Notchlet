@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 /// Shared plumbing for reading CLI credentials: JSON files in the home
 /// directory, keychain items and JWT expiry claims. Providers compose these
@@ -20,18 +19,29 @@ enum CredentialSupport {
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
-    /// Decodes the JSON payload of a keychain generic password item. Reading
-    /// another app's item triggers a one-time macOS permission prompt.
-    static func keychainJSON<T: Decodable>(service: String) -> T? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecReturnData as String: true,
-        ]
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data
-        else { return nil }
+    /// Decodes the JSON payload of a keychain generic password item, read
+    /// through `/usr/bin/security` rather than the Security framework.
+    ///
+    /// CLIs write their items with that same tool, which puts it on the
+    /// item's access list for good. Reading as Notchlet instead would show
+    /// the keychain password prompt again after every token rotation: the
+    /// CLI's rewrite of the item drops the "Always Allow" grant the user
+    /// gave us, while `security` keeps its access. Runs off the main actor
+    /// so the child process never stalls the panel.
+    static func keychainJSON<T: Decodable>(service: String) async -> T? {
+        let data = await Task.detached {
+            let process = Process()
+            process.executableURL = URL(filePath: "/usr/bin/security")
+            process.arguments = ["find-generic-password", "-s", service, "-w"]
+            let output = Pipe()
+            process.standardOutput = output
+            process.standardError = FileHandle.nullDevice
+            guard (try? process.run()) != nil else { return nil as Data? }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return process.terminationStatus == 0 ? data : nil
+        }.value
+        guard let data else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
     }
 

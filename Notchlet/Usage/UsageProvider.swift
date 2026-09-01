@@ -34,8 +34,9 @@ protocol UsageProvider: Sendable {
 protocol HTTPUsageProvider: UsageProvider {
     var usageURL: URL { get }
     /// Headers authenticating the request, built from the CLI's local state.
-    /// Throws `notAvailable` when the CLI has no usable login.
-    func authHeaders() throws -> [String: String]
+    /// Throws `notAvailable` when the CLI has no usable login. Async because
+    /// a keychain read goes through a child process.
+    func authHeaders() async throws -> [String: String]
     /// Maps the endpoint's response body to usage windows.
     func parseWindows(from data: Data) throws -> [UsageWindow]
     /// Plan tier from the same response, if it exposes one. Feeds anonymous
@@ -50,7 +51,7 @@ extension HTTPUsageProvider {
 
     func fetchUsage() async throws -> UsageSnapshot {
         var request = URLRequest(url: usageURL)
-        for (header, value) in try authHeaders() {
+        for (header, value) in try await authHeaders() {
             request.setValue(value, forHTTPHeaderField: header)
         }
         let (data, response) = try await URLSession.shared.data(for: request)
