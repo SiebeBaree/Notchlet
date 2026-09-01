@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Settings, rendered inside the expanded notch. There is no settings
-/// window and no menu bar item; the notch is the whole surface. The
-/// providers row opens a sub-page with one visibility toggle per provider.
+/// window and no menu bar item; the notch is the whole surface, so quitting
+/// lives here too. The providers row opens a sub-page with one visibility
+/// toggle per provider.
 struct NotchSettingsView: View {
     let store: UsageStore
     let updater: UpdateController
@@ -105,13 +106,16 @@ struct NotchSettingsView: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(.white.opacity(0.85))
                 Spacer()
+                // Segmented, not a menu: a popup menu is its own window, and
+                // the notch reads the cursor moving into it as leaving the
+                // panel, which collapses it and drops the settings pane.
                 Picker("Refresh every", selection: $refreshMinutes) {
                     ForEach(UsageStore.intervalChoicesMinutes, id: \.self) { minutes in
-                        Text("\(minutes) min").tag(minutes)
+                        Text("\(minutes)m").tag(minutes)
                     }
                 }
                 .labelsHidden()
-                .pickerStyle(.menu)
+                .pickerStyle(.segmented)
                 .controlSize(.small)
                 .fixedSize()
                 .onChange(of: refreshMinutes) { _, minutes in
@@ -124,12 +128,17 @@ struct NotchSettingsView: View {
                 .fill(.white.opacity(0.15))
                 .frame(height: 1)
 
-            HStack {
+            // The only way out of the app: no dock icon, no menu bar item,
+            // and the panel never activates, so Cmd+Q never reaches us.
+            HStack(spacing: 14) {
                 if let version = updater.availableUpdateVersion {
                     Text("Version \(version) available")
                         .font(.system(size: 11.5))
                         .foregroundStyle(.white)
                     Spacer()
+                    HoverTextButton("Quit") {
+                        NSApp.terminate(nil)
+                    }
                     Button("Install") {
                         updater.installAvailableUpdate()
                     }
@@ -140,6 +149,9 @@ struct NotchSettingsView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.4))
                     Spacer()
+                    HoverTextButton("Quit") {
+                        NSApp.terminate(nil)
+                    }
                     HoverTextButton("Check for updates") {
                         updater.checkForUpdates()
                     }
