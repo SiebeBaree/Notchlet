@@ -4,10 +4,12 @@ import Foundation
 ///
 /// Reads the OAuth access token Claude Code stored at login (macOS keychain,
 /// with `~/.claude/.credentials.json` as fallback) and calls the same usage
-/// endpoint Claude Code's `/usage` screen calls. Tokens are never refreshed
-/// here: rotating the refresh token behind Claude Code's back would break its
-/// session, so an expired token just reports `notAvailable` until the user
-/// runs Claude Code again.
+/// endpoint Claude Code's `/usage` screen calls. Claude Code rotates the
+/// token every 8 hours while it runs, rewriting the keychain item each time;
+/// see `CredentialSupport.keychainJSON` for why that read stays silent.
+/// Tokens are never refreshed here: rotating the refresh token behind Claude
+/// Code's back would break its session, so an expired token just reports
+/// `notAvailable` until the user runs Claude Code again.
 struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     let id = "claude-code"
     let name = "Claude"
@@ -21,8 +23,8 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     private static let sessionDuration: TimeInterval = 5 * 3600
     private static let weekDuration: TimeInterval = 7 * 24 * 3600
 
-    func authHeaders() throws -> [String: String] {
-        let candidates: [Credentials?] = [
+    func authHeaders() async throws -> [String: String] {
+        let candidates: [Credentials?] = await [
             CredentialSupport.keychainJSON(service: "Claude Code-credentials"),
             CredentialSupport.homeJSON(".claude/.credentials.json"),
         ]
