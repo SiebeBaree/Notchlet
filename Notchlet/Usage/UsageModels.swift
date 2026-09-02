@@ -56,8 +56,22 @@ struct UsageSnapshot: Equatable {
     /// What a provider's summary gauge shows: the shortest window, because
     /// that is the one that runs out in normal use (the 5h session when the
     /// plan has one, else the plan's only window). Static per plan, never
-    /// swayed by which window currently has the lowest percentage.
+    /// swayed by which window currently has the lowest percentage. Among
+    /// windows of equal length the first wins, so providers whose windows
+    /// all share one cycle put the headline first.
     var primaryWindow: UsageWindow? {
         windows.min { $0.duration < $1.duration }
+    }
+}
+
+/// Date parsing shared by providers.
+enum UsageDate {
+    /// ISO 8601 with any fractional-second precision. `ISO8601DateFormatter`
+    /// refuses fractions unless they are exactly three digits, and endpoints
+    /// send three (Cursor) or six (Anthropic). Sub-second precision is
+    /// irrelevant here, so the fraction is stripped before parsing.
+    static func parse(_ string: String) -> Date? {
+        let stripped = string.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
+        return ISO8601DateFormatter().date(from: stripped)
     }
 }

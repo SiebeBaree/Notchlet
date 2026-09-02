@@ -64,7 +64,7 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         let response = try decoder.decode(Response.self, from: data)
 
         return response.limits.compactMap { limit in
-            let resetsAt = limit.resetsAt.flatMap(Self.parseDate)
+            let resetsAt = limit.resetsAt.flatMap(UsageDate.parse)
             let usedFraction = min(max(limit.percent / 100, 0), 1)
             switch limit.kind {
             case "session":
@@ -96,14 +96,6 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
                 return nil
             }
         }
-    }
-
-    /// The endpoint sends ISO 8601 with microseconds, which
-    /// `ISO8601DateFormatter` refuses. Sub-second precision is irrelevant
-    /// here, so strip the fraction before parsing.
-    static func parseDate(_ string: String) -> Date? {
-        let stripped = string.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
-        return ISO8601DateFormatter().date(from: stripped)
     }
 
     private struct Credentials: Decodable {

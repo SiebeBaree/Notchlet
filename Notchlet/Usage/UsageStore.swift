@@ -26,6 +26,10 @@ final class UsageStore {
         var id: String { provider.id }
     }
 
+    /// How many providers can be on at once. The expanded panel has room
+    /// for three summary gauges side by side; more would crowd the notch.
+    static let maxActiveProviders = 3
+
     /// Closed-panel poll interval in minutes; the settings picker writes the
     /// same key. Unset or out-of-catalog values fall back to 10.
     static let intervalDefaultsKey = "refreshIntervalMinutes"
@@ -37,19 +41,32 @@ final class UsageStore {
 
     private(set) var entries: [Entry]
     /// Per-provider visibility from settings. Unset means "on when the CLI
-    /// is installed", so a fresh launch shows exactly the agents present on
-    /// this machine; a stored user choice always wins. Disabled providers
-    /// keep their entry (and last snapshot) but are neither polled nor shown.
+    /// is installed", capped at `maxActiveProviders`, so a fresh launch
+    /// shows the agents present on this machine; a stored user choice always
+    /// wins. Disabled providers keep their entry (and last snapshot) but are
+    /// neither polled nor shown.
     private var providerEnabled: [String: Bool]
     private var isPanelOpen = false
     private var refreshTask: Task<Void, Never>?
 
     init(providers: [any UsageProvider]) {
         entries = providers.map { Entry(provider: $0, snapshot: nil) }
-        providerEnabled = providers.reduce(into: [:]) { enabled, provider in
-            let stored = UserDefaults.standard.object(forKey: Self.enabledDefaultsKey(provider.id)) as? Bool
-            enabled[provider.id] = stored ?? provider.isInstalled
+        // Stored choices first, then installed CLIs fill the remaining slots
+        // in registration order. A fresh install with four CLIs shows the
+        // first three and leaves the fourth one toggle away.
+        var enabled: [String: Bool] = [:]
+        for provider in providers {
+            enabled[provider.id] = UserDefaults.standard.object(forKey: Self.enabledDefaultsKey(provider.id)) as? Bool
         }
+        var openSlots = Self.maxActiveProviders - enabled.values.filter { $0 == true }.count
+        for provider in providers where enabled[provider.id] == nil {
+            let on = provider.isInstalled && openSlots > 0
+            enabled[provider.id] = on
+            if on {
+                openSlots -= 1
+            }
+        }
+        providerEnabled = enabled
     }
 
     static func enabledDefaultsKey(_ providerID: String) -> String {
@@ -60,7 +77,17 @@ final class UsageStore {
         providerEnabled[providerID] ?? true
     }
 
+    /// Whether another provider can be switched on without passing the cap.
+    var canEnableMore: Bool {
+        entries.filter { isEnabled($0.id) }.count < Self.maxActiveProviders
+    }
+
+    /// Ignores a request that would pass the cap; the settings toggle is
+    /// disabled in that state, so this only guards against races.
     func setEnabled(_ providerID: String, _ enabled: Bool) {
+        if enabled, !isEnabled(providerID), !canEnableMore {
+            return
+        }
         providerEnabled[providerID] = enabled
         UserDefaults.standard.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
         // Re-enabling fetches right away if the data is due; disabling just

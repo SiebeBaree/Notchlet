@@ -71,4 +71,13 @@ struct CredentialSupportTests {
         #expect(CredentialSupport.jwtExpiry(of: "not-a-jwt") == nil)
         #expect(CredentialSupport.jwtExpiry(of: "a.b.c") == nil)
     }
+
+    /// `hex()` output for a UTF-8 text value and for the same token stored
+    /// as a UTF-16 blob; dropping NULs makes both read the same.
+    @Test func decodesSQLiteHexValues() {
+        #expect(CredentialSupport.data(fromHex: "65794A2E") == Data("eyJ.".utf8))
+        #expect(CredentialSupport.data(fromHex: "650079004A002E00").filter { $0 != 0 } == Data("eyJ.".utf8))
+        #expect(CredentialSupport.data(fromHex: "zz").isEmpty)
+        #expect(CredentialSupport.data(fromHex: "").isEmpty)
+    }
 }

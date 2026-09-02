@@ -64,6 +64,12 @@ extension HTTPUsageProvider {
             let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
             throw UsageProviderError.rateLimited(retryAfter: retryAfter)
         }
+        if http.statusCode == 401 || http.statusCode == 403 {
+            // A token that passed the local expiry check but the server
+            // rejects: revoked or logged out elsewhere. Same outcome as no
+            // login, and nothing to back off from.
+            throw UsageProviderError.notAvailable
+        }
         guard http.statusCode == 200 else {
             throw UsageProviderError.requestFailed
         }
@@ -76,7 +82,8 @@ extension HTTPUsageProvider {
 }
 
 enum UsageProviderError: Error {
-    /// The CLI is not installed, never logged in, or the login expired.
+    /// The CLI is not installed, never logged in, the login expired, or the
+    /// endpoint rejected the credentials.
     case notAvailable
     /// The usage endpoint returned a non-success response.
     case requestFailed

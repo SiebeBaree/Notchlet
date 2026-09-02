@@ -5,7 +5,7 @@
 <h1>Notchlet</h1>
 
 <p><b>Your agent limits, in the notch.</b><br>
-Hover the top of your Mac and see how much Claude Code and Codex usage you have left.</p>
+Hover the top of your Mac and see how much Claude Code, Codex, Cursor and OpenCode usage you have left.</p>
 
 <p>
 <a href="https://github.com/SiebeBaree/Notchlet/releases/latest"><img src="https://img.shields.io/badge/Download%20for%20macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
@@ -68,8 +68,12 @@ Run the `Notchlet` scheme in Xcode 26 or newer.
 | --- | --- | --- |
 | Claude Code | The endpoint behind `/usage` | 5h session, weekly, per-model weekly |
 | Codex | The endpoint behind `/status` | Whatever your ChatGPT plan gets |
+| Cursor | The endpoint behind the dashboard's usage page | Monthly total, plus the Cursor models and other models pools |
+| OpenCode | The OpenCode Go usage endpoint | 5h, weekly, monthly |
 
-At most three run at once. Toggle them in the settings behind the gear.
+Cursor's login comes from Cursor.app's own state database, OpenCode's from the key `/connect` saved. OpenCode Zen credits are not shown: they only exist on the web dashboard, and Notchlet does not borrow browser cookies.
+
+Agents found on your Mac are on by default, up to three at once. Toggle them in the settings behind the gear.
 
 Adding an agent is one file. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
