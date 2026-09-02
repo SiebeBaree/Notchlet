@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Usage for Claude Code.
 ///
@@ -23,17 +24,40 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     private static let sessionDuration: TimeInterval = 5 * 3600
     private static let weekDuration: TimeInterval = 7 * 24 * 3600
 
+    /// The last credentials read, reused until they expire. The keychain
+    /// read spawns a process and a token lasts hours, so reading once per
+    /// token instead of once per refresh keeps the open panel's 60s cadence
+    /// from forking `security` every minute. A rejected request clears this
+    /// (see `HTTPUsageProvider.fetchUsage`) in case the server retired the
+    /// old token when Claude Code rotated it.
+    private let cachedCredentials = OSAllocatedUnfairLock<Credentials?>(initialState: nil)
+
     func authHeaders() async throws -> [String: String] {
+        if let cached = cachedCredentials.withLock({ $0 }), cached.expiresAt > .now {
+            return Self.headers(token: cached.accessToken)
+        }
         let candidates: [Credentials?] = await [
             CredentialSupport.keychainJSON(service: "Claude Code-credentials"),
             CredentialSupport.homeJSON(".claude/.credentials.json"),
         ]
-        guard let token = candidates.compactMap(\.self)
-            .first(where: { $0.expiresAt > .now })?.accessToken
-        else {
+        let credentials = candidates.compactMap(\.self).first { $0.expiresAt > .now }
+        cachedCredentials.withLock { $0 = credentials }
+        guard let credentials else {
             throw UsageProviderError.notAvailable
         }
-        return [
+        return Self.headers(token: credentials.accessToken)
+    }
+
+    func forgetCredentials() -> Bool {
+        cachedCredentials.withLock { credentials in
+            let hadCredentials = credentials != nil
+            credentials = nil
+            return hadCredentials
+        }
+    }
+
+    private static func headers(token: String) -> [String: String] {
+        [
             "Authorization": "Bearer \(token)",
             "anthropic-beta": "oauth-2025-04-20",
         ]
@@ -98,8 +122,8 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         }
     }
 
-    private struct Credentials: Decodable {
-        struct OAuth: Decodable {
+    private struct Credentials: Decodable, Sendable {
+        struct OAuth: Decodable, Sendable {
             var accessToken: String
             var expiresAt: Double // milliseconds since epoch
         }

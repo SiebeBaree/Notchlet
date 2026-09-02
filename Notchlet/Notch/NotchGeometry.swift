@@ -12,10 +12,18 @@ enum NotchGeometry {
     /// aligned with the physical cutout.
     static let notchTopCornerRadius: CGFloat = 6
 
-    /// The panel is a fixed-size, transparent window pinned to the top center
-    /// of the screen. The SwiftUI content inside animates between the
-    /// collapsed notch shape and the expanded card.
+    /// Window size while the panel is expanded: a transparent window pinned
+    /// to the top center of the screen, with room for the card to animate
+    /// out of the notch.
     static let panelSize = CGSize(width: 640, height: 400)
+
+    /// Window size while the panel is collapsed: exactly the notch
+    /// silhouette including its outward fillets. The window shrinks to this
+    /// when closed so cursor movement anywhere else never reaches the app
+    /// and the window server has no larger transparent layer to composite.
+    static func collapsedPanelSize(notchSize: CGSize) -> CGSize {
+        CGSize(width: notchSize.width + 2 * notchTopCornerRadius, height: notchSize.height)
+    }
 
     /// Frame for the panel in screen coordinates (origin at bottom-left,
     /// like AppKit): horizontally centered, flush with the top edge.

@@ -60,6 +60,10 @@ enum Analytics {
             let config = PostHogConfig(apiKey: apiKey, host: host)
             config.personProfiles = .never
             config.captureApplicationLifecycleEvents = false
+            // The SDK's flush timer fires whether or not anything is queued.
+            // Events here are rare and nothing is time-sensitive, so wake
+            // every five minutes instead of the default 30 seconds.
+            config.flushIntervalSeconds = 5 * 60
             config.getAnonymousId = { _ in distinctID }
             PostHogSDK.shared.setup(config)
             if !isEnabled {
@@ -102,6 +106,9 @@ enum Analytics {
                 beatIfNewDay(usagePressure: usagePressure)
             }
         }
+        // Once a day is the precision that matters; let the system fold
+        // this wakeup into others.
+        heartbeatTimer?.tolerance = 5 * 60
     }
 
     private static func beatIfNewDay(usagePressure: @MainActor () -> [String: String]) {

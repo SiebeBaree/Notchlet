@@ -20,6 +20,21 @@ struct NotchGeometryTests {
         )
         #expect(frame == CGRect(x: 4116, y: 1380, width: 600, height: 200))
     }
+
+    @Test func collapsedPanelHugsTheNotchAndSharesItsCenter() {
+        let screen = CGRect(x: 0, y: 0, width: 3456, height: 2234)
+        let notch = CGSize(width: 200, height: 32)
+        let collapsed = NotchGeometry.panelFrame(
+            screenFrame: screen,
+            panelSize: NotchGeometry.collapsedPanelSize(notchSize: notch)
+        )
+        let expanded = NotchGeometry.panelFrame(screenFrame: screen)
+        // Fillets on both sides, notch height, and the same horizontal
+        // center as the expanded window so the drawn notch never shifts.
+        #expect(collapsed.size == CGSize(width: 212, height: 32))
+        #expect(collapsed.midX == expanded.midX)
+        #expect(collapsed.maxY == expanded.maxY)
+    }
 }
 
 struct UsageWindowTests {

@@ -42,6 +42,11 @@ protocol HTTPUsageProvider: UsageProvider {
     /// Plan tier from the same response, if it exposes one. Feeds anonymous
     /// analytics only; defaults to nil.
     func parsePlanTier(from data: Data) -> String?
+    /// Drops any credentials the provider caches between fetches and reports
+    /// whether there was anything to drop. Called when the endpoint rejects
+    /// them, to decide whether a retry with a fresh read could say anything
+    /// new. Defaults to false for providers that read credentials every time.
+    func forgetCredentials() -> Bool
 }
 
 extension HTTPUsageProvider {
@@ -49,7 +54,31 @@ extension HTTPUsageProvider {
         nil
     }
 
+    func forgetCredentials() -> Bool {
+        false
+    }
+
+    /// One request. A provider holding cached credentials gets a second
+    /// attempt with a fresh read, so a token the CLI rotated behind our back
+    /// costs one extra round trip rather than a visible error. Anything the
+    /// endpoint still rejects after that is a real logout, which reads the
+    /// same as never having logged in.
     func fetchUsage() async throws -> UsageSnapshot {
+        do {
+            return try await fetchOnce()
+        } catch UsageProviderError.unauthorized {
+            guard forgetCredentials() else {
+                throw UsageProviderError.notAvailable
+            }
+            do {
+                return try await fetchOnce()
+            } catch UsageProviderError.unauthorized {
+                throw UsageProviderError.notAvailable
+            }
+        }
+    }
+
+    private func fetchOnce() async throws -> UsageSnapshot {
         var request = URLRequest(url: usageURL)
         for (header, value) in try await authHeaders() {
             request.setValue(value, forHTTPHeaderField: header)
@@ -66,9 +95,10 @@ extension HTTPUsageProvider {
         }
         if http.statusCode == 401 || http.statusCode == 403 {
             // A token that passed the local expiry check but the server
-            // rejects: revoked or logged out elsewhere. Same outcome as no
-            // login, and nothing to back off from.
-            throw UsageProviderError.notAvailable
+            // rejects: rotated behind our back, revoked, or logged out
+            // elsewhere. `fetchUsage` tells those apart and settles on
+            // `notAvailable`; there is nothing here to back off from.
+            throw UsageProviderError.unauthorized
         }
         guard http.statusCode == 200 else {
             throw UsageProviderError.requestFailed
@@ -87,6 +117,10 @@ enum UsageProviderError: Error {
     case notAvailable
     /// The usage endpoint returned a non-success response.
     case requestFailed
+    /// The usage endpoint rejected the credentials (401 or 403). Internal to
+    /// `fetchUsage`, which retries once with a fresh read and then reports
+    /// `notAvailable`; the store never sees this case.
+    case unauthorized
     /// The usage endpoint returned 429; `retryAfter` is its Retry-After
     /// header in seconds, when present and parseable.
     case rateLimited(retryAfter: TimeInterval?)
