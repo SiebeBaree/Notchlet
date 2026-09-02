@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- Cursor and OpenCode usage, next to Claude Code and Codex. Cursor shows the
+  monthly budget split across its two model pools. OpenCode shows the OpenCode
+  Go windows, since Zen credits have no endpoint to read.
+- Three providers at a time. Installed CLIs fill the slots in the order they
+  register and the remaining toggles lock.
+- Moving the mouse along the top of the screen no longer costs CPU while the
+  notch is closed. The window is the size of the notch until you open it.
+- A CLI you are not logged into says so instead of showing an error.
+
 ## 0.1.1
 
 - No more keychain password prompts. Claude Code rotates its token every 8
