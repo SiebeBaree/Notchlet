@@ -34,6 +34,32 @@ struct CursorUsageProviderTests {
         #expect(windows.allSatisfy { $0.resetsAt == cycleEnd })
     }
 
+    /// A JWT with `sub` "auth0|user_123" expiring far in the future; the
+    /// signature is junk because nothing here verifies it.
+    private let farFutureJWT: String = {
+        let header = Data(#"{"alg":"HS256","typ":"JWT"}"#.utf8).base64EncodedString()
+        let payload = Data(#"{"sub":"auth0|user_123","exp":4102444800}"#.utf8).base64EncodedString()
+        return "\(header).\(payload).sig".replacingOccurrences(of: "=", with: "")
+    }()
+
+    @Test func appTokenBecomesTheDashboardCookie() {
+        #expect(CursorUsageProvider.sessionCookie(token: farFutureJWT)
+            == "WorkosCursorSessionToken=user_123%3A%3A\(farFutureJWT)")
+    }
+
+    @Test func pastedCookieValuesAreAcceptedInEveryFormTheBrowserShows() {
+        let expected = "WorkosCursorSessionToken=user_123%3A%3A\(farFutureJWT)"
+        #expect(CursorUsageProvider.sessionCookie(token: "user_123%3A%3A\(farFutureJWT)") == expected)
+        #expect(CursorUsageProvider.sessionCookie(token: "user_123::\(farFutureJWT)") == expected)
+        #expect(CursorUsageProvider.sessionCookie(token: "WorkosCursorSessionToken=user_123%3A%3A\(farFutureJWT)\n")
+            == expected)
+    }
+
+    @Test func expiredOrMalformedTokensGiveNoCookie() {
+        #expect(CursorUsageProvider.sessionCookie(token: farFutureJWT, now: .distantFuture) == nil)
+        #expect(CursorUsageProvider.sessionCookie(token: "not-a-jwt") == nil)
+    }
+
     @Test func headlineIsTheSummaryGauge() throws {
         let windows = try CursorUsageProvider().parseWindows(from: proFixture)
         #expect(UsageSnapshot(windows: windows, fetchedAt: .now).primaryWindow?.id == "total")

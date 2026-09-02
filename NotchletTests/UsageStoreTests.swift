@@ -12,9 +12,11 @@ struct UsageStoreTests {
         let isInstalled: Bool
         var name: String { id }
         var logoAssetName: String { "ClaudeLogo" }
+        var authOptions: [AuthOption] { [] }
+        var signInHint: String { "" }
 
         func fetchUsage() async throws -> UsageSnapshot {
-            throw UsageProviderError.notAvailable
+            throw UsageProviderError.notAvailable(.signedOut)
         }
     }
 

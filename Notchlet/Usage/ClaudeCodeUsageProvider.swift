@@ -7,15 +7,24 @@ import os
 /// with `~/.claude/.credentials.json` as fallback) and calls the same usage
 /// endpoint Claude Code's `/usage` screen calls. Claude Code rotates the
 /// token every 8 hours while it runs, rewriting the keychain item each time;
-/// see `CredentialSupport.keychainJSON` for why that read stays silent.
-/// Tokens are never refreshed here: rotating the refresh token behind Claude
-/// Code's back would break its session, so an expired token just reports
-/// `notAvailable` until the user runs Claude Code again.
+/// see `CredentialSupport.keychainData` for why that read stays silent.
+///
+/// While Claude Code is idle the token simply expires, which used to leave
+/// the notch stale until the next `claude` run. Now an expired token is
+/// refreshed the way a second Claude Code process would do it, following
+/// Claude Code's own lock and compare-and-swap protocol (see
+/// `ClaudeCodeCredentialStore`), so Claude Code picks the new token up
+/// instead of being signed out by it.
 struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     let id = "claude-code"
     let name = "Claude"
     let logoAssetName = "ClaudeLogo"
     let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
+    let signInHint = "Run claude to sign in"
+
+    static let keychainOption = AuthOption(id: "keychain", label: "Claude Code")
+    static let fileOption = AuthOption(id: "file", label: "Credentials file")
+    let authOptions = [Self.keychainOption, Self.fileOption]
 
     var isInstalled: Bool {
         CredentialSupport.homePathExists(".claude")
@@ -24,34 +33,73 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     private static let sessionDuration: TimeInterval = 5 * 3600
     private static let weekDuration: TimeInterval = 7 * 24 * 3600
 
+    private let store = ClaudeCodeCredentialStore()
+
+    private struct Cached: Sendable {
+        let optionID: String
+        let credentials: ClaudeTokenRefresh.Credentials
+    }
+
     /// The last credentials read, reused until they expire. The keychain
     /// read spawns a process and a token lasts hours, so reading once per
     /// token instead of once per refresh keeps the open panel's 60s cadence
     /// from forking `security` every minute. A rejected request clears this
     /// (see `HTTPUsageProvider.fetchUsage`) in case the server retired the
     /// old token when Claude Code rotated it.
-    private let cachedCredentials = OSAllocatedUnfairLock<Credentials?>(initialState: nil)
+    private let cache = OSAllocatedUnfairLock<Cached?>(initialState: nil)
+    /// A refresh token the server already rejected. Trying it again every
+    /// poll would only hammer the endpoint, so it is skipped until Claude
+    /// Code stores a different one.
+    private let deadRefreshToken = OSAllocatedUnfairLock<String?>(initialState: nil)
 
-    func authHeaders() async throws -> [String: String] {
-        if let cached = cachedCredentials.withLock({ $0 }), cached.expiresAt > .now {
-            return Self.headers(token: cached.accessToken)
+    func authHeaders(for option: AuthOption) async throws -> [String: String] {
+        if let cached = cache.withLock({ $0 }), cached.optionID == option.id, !cached.credentials.isExpired() {
+            return Self.headers(token: cached.credentials.accessToken)
         }
-        let candidates: [Credentials?] = await [
-            CredentialSupport.keychainJSON(service: "Claude Code-credentials"),
-            CredentialSupport.homeJSON(".claude/.credentials.json"),
-        ]
-        let credentials = candidates.compactMap(\.self).first { $0.expiresAt > .now }
-        cachedCredentials.withLock { $0 = credentials }
-        guard let credentials else {
-            throw UsageProviderError.notAvailable
+        let backend: ClaudeCodeCredentialStore.Backend = option.id == Self.fileOption.id ? .file : .keychain
+        guard let stored = await store.read(backend),
+              let credentials = ClaudeTokenRefresh.Credentials(json: stored.json)
+        else {
+            throw UsageProviderError.notAvailable(.signedOut)
         }
-        return Self.headers(token: credentials.accessToken)
+        let current = if credentials.isExpired() {
+            try await refresh(backend, expired: credentials)
+        } else {
+            credentials
+        }
+        cache.withLock { $0 = Cached(optionID: option.id, credentials: current) }
+        return Self.headers(token: current.accessToken)
     }
 
-    func forgetCredentials() -> Bool {
-        cachedCredentials.withLock { credentials in
-            let hadCredentials = credentials != nil
-            credentials = nil
+    /// Runs the refresh detached so a cancelled poll cannot abandon it
+    /// halfway: once the server has rotated the token, the write-back has
+    /// to happen or Claude Code is left with a dead refresh token.
+    private func refresh(
+        _ backend: ClaudeCodeCredentialStore.Backend,
+        expired: ClaudeTokenRefresh.Credentials
+    ) async throws -> ClaudeTokenRefresh.Credentials {
+        if let dead = deadRefreshToken.withLock({ $0 }), dead == expired.refreshToken {
+            throw UsageProviderError.notAvailable(.expired)
+        }
+        let store = store
+        let outcome = await Task.detached { await store.refreshIfExpired(backend) }.value
+        switch outcome {
+        case let .current(credentials):
+            return credentials
+        case .noCredentials:
+            throw UsageProviderError.notAvailable(.signedOut)
+        case let .cannotRefresh(deadToken):
+            deadRefreshToken.withLock { $0 = deadToken }
+            throw UsageProviderError.notAvailable(.expired)
+        case .lockBusy, .failed:
+            throw UsageProviderError.requestFailed
+        }
+    }
+
+    func forgetCredentials(for option: AuthOption) -> Bool {
+        cache.withLock { cached in
+            let hadCredentials = cached?.optionID == option.id
+            cached = nil
             return hadCredentials
         }
     }
@@ -120,17 +168,5 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
                 return nil
             }
         }
-    }
-
-    private struct Credentials: Decodable, Sendable {
-        struct OAuth: Decodable, Sendable {
-            var accessToken: String
-            var expiresAt: Double // milliseconds since epoch
-        }
-
-        var claudeAiOauth: OAuth
-
-        var accessToken: String { claudeAiOauth.accessToken }
-        var expiresAt: Date { Date(timeIntervalSince1970: claudeAiOauth.expiresAt / 1000) }
     }
 }

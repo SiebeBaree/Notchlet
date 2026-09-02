@@ -19,18 +19,55 @@ enum CredentialSupport {
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
-    /// Decodes the JSON payload of a keychain generic password item, read
-    /// through `/usr/bin/security` rather than the Security framework.
+    /// The payload of a keychain generic password item, read through
+    /// `/usr/bin/security` rather than the Security framework.
     ///
     /// CLIs write their items with that same tool, which puts it on the
     /// item's access list for good. Reading as Notchlet instead would show
     /// the keychain password prompt again after every token rotation: the
     /// CLI's rewrite of the item drops the "Always Allow" grant the user
-    /// gave us, while `security` keeps its access.
+    /// gave us, while `security` keeps its access. Notchlet's own items go
+    /// through the same tool for the same reason.
+    static func keychainData(service: String, account: String? = nil) async -> Data? {
+        var arguments = ["find-generic-password", "-s", service]
+        if let account {
+            arguments += ["-a", account]
+        }
+        guard let output = await run("/usr/bin/security", arguments + ["-w"]) else { return nil }
+        return decodeKeychainOutput(output)
+    }
+
     static func keychainJSON<T: Decodable>(service: String) async -> T? {
-        guard let data = await run("/usr/bin/security", ["find-generic-password", "-s", service, "-w"])
-        else { return nil }
+        guard let data = await keychainData(service: service) else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    static func keychainString(service: String, account: String) async -> String? {
+        guard let data = await keychainData(service: service, account: account) else { return nil }
+        let value = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    /// `security -w` prints the payload as text, or as `0x…` hex when it is
+    /// not plain text. Either way this yields the stored bytes.
+    static func decodeKeychainOutput(_ output: Data) -> Data {
+        let text = String(decoding: output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.hasPrefix("0x") else { return Data(text.utf8) }
+        let hex = text.dropFirst(2).prefix { $0.isHexDigit }
+        return data(fromHex: String(hex))
+    }
+
+    /// Creates or replaces a generic password item. The command goes in on
+    /// stdin with the value hex-encoded, the way Claude Code writes its own
+    /// item, so nothing secret ever appears in an argument list.
+    static func writeKeychainItem(service: String, account: String, value: Data) async -> Bool {
+        let hex = value.map { String(format: "%02x", $0) }.joined()
+        let command = "add-generic-password -U -a \"\(account)\" -s \"\(service)\" -X \"\(hex)\"\n"
+        return await run("/usr/bin/security", ["-i"], input: Data(command.utf8)) != nil
+    }
+
+    static func deleteKeychainItem(service: String, account: String) async {
+        _ = await run("/usr/bin/security", ["delete-generic-password", "-s", service, "-a", account])
     }
 
     /// One value from the key-value table of a SQLite database at a path
@@ -79,7 +116,7 @@ enum CredentialSupport {
     /// Runs a system tool and returns its standard output when it exits
     /// cleanly. Runs off the main actor so the child process never stalls
     /// the panel.
-    private static func run(_ tool: String, _ arguments: [String]) async -> Data? {
+    private static func run(_ tool: String, _ arguments: [String], input: Data? = nil) async -> Data? {
         await Task.detached {
             let process = Process()
             process.executableURL = URL(filePath: tool)
@@ -87,7 +124,13 @@ enum CredentialSupport {
             let output = Pipe()
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
+            let stdin = input.map { _ in Pipe() }
+            process.standardInput = stdin ?? FileHandle.nullDevice
             guard (try? process.run()) != nil else { return nil as Data? }
+            if let stdin, let input {
+                stdin.fileHandleForWriting.write(input)
+                try? stdin.fileHandleForWriting.close()
+            }
             let data = output.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             return process.terminationStatus == 0 ? data : nil

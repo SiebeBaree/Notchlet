@@ -58,6 +58,38 @@ enum UsageCopy {
         return "\(providerName) rate limited, retrying in \(shortDuration(wait))"
     }
 
+    /// The status line on a provider's settings page: what it signed in
+    /// with, or why it could not, followed by what to do about it.
+    static func providerStatusText(
+        state: UsageStore.ProviderState?,
+        problem: AuthProblem?,
+        option: AuthOption?,
+        signInHint: String,
+        retryAt: Date?,
+        now: Date = .now
+    ) -> String {
+        switch state {
+        case nil:
+            return "Waiting for the first refresh"
+        case .ok:
+            guard let option else { return "Signed in" }
+            return option.secretName.map { "Using the pasted \($0)" } ?? "Using \(option.label)"
+        case .notAvailable:
+            let reason = switch problem {
+            case .rejected: "Login rejected."
+            case .expired: "Login expired."
+            case .signedOut, nil: "Not signed in."
+            }
+            return "\(reason) \(signInHint)."
+        case .rateLimited:
+            guard let retryAt, retryAt > now else { return "Rate limited, retrying soon" }
+            return "Rate limited, retrying in \(shortDuration(retryAt.timeIntervalSince(now)))"
+        case .error:
+            guard let retryAt, retryAt > now else { return "Request failed, retrying soon" }
+            return "Request failed, retrying in \(shortDuration(retryAt.timeIntervalSince(now)))"
+        }
+    }
+
     /// "51m", "3h 10m" or "4d 16h", never "0m" for a positive interval.
     /// Two units at most; day-scale durations drop the minutes.
     static func shortDuration(_ interval: TimeInterval) -> String {

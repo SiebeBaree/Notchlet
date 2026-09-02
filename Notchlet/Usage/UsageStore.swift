@@ -21,6 +21,9 @@ final class UsageStore {
         let provider: any UsageProvider
         var snapshot: UsageSnapshot?
         var state: ProviderState?
+        /// Why the last refresh found no usable login, while `state` is
+        /// `notAvailable`. Drives the status line in the provider's settings.
+        var authProblem: AuthProblem?
         var schedule = RefreshSchedule()
 
         var id: String { provider.id }
@@ -101,6 +104,14 @@ final class UsageStore {
         reschedule()
     }
 
+    /// Fetches one provider right away, cooldowns included: the user just
+    /// changed how it signs in, so whatever it last knew is moot.
+    func refreshNow(_ providerID: String) {
+        guard let index = entries.firstIndex(where: { $0.id == providerID }) else { return }
+        entries[index].schedule = RefreshSchedule()
+        reschedule()
+    }
+
     /// Panel visibility drives the cadence. Opening shrinks the interval to
     /// `openInterval`, which makes any provider older than that due
     /// immediately, so the user sees fresh numbers at the moment they look.
@@ -160,8 +171,8 @@ final class UsageStore {
                 group.addTask {
                     do {
                         return try await (index, .success(provider.fetchUsage()))
-                    } catch UsageProviderError.notAvailable {
-                        return (index, .notAvailable)
+                    } catch let UsageProviderError.notAvailable(problem) {
+                        return (index, .notAvailable(problem))
                     } catch let UsageProviderError.rateLimited(retryAfter) {
                         return (index, .rateLimited(retryAfter: retryAfter))
                     } catch is CancellationError {
@@ -189,7 +200,7 @@ final class UsageStore {
 
     private enum FetchOutcome {
         case success(UsageSnapshot)
-        case notAvailable
+        case notAvailable(AuthProblem)
         case rateLimited(retryAfter: TimeInterval?)
         case failed
         /// The refresh loop was restarted mid-flight, not a provider fault.
@@ -200,11 +211,13 @@ final class UsageStore {
         switch outcome {
         case let .success(snapshot):
             entries[index].snapshot = snapshot
+            entries[index].authProblem = nil
             entries[index].schedule.recordSuccess()
             transition(at: index, to: .ok)
-        case .notAvailable:
-            // A local credentials check, no request was made, so nothing to
+        case let .notAvailable(problem):
+            // A local credentials check or a plain rejection, so nothing to
             // back off from.
+            entries[index].authProblem = problem
             entries[index].schedule.recordSuccess()
             transition(at: index, to: .notAvailable)
         case let .rateLimited(retryAfter):

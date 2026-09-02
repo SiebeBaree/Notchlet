@@ -71,7 +71,7 @@ Run the `Notchlet` scheme in Xcode 26 or newer.
 | Cursor | The endpoint behind the dashboard's usage page | Monthly total, plus the Cursor models and other models pools |
 | OpenCode | The OpenCode Go usage endpoint | 5h, weekly, monthly |
 
-Cursor's login comes from Cursor.app's own state database, OpenCode's from the key `/connect` saved. OpenCode Zen credits are not shown: they only exist on the web dashboard, and Notchlet does not borrow browser cookies.
+Each agent has one or more ways to sign in, and Auto picks the first that works. Claude Code's login comes from its keychain item, with its credentials file as fallback. Codex's comes from the CLI's `auth.json`. Cursor's comes from Cursor.app's own state database, or a session token you paste. OpenCode's comes from the key `/connect` saved, or a key you paste. Pick a method per agent in its settings page; pasted secrets live in Notchlet's own keychain item. OpenCode Zen credits are not shown: they only exist on the web dashboard, and Notchlet does not borrow browser cookies.
 
 Agents found on your Mac are on by default, up to three at once. Toggle them in the settings behind the gear.
 
@@ -82,7 +82,8 @@ Adding an agent is one file. See [CONTRIBUTING.md](CONTRIBUTING.md).
 Notchlet reads the credentials the CLIs already wrote to your machine and calls the same usage endpoints the CLIs call. Nothing else.
 
 - It never spends usage to measure usage.
-- It never refreshes your tokens. Rotating a refresh token behind the CLI's back can log you out of it, so an expired login means no data until you run that CLI again.
+- It refreshes one token, Claude Code's, and only once it has expired while Claude Code is idle. It does that the way a second Claude Code process would: same locks, same compare-and-swap write to the same keychain item, so Claude Code picks the new token up instead of being signed out by it. Every other agent's token is left alone; the CLIs renew those themselves on use.
+- It never asks for your keychain password. Every keychain read and write goes through the same `security` tool the CLIs use.
 - Your usage numbers, credentials and account never leave your Mac.
 
 Notchlet does send anonymous product analytics, a random UUID plus events like "the notch was opened". The full list of what leaves the machine is one file, [`AnalyticsEvent.swift`](Notchlet/Analytics/AnalyticsEvent.swift). Turn it off with one toggle in settings. Builds from source send nothing at all.
