@@ -3,7 +3,8 @@ import SwiftUI
 /// Settings, rendered inside the expanded notch. There is no settings
 /// window and no menu bar item; the notch is the whole surface, so quitting
 /// lives here too. The providers row opens a sub-page with one visibility
-/// toggle per provider.
+/// toggle per provider; at the cap the remaining toggles lock until one is
+/// turned off.
 struct NotchSettingsView: View {
     let store: UsageStore
     let updater: UpdateController
@@ -61,7 +62,13 @@ struct NotchSettingsView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .controlSize(.mini)
+                    .disabled(!store.isEnabled(entry.id) && !store.canEnableMore)
                 }
+            }
+            if !store.canEnableMore, store.entries.contains(where: { !store.isEnabled($0.id) }) {
+                Text("Up to \(UsageStore.maxActiveProviders) at once. Turn one off to add another.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.4))
             }
         }
     }
