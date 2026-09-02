@@ -59,15 +59,31 @@ enum CredentialSupport {
 
     /// Creates or replaces a generic password item. The command goes in on
     /// stdin with the value hex-encoded, the way Claude Code writes its own
-    /// item, so nothing secret ever appears in an argument list.
+    /// item, so nothing secret ever appears in an argument list. The names
+    /// are quoted on that command line, so a name that could break the
+    /// quoting is refused rather than escaped by guesswork; every name
+    /// Notchlet uses is plain ASCII anyway.
     static func writeKeychainItem(service: String, account: String, value: Data) async -> Bool {
+        guard isPlainKeychainName(service), isPlainKeychainName(account) else { return false }
         let hex = value.map { String(format: "%02x", $0) }.joined()
         let command = "add-generic-password -U -a \"\(account)\" -s \"\(service)\" -X \"\(hex)\"\n"
         return await run("/usr/bin/security", ["-i"], input: Data(command.utf8)) != nil
     }
 
-    static func deleteKeychainItem(service: String, account: String) async {
-        _ = await run("/usr/bin/security", ["delete-generic-password", "-s", service, "-a", account])
+    /// Whether a service or account name can go inside double quotes on a
+    /// `security -i` command line unchanged.
+    static func isPlainKeychainName(_ name: String) -> Bool {
+        !name.isEmpty && !name.contains { $0 == "\"" || $0 == "\\" || $0.isNewline }
+    }
+
+    /// Removes a generic password item. An item that is already gone counts
+    /// as removed; anything else, a locked keychain say, does not.
+    static func deleteKeychainItem(service: String, account: String) async -> Bool {
+        let itemNotFound: Int32 = 44
+        guard let status = await exitStatus(
+            "/usr/bin/security", ["delete-generic-password", "-s", service, "-a", account]
+        ) else { return false }
+        return status == 0 || status == itemNotFound
     }
 
     /// One value from the key-value table of a SQLite database at a path
@@ -114,9 +130,24 @@ enum CredentialSupport {
     }
 
     /// Runs a system tool and returns its standard output when it exits
-    /// cleanly. Runs off the main actor so the child process never stalls
-    /// the panel.
+    /// cleanly.
     private static func run(_ tool: String, _ arguments: [String], input: Data? = nil) async -> Data? {
+        guard let (status, output) = await launch(tool, arguments, input: input), status == 0 else { return nil }
+        return output
+    }
+
+    private static func exitStatus(_ tool: String, _ arguments: [String]) async -> Int32? {
+        await launch(tool, arguments, input: nil)?.status
+    }
+
+    /// Runs a system tool to completion, feeding it `input` on stdin when
+    /// given. Runs off the main actor so the child process never stalls the
+    /// panel. Nil only when the tool could not be started.
+    private static func launch(
+        _ tool: String,
+        _ arguments: [String],
+        input: Data?
+    ) async -> (status: Int32, output: Data)? {
         await Task.detached {
             let process = Process()
             process.executableURL = URL(filePath: tool)
@@ -126,14 +157,16 @@ enum CredentialSupport {
             process.standardError = FileHandle.nullDevice
             let stdin = input.map { _ in Pipe() }
             process.standardInput = stdin ?? FileHandle.nullDevice
-            guard (try? process.run()) != nil else { return nil as Data? }
+            guard (try? process.run()) != nil else { return nil }
             if let stdin, let input {
-                stdin.fileHandleForWriting.write(input)
+                // The throwing variant: a child that exits before reading
+                // would otherwise raise an ObjC exception through the pipe.
+                try? stdin.fileHandleForWriting.write(contentsOf: input)
                 try? stdin.fileHandleForWriting.close()
             }
             let data = output.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
-            return process.terminationStatus == 0 ? data : nil
+            return (process.terminationStatus, data)
         }.value
     }
 

@@ -125,11 +125,18 @@ enum SecretStore {
         return saved
     }
 
-    static func remove(providerID: String, optionID: String) async {
-        await CredentialSupport.deleteKeychainItem(
+    /// Removes a stored secret and reports whether it is gone. The flag is
+    /// only cleared once the keychain confirms, so settings never claim a
+    /// secret is removed while it is still there.
+    @discardableResult
+    static func remove(providerID: String, optionID: String) async -> Bool {
+        let removed = await CredentialSupport.deleteKeychainItem(
             service: service,
             account: account(providerID: providerID, optionID: optionID)
         )
-        UserDefaults.standard.removeObject(forKey: flagDefaultsKey(providerID: providerID, optionID: optionID))
+        if removed {
+            UserDefaults.standard.removeObject(forKey: flagDefaultsKey(providerID: providerID, optionID: optionID))
+        }
+        return removed
     }
 }

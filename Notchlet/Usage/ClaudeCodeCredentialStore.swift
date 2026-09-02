@@ -70,10 +70,13 @@ struct ClaudeCodeCredentialStore: Sendable {
     var legacyRefreshLockURL: URL { URL(filePath: configDir.resolvingSymlinksInPath().path + ".lock") }
     var storageWriteLockURL: URL { configDir.appending(path: ".storage-write.lock") }
 
+    /// Reads the item by service and account, as Claude Code does, so a read
+    /// and a write-back can never land on two different items.
     func read(_ backend: Backend) async -> Stored? {
         switch backend {
         case .keychain:
-            await CredentialSupport.keychainData(service: keychainService).map { Stored(json: $0, backend: .keychain) }
+            await CredentialSupport.keychainData(service: keychainService, account: Self.keychainAccount())
+                .map { Stored(json: $0, backend: .keychain) }
         case .file:
             (try? Data(contentsOf: fileURL)).map { Stored(json: $0, backend: .file) }
         }
@@ -163,7 +166,17 @@ struct ClaudeCodeCredentialStore: Sendable {
             // Another process won the race; its token is the live one.
             return .current(ClaudeTokenRefresh.Credentials(json: latest.json) ?? refreshed)
         }
-        _ = await write(merged, to: backend)
+        // Claude Code retries its own save three times too. If the store
+        // still refuses, the new token is used anyway: the server may have
+        // retired the old refresh token by now, so asking it again later
+        // could only rotate a second time and make things worse for
+        // Claude Code, whereas Notchlet at least keeps showing data.
+        for attempt in 1 ... 3 {
+            if await write(merged, to: backend) {
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(100 * attempt))
+        }
         return .current(refreshed)
     }
 }

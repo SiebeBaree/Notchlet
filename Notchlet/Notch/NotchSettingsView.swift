@@ -214,11 +214,25 @@ private struct ProviderPage: View {
     let providerID: String
     let back: () -> Void
 
-    @State private var selection: AuthSelection = .auto
-    @State private var storedSecrets: Set<String> = []
+    /// Seeded in `init` rather than `onAppear`: a state change on appear
+    /// would fire `onChange`, which rewrites the setting, refetches and logs
+    /// a change that never happened.
+    @State private var selection: AuthSelection
+    @State private var storedSecrets: Set<String>
     @State private var notice: String?
 
     private static let problemColor = Color(red: 0.85, green: 0.64, blue: 0.26)
+
+    init(store: UsageStore, providerID: String, back: @escaping () -> Void) {
+        self.store = store
+        self.providerID = providerID
+        self.back = back
+        let options = store.entries.first { $0.id == providerID }?.provider.authOptions ?? []
+        _selection = State(initialValue: ProviderAuthSettings.selection(for: providerID, options: options))
+        _storedSecrets = State(initialValue: Set(options.filter {
+            SecretStore.hasSecret(providerID: providerID, optionID: $0.id)
+        }.map(\.id)))
+    }
 
     private var entry: UsageStore.Entry? {
         store.entries.first { $0.id == providerID }
@@ -280,12 +294,6 @@ private struct ProviderPage: View {
                         .foregroundStyle(.white.opacity(0.4))
                 }
             }
-            .onAppear {
-                selection = ProviderAuthSettings.selection(for: providerID, options: provider.authOptions)
-                storedSecrets = Set(provider.authOptions.filter {
-                    SecretStore.hasSecret(providerID: providerID, optionID: $0.id)
-                }.map(\.id))
-            }
         }
     }
 
@@ -309,8 +317,12 @@ private struct ProviderPage: View {
                 Spacer()
                 HoverTextButton("Remove") {
                     Task {
-                        await SecretStore.remove(providerID: providerID, optionID: option.id)
+                        guard await SecretStore.remove(providerID: providerID, optionID: option.id) else {
+                            notice = "Could not remove the \(secretName) from the keychain"
+                            return
+                        }
                         storedSecrets.remove(option.id)
+                        notice = nil
                         store.refreshNow(providerID)
                         Analytics.capture(.settingChanged(
                             key: "provider_\(providerID)_secret_\(option.id)",

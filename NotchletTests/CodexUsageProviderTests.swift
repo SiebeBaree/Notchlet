@@ -80,4 +80,13 @@ struct CredentialSupportTests {
         #expect(CredentialSupport.data(fromHex: "zz").isEmpty)
         #expect(CredentialSupport.data(fromHex: "").isEmpty)
     }
+
+    @Test func keychainNamesThatWouldBreakTheQuotingAreRefused() {
+        #expect(CredentialSupport.isPlainKeychainName("Claude Code-credentials"))
+        #expect(CredentialSupport.isPlainKeychainName("cursor.token"))
+        #expect(!CredentialSupport.isPlainKeychainName(""))
+        #expect(!CredentialSupport.isPlainKeychainName("a\"b"))
+        #expect(!CredentialSupport.isPlainKeychainName("a\\b"))
+        #expect(!CredentialSupport.isPlainKeychainName("a\nb"))
+    }
 }

@@ -105,11 +105,19 @@ final class UsageStore {
     }
 
     /// Fetches one provider right away, cooldowns included: the user just
-    /// changed how it signs in, so whatever it last knew is moot.
+    /// changed how it signs in, so whatever it last knew is moot. A provider
+    /// that is switched off is fetched once anyway, so its settings page can
+    /// still say whether the new login works.
     func refreshNow(_ providerID: String) {
         guard let index = entries.firstIndex(where: { $0.id == providerID }) else { return }
         entries[index].schedule = RefreshSchedule()
-        reschedule()
+        if isEnabled(providerID) {
+            reschedule()
+        } else {
+            Task { [weak self] in
+                await self?.fetch([index], now: .now)
+            }
+        }
     }
 
     /// Panel visibility drives the cadence. Opening shrinks the interval to
@@ -152,8 +160,7 @@ final class UsageStore {
         return nextDue.map { max($0.timeIntervalSinceNow, 1) }
     }
 
-    /// Fetches every provider that has come due, concurrently so one slow
-    /// endpoint doesn't hold up the others.
+    /// Fetches every enabled provider that has come due.
     private func refreshDueProviders() async {
         let interval = pollInterval
         let now = Date.now
@@ -161,12 +168,17 @@ final class UsageStore {
             isEnabled(entries[$0].id) && entries[$0].schedule.nextDue(interval: interval) <= now
         }
         guard !due.isEmpty else { return }
+        await fetch(due, now: now)
+    }
 
-        for index in due {
+    /// Fetches the given providers concurrently, so one slow endpoint
+    /// doesn't hold up the others, and applies each outcome as it lands.
+    private func fetch(_ indices: [Int], now: Date) async {
+        for index in indices {
             entries[index].schedule.recordAttempt(now: now)
         }
         await withTaskGroup(of: (Int, FetchOutcome).self) { group in
-            for index in due {
+            for index in indices {
                 let provider = entries[index].provider
                 group.addTask {
                     do {
