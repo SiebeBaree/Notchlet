@@ -6,7 +6,9 @@ import Foundation
 /// Code style SQLite store every Electron editor has) and calls the endpoint
 /// behind the dashboard's usage page. That endpoint takes the token as the
 /// `WorkosCursorSessionToken` cookie, prefixed with the user id from the
-/// token's `sub` claim, which is how Cursor's own dashboard sends it.
+/// token's `sub` claim, which is how Cursor's own dashboard sends it. A
+/// session token pasted from the browser works the same way, for anyone
+/// who uses Cursor without the app on this Mac.
 ///
 /// Included usage is a monthly budget split in two pools, Cursor's own
 /// models (Composer, Grok) and third-party models, both reset with the
@@ -19,6 +21,11 @@ struct CursorUsageProvider: HTTPUsageProvider {
     let name = "Cursor"
     let logoAssetName = "CursorLogo"
     let usageURL = URL(string: "https://cursor.com/api/usage-summary")!
+    let signInHint = "Sign in to Cursor, or paste a session token"
+
+    static let appOption = AuthOption(id: "app", label: "Cursor app")
+    static let tokenOption = AuthOption(id: "token", label: "Pasted token", secretName: "session token")
+    let authOptions = [Self.appOption, Self.tokenOption]
 
     private static let stateDatabase = "Library/Application Support/Cursor/User/globalStorage/state.vscdb"
 
@@ -27,26 +34,43 @@ struct CursorUsageProvider: HTTPUsageProvider {
             || CredentialSupport.homePathExists(".cursor")
     }
 
-    func authHeaders() async throws -> [String: String] {
-        guard let token = await CredentialSupport.sqliteValue(
-            homePath: Self.stateDatabase,
-            table: "ItemTable",
-            key: "cursorAuth/accessToken"
-        ), let cookie = Self.sessionCookie(token: token) else {
-            throw UsageProviderError.notAvailable
+    func authHeaders(for option: AuthOption) async throws -> [String: String] {
+        let token: String? = if option.id == Self.tokenOption.id {
+            await SecretStore.read(providerID: id, optionID: option.id)
+        } else {
+            await CredentialSupport.sqliteValue(
+                homePath: Self.stateDatabase,
+                table: "ItemTable",
+                key: "cursorAuth/accessToken"
+            )
+        }
+        guard let token else {
+            throw UsageProviderError.notAvailable(.signedOut)
+        }
+        guard let cookie = Self.sessionCookie(token: token) else {
+            throw UsageProviderError.notAvailable(.expired)
         }
         return ["Accept": "application/json", "Cookie": cookie]
     }
 
     /// The dashboard's session cookie: user id and token joined by an
-    /// encoded "::". Nil when the token is expired or has no usable subject.
+    /// encoded "::". Takes the bare JWT Cursor.app stores, or the cookie as
+    /// a user copies it from a browser: the value alone or with its name,
+    /// separator raw or percent-encoded. Nil when the token is expired or
+    /// has no usable subject.
     static func sessionCookie(token: String, now: Date = .now) -> String? {
-        guard let claims = CredentialSupport.jwtClaims(of: token),
+        var pasted = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let separator = pasted.firstIndex(of: "="), pasted[..<separator] == "WorkosCursorSessionToken" {
+            pasted = String(pasted[pasted.index(after: separator)...])
+        }
+        let jwt = pasted.replacingOccurrences(of: "%3A%3A", with: "::")
+            .components(separatedBy: "::").last ?? pasted
+        guard let claims = CredentialSupport.jwtClaims(of: jwt),
               let exp = claims["exp"] as? TimeInterval, Date(timeIntervalSince1970: exp) > now,
               let subject = claims["sub"] as? String,
               let userID = subject.split(separator: "|").last, !userID.isEmpty
         else { return nil }
-        return "WorkosCursorSessionToken=\(userID)%3A%3A\(token)"
+        return "WorkosCursorSessionToken=\(userID)%3A%3A\(jwt)"
     }
 
     /// `membershipType` is the plan: "free", "pro", "pro_plus", "ultra",

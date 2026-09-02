@@ -21,6 +21,9 @@ final class UsageStore {
         let provider: any UsageProvider
         var snapshot: UsageSnapshot?
         var state: ProviderState?
+        /// Why the last refresh found no usable login, while `state` is
+        /// `notAvailable`. Drives the status line in the provider's settings.
+        var authProblem: AuthProblem?
         var schedule = RefreshSchedule()
 
         var id: String { provider.id }
@@ -101,6 +104,22 @@ final class UsageStore {
         reschedule()
     }
 
+    /// Fetches one provider right away, cooldowns included: the user just
+    /// changed how it signs in, so whatever it last knew is moot. A provider
+    /// that is switched off is fetched once anyway, so its settings page can
+    /// still say whether the new login works.
+    func refreshNow(_ providerID: String) {
+        guard let index = entries.firstIndex(where: { $0.id == providerID }) else { return }
+        entries[index].schedule = RefreshSchedule()
+        if isEnabled(providerID) {
+            reschedule()
+        } else {
+            Task { [weak self] in
+                await self?.fetch([index], now: .now)
+            }
+        }
+    }
+
     /// Panel visibility drives the cadence. Opening shrinks the interval to
     /// `openInterval`, which makes any provider older than that due
     /// immediately, so the user sees fresh numbers at the moment they look.
@@ -141,8 +160,7 @@ final class UsageStore {
         return nextDue.map { max($0.timeIntervalSinceNow, 1) }
     }
 
-    /// Fetches every provider that has come due, concurrently so one slow
-    /// endpoint doesn't hold up the others.
+    /// Fetches every enabled provider that has come due.
     private func refreshDueProviders() async {
         let interval = pollInterval
         let now = Date.now
@@ -150,18 +168,23 @@ final class UsageStore {
             isEnabled(entries[$0].id) && entries[$0].schedule.nextDue(interval: interval) <= now
         }
         guard !due.isEmpty else { return }
+        await fetch(due, now: now)
+    }
 
-        for index in due {
+    /// Fetches the given providers concurrently, so one slow endpoint
+    /// doesn't hold up the others, and applies each outcome as it lands.
+    private func fetch(_ indices: [Int], now: Date) async {
+        for index in indices {
             entries[index].schedule.recordAttempt(now: now)
         }
         await withTaskGroup(of: (Int, FetchOutcome).self) { group in
-            for index in due {
+            for index in indices {
                 let provider = entries[index].provider
                 group.addTask {
                     do {
                         return try await (index, .success(provider.fetchUsage()))
-                    } catch UsageProviderError.notAvailable {
-                        return (index, .notAvailable)
+                    } catch let UsageProviderError.notAvailable(problem) {
+                        return (index, .notAvailable(problem))
                     } catch let UsageProviderError.rateLimited(retryAfter) {
                         return (index, .rateLimited(retryAfter: retryAfter))
                     } catch is CancellationError {
@@ -189,7 +212,7 @@ final class UsageStore {
 
     private enum FetchOutcome {
         case success(UsageSnapshot)
-        case notAvailable
+        case notAvailable(AuthProblem)
         case rateLimited(retryAfter: TimeInterval?)
         case failed
         /// The refresh loop was restarted mid-flight, not a provider fault.
@@ -200,11 +223,13 @@ final class UsageStore {
         switch outcome {
         case let .success(snapshot):
             entries[index].snapshot = snapshot
+            entries[index].authProblem = nil
             entries[index].schedule.recordSuccess()
             transition(at: index, to: .ok)
-        case .notAvailable:
-            // A local credentials check, no request was made, so nothing to
+        case let .notAvailable(problem):
+            // A local credentials check or a plain rejection, so nothing to
             // back off from.
+            entries[index].authProblem = problem
             entries[index].schedule.recordSuccess()
             transition(at: index, to: .notAvailable)
         case let .rateLimited(retryAfter):

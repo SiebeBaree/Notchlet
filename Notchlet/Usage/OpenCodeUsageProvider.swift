@@ -7,7 +7,9 @@ import Foundation
 /// subscription date. The API key OpenCode stores after `/connect` in
 /// `~/.local/share/opencode/auth.json` is the static key the CLI itself
 /// sends; it never expires and there is no refresh flow, so a rejected key
-/// means the user rotated it and has to reconnect.
+/// means the user rotated it and has to reconnect. A key pasted from the
+/// OpenCode dashboard works the same way, for a data directory Notchlet
+/// cannot see (`XDG_DATA_HOME` moved it) or a machine without the CLI.
 ///
 /// Zen pay-as-you-go credits have no key-authenticated endpoint, only the
 /// browser dashboard shows them, so a workspace without a Go subscription
@@ -17,6 +19,11 @@ struct OpenCodeUsageProvider: HTTPUsageProvider {
     let name = "OpenCode"
     let logoAssetName = "OpenCodeLogo"
     let usageURL = URL(string: "https://opencode.ai/zen/go/v1/usage")!
+    let signInHint = "Run opencode auth login, or paste a key"
+
+    static let cliOption = AuthOption(id: "cli", label: "OpenCode CLI")
+    static let keyOption = AuthOption(id: "key", label: "Pasted key", secretName: "API key")
+    let authOptions = [Self.cliOption, Self.keyOption]
 
     /// OpenCode's data directory, created on first run. `XDG_DATA_HOME` can
     /// move it, but a login-item app never sees the shell's exports, so only
@@ -27,20 +34,29 @@ struct OpenCodeUsageProvider: HTTPUsageProvider {
         CredentialSupport.homePathExists(Self.dataDirectory)
     }
 
+    func authHeaders(for option: AuthOption) async throws -> [String: String] {
+        let key: String? = if option.id == Self.keyOption.id {
+            await SecretStore.read(providerID: id, optionID: option.id)
+        } else {
+            Self.cliKey()
+        }
+        guard let key, !key.isEmpty else {
+            throw UsageProviderError.notAvailable(.signedOut)
+        }
+        return ["Authorization": "Bearer \(key)"]
+    }
+
     /// The Go key first; a Zen key from the workspace member who holds the
     /// Go subscription is accepted by the endpoint too.
-    func authHeaders() throws -> [String: String] {
+    private static func cliKey() -> String? {
         struct Entry: Decodable {
             var key: String?
         }
 
-        guard let auth: [String: Entry] = CredentialSupport.homeJSON("\(Self.dataDirectory)/auth.json"),
-              let key = auth["opencode-go"]?.key ?? auth["opencode"]?.key,
-              !key.isEmpty
-        else {
-            throw UsageProviderError.notAvailable
+        guard let auth: [String: Entry] = CredentialSupport.homeJSON("\(dataDirectory)/auth.json") else {
+            return nil
         }
-        return ["Authorization": "Bearer \(key)"]
+        return auth["opencode-go"]?.key ?? auth["opencode"]?.key
     }
 
     /// Maps `usage.rolling` / `weekly` / `monthly`, each

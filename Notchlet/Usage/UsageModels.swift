@@ -52,6 +52,9 @@ struct UsageSnapshot: Equatable {
     /// Plan tier ("plus", "max", ...) when the endpoint exposes one. Only
     /// used for anonymous analytics breakdowns, never shown in the UI.
     var planTier: String?
+    /// Which of the provider's auth options produced this snapshot, for the
+    /// status line on its settings page.
+    var authOptionID: String?
 
     /// What a provider's summary gauge shows: the shortest window, because
     /// that is the one that runs out in normal use (the 5h session when the

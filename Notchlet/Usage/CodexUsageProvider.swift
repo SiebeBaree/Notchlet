@@ -7,20 +7,24 @@ import Foundation
 /// is decided server-side per plan (observed: 5h+weekly on Plus, weekly only
 /// on Pro tiers, monthly on an unused Go account), so durations and labels
 /// come from the response, never from a plan table — the CLI itself has
-/// none. Tokens are never refreshed
-/// here: OpenAI rotates refresh tokens, and rotating behind the CLI's back
-/// can invalidate its session.
+/// none. Tokens are never refreshed here: they last ten days and the CLI
+/// renews them on use, and OpenAI rejects a reused refresh token, so a
+/// refresh behind the CLI's back could sign it out.
 struct CodexUsageProvider: HTTPUsageProvider {
     let id = "codex"
     let name = "Codex"
     let logoAssetName = "OpenAILogo"
     let usageURL = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
+    let signInHint = "Run codex login"
+
+    static let cliOption = AuthOption(id: "cli", label: "Codex CLI")
+    let authOptions = [Self.cliOption]
 
     var isInstalled: Bool {
         CredentialSupport.homePathExists(".codex")
     }
 
-    func authHeaders() throws -> [String: String] {
+    func authHeaders(for option: AuthOption) throws -> [String: String] {
         struct Auth: Decodable {
             struct Tokens: Decodable {
                 var accessToken: String
@@ -35,11 +39,13 @@ struct CodexUsageProvider: HTTPUsageProvider {
             var tokens: Tokens
         }
 
-        guard let auth: Auth = CredentialSupport.homeJSON(".codex/auth.json"),
-              let expiry = CredentialSupport.jwtExpiry(of: auth.tokens.accessToken),
-              expiry > .now
-        else {
-            throw UsageProviderError.notAvailable
+        // An API-key login has no tokens object, which reads as signed out:
+        // the usage endpoint only answers ChatGPT logins.
+        guard let auth: Auth = CredentialSupport.homeJSON(".codex/auth.json") else {
+            throw UsageProviderError.notAvailable(.signedOut)
+        }
+        guard let expiry = CredentialSupport.jwtExpiry(of: auth.tokens.accessToken), expiry > .now else {
+            throw UsageProviderError.notAvailable(.expired)
         }
         var headers = ["Authorization": "Bearer \(auth.tokens.accessToken)"]
         if let accountId = auth.tokens.accountId {

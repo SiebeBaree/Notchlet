@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Claude no longer goes stale while Claude Code is idle. An expired token is
+  refreshed the way a second Claude Code process would do it, using Claude
+  Code's own locks and write-back, so Claude Code stays signed in.
+- A settings page per provider: pick how it signs in, see what it is using or
+  why it cannot, and paste a Cursor session token or an OpenCode API key for
+  machines where the app or CLI is not the source.
+
 ## 0.2.0
 
 - Cursor and OpenCode usage, next to Claude Code and Codex. Cursor shows the
