@@ -3,11 +3,19 @@ import SwiftUI
 
 /// Creates the notch panel, pins it over the notch and repositions it when
 /// display configuration changes.
+///
+/// The window is sized to the bare notch while collapsed and grows to
+/// `NotchGeometry.panelSize` only while expanded. Every cursor move inside
+/// the window runs SwiftUI hover hit-testing, so a window that is only ever
+/// as large as what it draws keeps the app idle whenever the mouse is
+/// anywhere else.
 final class NotchWindowController: NSWindowController {
     private let store: UsageStore
     private let updater: UpdateController
-    private let hostingView: NSHostingView<NotchView>
     private var notchSize: CGSize
+    private var isExpanded = false
+
+    private lazy var hostingView = NSHostingView(rootView: makeRootView())
 
     init(store: UsageStore, updater: UpdateController) {
         let panel = NotchPanel()
@@ -16,9 +24,11 @@ final class NotchWindowController: NSWindowController {
         self.store = store
         self.updater = updater
         self.notchSize = notchSize
-        hostingView = NSHostingView(rootView: NotchView(store: store, updater: updater, notchSize: notchSize))
 
         super.init(window: panel)
+        // The window frame is ours to set, so the hosting view has no reason
+        // to publish an intrinsic size for AppKit to fit the window to.
+        hostingView.sizingOptions = []
         panel.contentView = hostingView
 
         reposition()
@@ -53,16 +63,37 @@ final class NotchWindowController: NSWindowController {
         return CGSize(width: screen.frame.width - left.width - right.width, height: topInset)
     }
 
-    /// Moves the panel onto the current target screen. The notch size is
-    /// recomputed here too: unplugging a display can switch us between a
-    /// physical notch and the virtual fallback, and the content has to follow.
+    private func makeRootView() -> NotchView {
+        NotchView(store: store, updater: updater, notchSize: notchSize) { [weak self] expanded in
+            self?.setExpanded(expanded)
+        }
+    }
+
+    /// The view grows the window before it expands and shrinks it after the
+    /// collapse animation ends, so the card always has room to draw.
+    private func setExpanded(_ expanded: Bool) {
+        guard expanded != isExpanded else { return }
+        isExpanded = expanded
+        reposition()
+    }
+
+    private var panelSize: CGSize {
+        isExpanded ? NotchGeometry.panelSize : NotchGeometry.collapsedPanelSize(notchSize: notchSize)
+    }
+
+    /// Moves the panel onto the current target screen at the size the
+    /// current state needs. The notch size is recomputed here too:
+    /// unplugging a display can switch us between a physical notch and the
+    /// virtual fallback, and the content has to follow.
     @objc private func reposition() {
         guard let screen = Self.targetScreen, let window else { return }
-        window.setFrame(NotchGeometry.panelFrame(screenFrame: screen.frame), display: true)
-
         let currentNotchSize = Self.notchSize(of: screen)
-        guard currentNotchSize != notchSize else { return }
-        notchSize = currentNotchSize
-        hostingView.rootView = NotchView(store: store, updater: updater, notchSize: currentNotchSize)
+        if currentNotchSize != notchSize {
+            notchSize = currentNotchSize
+            // A fresh root view starts collapsed, so the window must too.
+            isExpanded = false
+            hostingView.rootView = makeRootView()
+        }
+        window.setFrame(NotchGeometry.panelFrame(screenFrame: screen.frame, panelSize: panelSize), display: true)
     }
 }

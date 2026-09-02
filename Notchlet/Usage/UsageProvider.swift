@@ -42,6 +42,10 @@ protocol HTTPUsageProvider: UsageProvider {
     /// Plan tier from the same response, if it exposes one. Feeds anonymous
     /// analytics only; defaults to nil.
     func parsePlanTier(from data: Data) -> String?
+    /// Drops any credentials the provider caches between fetches. Called
+    /// when the endpoint rejects them, before one retry with a fresh read.
+    /// Defaults to a no-op for providers that read credentials every time.
+    func forgetCredentials()
 }
 
 extension HTTPUsageProvider {
@@ -49,7 +53,21 @@ extension HTTPUsageProvider {
         nil
     }
 
+    func forgetCredentials() {}
+
+    /// One request, with a single retry on 401 after re-reading credentials
+    /// so a cached token that the CLI has since replaced costs one extra
+    /// round trip rather than a visible error.
     func fetchUsage() async throws -> UsageSnapshot {
+        do {
+            return try await fetchOnce()
+        } catch UsageProviderError.unauthorized {
+            forgetCredentials()
+            return try await fetchOnce()
+        }
+    }
+
+    private func fetchOnce() async throws -> UsageSnapshot {
         var request = URLRequest(url: usageURL)
         for (header, value) in try await authHeaders() {
             request.setValue(value, forHTTPHeaderField: header)
@@ -57,6 +75,9 @@ extension HTTPUsageProvider {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw UsageProviderError.requestFailed
+        }
+        if http.statusCode == 401 {
+            throw UsageProviderError.unauthorized
         }
         if http.statusCode == 429 {
             // Retry-After can also be an HTTP-date; the scheduler's own
@@ -80,6 +101,9 @@ enum UsageProviderError: Error {
     case notAvailable
     /// The usage endpoint returned a non-success response.
     case requestFailed
+    /// The usage endpoint rejected the credentials (401). Surfaces to the
+    /// store only when the retry with fresh credentials fails too.
+    case unauthorized
     /// The usage endpoint returned 429; `retryAfter` is its Retry-After
     /// header in seconds, when present and parseable.
     case rateLimited(retryAfter: TimeInterval?)

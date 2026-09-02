@@ -20,6 +20,9 @@ struct NotchView: View {
     let store: UsageStore
     let updater: UpdateController
     let notchSize: CGSize
+    /// Tells the window controller to grow the window before the card
+    /// expands and to shrink it once the collapse animation has ended.
+    let resizePanel: (_ expanded: Bool) -> Void
 
     @State private var isExpanded = false
     @State private var focusedProviderID: String?
@@ -39,13 +42,7 @@ struct NotchView: View {
         VStack(spacing: 0) {
             shape
                 .onHover { hovering in
-                    withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
-                        isExpanded = hovering
-                        if !hovering {
-                            focusedProviderID = nil
-                            pane = .usage
-                        }
-                    }
+                    setExpanded(hovering)
                     store.setPanelOpen(hovering)
                     trackOpenClose(hovering: hovering)
                 }
@@ -70,6 +67,26 @@ struct NotchView: View {
                 bottomRadius: isExpanded ? 20 : 10
             )
         )
+    }
+
+    /// Animates between the notch and the card. The window grows before the
+    /// card appears and shrinks only once the collapse has fully settled;
+    /// a hover that returns mid-collapse keeps the window as it is.
+    private func setExpanded(_ expanded: Bool) {
+        if expanded {
+            resizePanel(true)
+        }
+        withAnimation(.spring(duration: 0.35, bounce: 0.15), completionCriteria: .removed) {
+            isExpanded = expanded
+            if !expanded {
+                focusedProviderID = nil
+                pane = .usage
+            }
+        } completion: {
+            if !isExpanded {
+                resizePanel(false)
+            }
+        }
     }
 
     /// Debounced open plus close-with-duration analytics. The 250ms delay

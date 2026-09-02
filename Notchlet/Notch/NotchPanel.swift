@@ -20,5 +20,7 @@ final class NotchPanel: NSPanel {
         isReleasedWhenClosed = false
     }
 
+    /// Key is required: a mouse-down on the settings switches in a window
+    /// that refuses key status collapses the panel instead of toggling.
     override var canBecomeKey: Bool { true }
 }
