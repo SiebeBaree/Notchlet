@@ -42,10 +42,11 @@ protocol HTTPUsageProvider: UsageProvider {
     /// Plan tier from the same response, if it exposes one. Feeds anonymous
     /// analytics only; defaults to nil.
     func parsePlanTier(from data: Data) -> String?
-    /// Drops any credentials the provider caches between fetches. Called
-    /// when the endpoint rejects them, before one retry with a fresh read.
-    /// Defaults to a no-op for providers that read credentials every time.
-    func forgetCredentials()
+    /// Drops any credentials the provider caches between fetches and reports
+    /// whether there was anything to drop. Called when the endpoint rejects
+    /// them, to decide whether a retry with a fresh read could say anything
+    /// new. Defaults to false for providers that read credentials every time.
+    func forgetCredentials() -> Bool
 }
 
 extension HTTPUsageProvider {
@@ -53,17 +54,27 @@ extension HTTPUsageProvider {
         nil
     }
 
-    func forgetCredentials() {}
+    func forgetCredentials() -> Bool {
+        false
+    }
 
-    /// One request, with a single retry on 401 after re-reading credentials
-    /// so a cached token that the CLI has since replaced costs one extra
-    /// round trip rather than a visible error.
+    /// One request. A provider holding cached credentials gets a second
+    /// attempt with a fresh read, so a token the CLI rotated behind our back
+    /// costs one extra round trip rather than a visible error. Anything the
+    /// endpoint still rejects after that is a real logout, which reads the
+    /// same as never having logged in.
     func fetchUsage() async throws -> UsageSnapshot {
         do {
             return try await fetchOnce()
         } catch UsageProviderError.unauthorized {
-            forgetCredentials()
-            return try await fetchOnce()
+            guard forgetCredentials() else {
+                throw UsageProviderError.notAvailable
+            }
+            do {
+                return try await fetchOnce()
+            } catch UsageProviderError.unauthorized {
+                throw UsageProviderError.notAvailable
+            }
         }
     }
 
@@ -76,14 +87,18 @@ extension HTTPUsageProvider {
         guard let http = response as? HTTPURLResponse else {
             throw UsageProviderError.requestFailed
         }
-        if http.statusCode == 401 {
-            throw UsageProviderError.unauthorized
-        }
         if http.statusCode == 429 {
             // Retry-After can also be an HTTP-date; the scheduler's own
             // backoff covers that case, so only the seconds form is parsed.
             let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
             throw UsageProviderError.rateLimited(retryAfter: retryAfter)
+        }
+        if http.statusCode == 401 || http.statusCode == 403 {
+            // A token that passed the local expiry check but the server
+            // rejects: rotated behind our back, revoked, or logged out
+            // elsewhere. `fetchUsage` tells those apart and settles on
+            // `notAvailable`; there is nothing here to back off from.
+            throw UsageProviderError.unauthorized
         }
         guard http.statusCode == 200 else {
             throw UsageProviderError.requestFailed
@@ -97,12 +112,14 @@ extension HTTPUsageProvider {
 }
 
 enum UsageProviderError: Error {
-    /// The CLI is not installed, never logged in, or the login expired.
+    /// The CLI is not installed, never logged in, the login expired, or the
+    /// endpoint rejected the credentials.
     case notAvailable
     /// The usage endpoint returned a non-success response.
     case requestFailed
-    /// The usage endpoint rejected the credentials (401). Surfaces to the
-    /// store only when the retry with fresh credentials fails too.
+    /// The usage endpoint rejected the credentials (401 or 403). Internal to
+    /// `fetchUsage`, which retries once with a fresh read and then reports
+    /// `notAvailable`; the store never sees this case.
     case unauthorized
     /// The usage endpoint returned 429; `retryAfter` is its Retry-After
     /// header in seconds, when present and parseable.

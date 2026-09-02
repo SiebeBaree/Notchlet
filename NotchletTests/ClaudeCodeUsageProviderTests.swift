@@ -38,7 +38,7 @@ struct ClaudeCodeUsageProviderTests {
     }
 
     @Test func parsesMicrosecondResetDates() throws {
-        let date = try #require(ClaudeCodeUsageProvider.parseDate("2026-08-29T09:50:00.003920+00:00"))
+        let date = try #require(UsageDate.parse("2026-08-29T09:50:00.003920+00:00"))
         let expected = try #require(ISO8601DateFormatter().date(from: "2026-08-29T09:50:00+00:00"))
         #expect(date == expected)
     }

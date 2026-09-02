@@ -27,9 +27,9 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     /// The last credentials read, reused until they expire. The keychain
     /// read spawns a process and a token lasts hours, so reading once per
     /// token instead of once per refresh keeps the open panel's 60s cadence
-    /// from forking `security` every minute. A 401 clears this (see
-    /// `HTTPUsageProvider.fetchUsage`) in case the server retired the old
-    /// token when Claude Code rotated it.
+    /// from forking `security` every minute. A rejected request clears this
+    /// (see `HTTPUsageProvider.fetchUsage`) in case the server retired the
+    /// old token when Claude Code rotated it.
     private let cachedCredentials = OSAllocatedUnfairLock<Credentials?>(initialState: nil)
 
     func authHeaders() async throws -> [String: String] {
@@ -48,8 +48,12 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         return Self.headers(token: credentials.accessToken)
     }
 
-    func forgetCredentials() {
-        cachedCredentials.withLock { $0 = nil }
+    func forgetCredentials() -> Bool {
+        cachedCredentials.withLock { credentials in
+            let hadCredentials = credentials != nil
+            credentials = nil
+            return hadCredentials
+        }
     }
 
     private static func headers(token: String) -> [String: String] {
@@ -84,7 +88,7 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         let response = try decoder.decode(Response.self, from: data)
 
         return response.limits.compactMap { limit in
-            let resetsAt = limit.resetsAt.flatMap(Self.parseDate)
+            let resetsAt = limit.resetsAt.flatMap(UsageDate.parse)
             let usedFraction = min(max(limit.percent / 100, 0), 1)
             switch limit.kind {
             case "session":
@@ -116,14 +120,6 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
                 return nil
             }
         }
-    }
-
-    /// The endpoint sends ISO 8601 with microseconds, which
-    /// `ISO8601DateFormatter` refuses. Sub-second precision is irrelevant
-    /// here, so strip the fraction before parsing.
-    static func parseDate(_ string: String) -> Date? {
-        let stripped = string.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
-        return ISO8601DateFormatter().date(from: stripped)
     }
 
     private struct Credentials: Decodable, Sendable {

@@ -30,8 +30,11 @@ struct NotchView: View {
     @State private var openedAt: Date?
     @State private var openDebounce: Task<Void, Never>?
 
+    /// Providers with something to draw. A snapshot without windows (an
+    /// unlimited plan, say) would be a brand row over nothing, so it counts
+    /// as no data.
     private var activeEntries: [UsageStore.Entry] {
-        store.entries.filter { store.isEnabled($0.id) && $0.snapshot != nil }
+        store.entries.filter { store.isEnabled($0.id) && $0.snapshot?.windows.isEmpty == false }
     }
 
     private var expandedWidth: CGFloat {

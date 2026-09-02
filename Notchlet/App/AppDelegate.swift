@@ -12,9 +12,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // network: the keychain permission prompt would hang the test runner.
         guard NSClassFromString("XCTestCase") == nil else { return }
 
+        // Order is the settings order, and the order installed CLIs claim
+        // the active slots on first launch.
         let store = UsageStore(providers: [
             ClaudeCodeUsageProvider(),
             CodexUsageProvider(),
+            CursorUsageProvider(),
+            OpenCodeUsageProvider(),
         ])
         self.store = store
         store.startRefreshing()
