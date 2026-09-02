@@ -3,7 +3,9 @@ import Foundation
 import Testing
 
 /// Default visibility under the active-provider cap. Uses throwaway
-/// provider ids so the real settings keys are never touched.
+/// provider ids so the real settings keys are never touched. Serialized
+/// because every test reads and writes the same UserDefaults keys.
+@Suite(.serialized)
 struct UsageStoreTests {
     private struct StubProvider: UsageProvider {
         let id: String
