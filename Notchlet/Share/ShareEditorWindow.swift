@@ -61,16 +61,32 @@ final class ShareEditorModel {
         history.providersWithHistory
     }
 
-    /// The providers the card names: all of them, or the one in scope. A
-    /// scope whose provider is gone falls back to all.
+    /// The scope the card and the chips use: the chosen one, or all when
+    /// its provider no longer has history (switched off while the window
+    /// was open, say). Labels and data both go through this so they never
+    /// disagree.
+    var effectiveScope: UsageHistory.Scope {
+        if case let .provider(id) = scope, !providers.contains(where: { $0.id == id }) {
+            return .all
+        }
+        return scope
+    }
+
+    /// The providers the card names.
     var scopedProviders: [ShareCard.Provider] {
         let all = providers
-        let chosen: [any UsageProvider] = if case let .provider(id) = scope, all.contains(where: { $0.id == id }) {
+        let chosen: [any UsageProvider] = if case let .provider(id) = effectiveScope {
             all.filter { $0.id == id }
         } else {
             all
         }
         return chosen.map { ShareCard.Provider(id: $0.id, name: $0.name, logoAssetName: $0.logoAssetName) }
+    }
+
+    /// The archives show right away at launch, but today and yesterday
+    /// only arrive with the first read of the logs.
+    var isReadingLogs: Bool {
+        history.lastIngestAt == nil
     }
 
     var theme: ShareTheme {
@@ -79,22 +95,22 @@ final class ShareEditorModel {
 
     /// What the period holds, for the editor's disabled states.
     var summary: UsageLedger.Summary {
-        history.summary(options.period, scope: scope)
+        history.summary(options.period, scope: effectiveScope)
     }
 
     var card: ShareCard {
         ShareCard.make(
             options: options,
             providers: scopedProviders,
-            ledger: history.ledger(scope),
-            coverageStart: history.coverageStart(scope),
+            ledger: history.ledger(effectiveScope),
+            coverageStart: history.coverageStart(effectiveScope),
             today: history.today,
             calendar: history.calendar
         )
     }
 
     var canExport: Bool {
-        card.hasUsage
+        !isReadingLogs && card.hasUsage
     }
 
     private func png() -> Data? {
@@ -306,7 +322,10 @@ struct ShareEditorView: View {
             VStack(alignment: .leading, spacing: 8) {
                 group("Show") {
                     if model.providers.count > 1 {
-                        ScopeChips(providers: model.providers, scope: $model.scope)
+                        ScopeChips(providers: model.providers, scope: Binding(
+                            get: { model.effectiveScope },
+                            set: { model.scope = $0 }
+                        ))
                     }
                     Picker("Period", selection: $model.options.period) {
                         Text("Today").tag(UsageHistory.Range.today)
@@ -366,8 +385,8 @@ struct ShareEditorView: View {
     @ViewBuilder
     private var includeRows: some View {
         let summary = model.summary
-        let hasUsage = summary.tokens > 0
-        let noUsage = "No usage in this period"
+        let hasUsage = !model.isReadingLogs && summary.tokens > 0
+        let noUsage = model.isReadingLogs ? "Reading logs" : "No usage in this period"
         includeRow(
             "Cost",
             detail: !hasUsage ? noUsage : summary
