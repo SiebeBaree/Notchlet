@@ -33,12 +33,13 @@ nonisolated struct HistoryArchiveStore: Sendable {
     let directory: URL
 
     /// Nil when there is no file yet, or when it cannot be read as the
-    /// current version: a corrupt or foreign file starts the provider over
-    /// rather than crashing the app on every launch.
+    /// current version for this provider: a corrupt, foreign or misplaced
+    /// file starts the provider over rather than crashing the app on every
+    /// launch or being saved under another provider's id.
     func load(_ providerID: String) -> ProviderArchive? {
         guard let data = try? Data(contentsOf: url(for: providerID)),
               let archive = try? JSONDecoder().decode(ProviderArchive.self, from: data),
-              archive.version == ProviderArchive.currentVersion
+              archive.version == ProviderArchive.currentVersion, archive.providerID == providerID
         else { return nil }
         return archive
     }

@@ -27,6 +27,10 @@ struct HistoryModelsTests {
         #expect(day < DayKey(year: 2026, month: 10, day: 1))
         #expect(day > DayKey(year: 2025, month: 12, day: 31))
         #expect(DayKey("2026-13-01") == nil)
+        #expect(DayKey("2026-02-30") == nil)
+        #expect(DayKey("2026-02-29") == nil)
+        #expect(DayKey("2028-02-29") != nil)
+        #expect(DayKey("2026-04-31") == nil)
         #expect(DayKey("yesterday") == nil)
     }
 
@@ -92,5 +96,30 @@ struct HistoryModelsTests {
         #expect(rows[1].reportedCost == nil)
         #expect(rows[0].reportedCost == 0.5)
         #expect(rows.allSatisfy { $0.providerID == "p" })
+    }
+
+    @Test func aReportedCostNeverCoversUnpricedEventsOfTheSameDay() {
+        let events = [
+            UsageEvent(
+                model: "m",
+                timestamp: date("2026-09-03T01:00:00Z"),
+                tokens: TokenCount(output: 1),
+                reportedCost: 0.2
+            ),
+            UsageEvent(model: "m", timestamp: date("2026-09-03T02:00:00Z"), tokens: TokenCount(output: 2)),
+            UsageEvent(
+                model: "m",
+                timestamp: date("2026-09-03T03:00:00Z"),
+                tokens: TokenCount(output: 4),
+                reportedCost: 0.3
+            ),
+        ]
+        let rows = UsageRollup.daily(events, providerID: "p", calendar: utc)
+
+        #expect(rows.count == 2)
+        #expect(rows[0].reportedCost == nil)
+        #expect(rows[0].tokens.output == 2)
+        #expect(rows[1].reportedCost == 0.5)
+        #expect(rows[1].tokens.output == 5)
     }
 }

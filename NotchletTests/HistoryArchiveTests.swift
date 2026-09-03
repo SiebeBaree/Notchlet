@@ -54,8 +54,12 @@ struct HistoryArchiveTests {
             .write(to: directory.appending(path: "codex.json"))
         try Data("nonsense".utf8).write(to: directory.appending(path: "cursor.json"))
 
+        try Data(#"{"version":1,"providerID":"codex","rows":[]}"#.utf8)
+            .write(to: directory.appending(path: "claude-code.json"))
+
         let store = HistoryArchiveStore(directory: directory)
         #expect(store.load("codex") == nil)
         #expect(store.load("cursor") == nil)
+        #expect(store.load("claude-code") == nil)
     }
 }

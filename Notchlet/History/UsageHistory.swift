@@ -239,9 +239,13 @@ final class UsageHistory {
         ledger(scope).byDay(span)
     }
 
-    /// The earliest day the scope can vouch for: the earliest of its
-    /// providers' coverage starts. Nil until the first ingest.
+    /// The first day every provider in the scope can vouch for, so the
+    /// latest of their coverage starts: before it the sum is missing a
+    /// provider, and a partial day would read as a quiet one. Nil until
+    /// every provider has an archive.
     func coverageStart(_ scope: Scope) -> DayKey? {
-        providerIDs(in: scope).compactMap { histories[$0]?.archive.coverageStart }.min()
+        let ids = providerIDs(in: scope)
+        let starts = ids.compactMap { histories[$0]?.archive.coverageStart }
+        return starts.count == ids.count ? starts.max() : nil
     }
 }

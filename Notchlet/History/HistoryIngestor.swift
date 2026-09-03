@@ -53,7 +53,13 @@ actor HistoryIngestor {
         }
         if !sealing.isEmpty || sealedThrough != plan.sealThrough {
             archive.rows += sealing
-            archive.rows.sort { ($0.day, $0.model ?? "") < ($1.day, $1.model ?? "") }
+            archive.rows.sort {
+                ($0.day, $0.model ?? "", $0.reportedCost == nil ? 0 : 1) < (
+                    $1.day,
+                    $1.model ?? "",
+                    $1.reportedCost == nil ? 0 : 1
+                )
+            }
             archive.sealedThrough = plan.sealThrough
             try archives.save(archive)
             loaded[providerID] = archive

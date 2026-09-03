@@ -67,13 +67,24 @@ nonisolated struct DayKey: Hashable, Comparable, Sendable {
         self.init(year: parts.year ?? 1970, month: parts.month ?? 1, day: parts.day ?? 1)
     }
 
-    /// Parses "yyyy-MM-dd", the form the archive stores.
+    /// Parses "yyyy-MM-dd", the form the archive stores. A day the month
+    /// does not have is refused: `Calendar` would roll it into the next
+    /// month and the key would no longer name its own day.
     init?(_ string: String) {
         let parts = string.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3, let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]),
-              (1 ... 12).contains(month), (1 ... 31).contains(day)
+              (1 ... 12).contains(month), (1 ... Self.days(inMonth: month, year: year)).contains(day)
         else { return nil }
         self.init(year: year, month: month, day: day)
+    }
+
+    /// Gregorian month lengths, leap years included.
+    static func days(inMonth month: Int, year: Int) -> Int {
+        switch month {
+        case 2: (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 ? 29 : 28
+        case 4, 6, 9, 11: 30
+        default: 31
+        }
     }
 
     var string: String {
@@ -124,8 +135,9 @@ extension DayKey: Codable {
     }
 }
 
-/// One provider's use of one model on one day. The unit the archive keeps
-/// and the pane sums, so a per-day, per-model breakdown is always there.
+/// One provider's use of one model on one day, priced by the CLI or not.
+/// The unit the archive keeps and the pane sums, so a per-day, per-model
+/// breakdown is always there.
 nonisolated struct DailyUsage: Hashable, Codable, Sendable {
     var day: DayKey
     var providerID: String
@@ -156,17 +168,24 @@ nonisolated enum UsageRollup {
         return unkeyed + keyed.values
     }
 
-    /// Buckets by local day and model. Sorted by day then model so the
-    /// archive on disk stays stable.
+    /// Buckets by local day and model. Events the CLI priced itself and
+    /// events it did not stay in separate rows, so a reported cost never
+    /// stands in for tokens it did not cover and the price table gets the
+    /// rest. Sorted by day then model so the archive on disk stays stable.
     static func daily(_ events: [UsageEvent], providerID: String, calendar: Calendar) -> [DailyUsage] {
         struct Key: Hashable {
             let day: DayKey
             let model: String?
+            let hasReportedCost: Bool
         }
 
         var rows: [Key: DailyUsage] = [:]
         for event in events {
-            let key = Key(day: DayKey(event.timestamp, calendar: calendar), model: event.model)
+            let key = Key(
+                day: DayKey(event.timestamp, calendar: calendar),
+                model: event.model,
+                hasReportedCost: event.reportedCost != nil
+            )
             var row = rows[key] ?? DailyUsage(
                 day: key.day, providerID: providerID, model: key.model, requests: 0, tokens: .zero
             )
@@ -177,6 +196,12 @@ nonisolated enum UsageRollup {
             }
             rows[key] = row
         }
-        return rows.values.sorted { ($0.day, $0.model ?? "") < ($1.day, $1.model ?? "") }
+        return rows.values.sorted {
+            ($0.day, $0.model ?? "", $0.reportedCost == nil ? 0 : 1) < (
+                $1.day,
+                $1.model ?? "",
+                $1.reportedCost == nil ? 0 : 1
+            )
+        }
     }
 }
