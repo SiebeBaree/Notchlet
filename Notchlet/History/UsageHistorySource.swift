@@ -32,7 +32,7 @@ nonisolated protocol LogLineParser: Sendable {
 /// start. Files older than `since` are skipped by their modification date
 /// alone and dropped from memory. Files parse in parallel, at most four at
 /// a time, so a first read of a year of logs uses the machine without
-/// starving it.
+/// starving it. Roots are in order of preference; see `logFiles`.
 actor LogDirectoryReader<Parser: LogLineParser> {
     private struct Cached {
         var size: UInt64
@@ -120,23 +120,30 @@ actor LogDirectoryReader<Parser: LogLineParser> {
     }
 
     /// Every `.jsonl` under the roots, with the attributes the cache keys
-    /// on, minus files last written before `since`.
+    /// on, minus files last written before `since`. Roots are in order of
+    /// preference: a file name already seen under an earlier root is a
+    /// copy (Codex archives a thread by moving it) and is skipped.
     private nonisolated static func logFiles(under roots: [URL], modifiedSince since: Date?) -> [LogFile] {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
         var files: [LogFile] = []
+        var seenNames: Set<String> = []
         for root in roots {
             guard let enumerator = FileManager.default.enumerator(
                 at: root, includingPropertiesForKeys: Array(keys), options: []
             ) else { continue }
+            var names: Set<String> = []
             for case let url as URL in enumerator where url.pathExtension == "jsonl" {
-                guard let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
+                guard !seenNames.contains(url.lastPathComponent),
+                      let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
                       let size = values.fileSize, let modified = values.contentModificationDate
                 else { continue }
+                names.insert(url.lastPathComponent)
                 if let since, modified < since {
                     continue
                 }
                 files.append(LogFile(url: url, size: UInt64(size), modified: modified))
             }
+            seenNames.formUnion(names)
         }
         return files
     }
