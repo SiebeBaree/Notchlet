@@ -7,9 +7,11 @@ struct HistoryIngestorTests {
         var events: [UsageEvent] = []
         var requestedSince: [Date?] = []
         var error: Error?
+        var delay: Duration = .zero
 
         func events(since: Date?) async throws -> [UsageEvent] {
             requestedSince.append(since)
+            try await Task.sleep(for: delay)
             if let error {
                 throw error
             }
@@ -93,6 +95,25 @@ struct HistoryIngestorTests {
         #expect(history.archive.coverageStart?.string == "2026-09-03")
         #expect(history.archive.sealedThrough?.string == "2026-09-01")
         #expect(history.rows.isEmpty)
+    }
+
+    @Test func anIngestThatArrivesDuringAnotherJoinsIt() async throws {
+        let store = temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
+        let source = StubSource()
+        source.events = [event("2026-08-20T10:00:00Z")]
+        source.delay = .milliseconds(200)
+        let ingestor = HistoryIngestor(archives: store, calendar: utc)
+
+        async let first = ingestor.ingest("p", from: source, now: date("2026-09-03T15:00:00Z"))
+        try await Task.sleep(for: .milliseconds(50))
+        async let second = ingestor.ingest("p", from: source, now: date("2026-09-10T15:00:00Z"))
+        let (a, b) = try await (first, second)
+
+        #expect(source.requestedSince.count == 1)
+        #expect(a == b)
+        #expect(a.archive.sealedThrough?.string == "2026-09-01")
+        #expect(await ingestor.archive(for: "p") == a.archive)
     }
 
     @Test func aFailingSourceLeavesTheArchiveAlone() async throws {

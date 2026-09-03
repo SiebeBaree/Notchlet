@@ -13,13 +13,17 @@ nonisolated struct ProviderHistory: Equatable, Sendable {
 /// Runs ingests off the main actor: asks a source for events, rolls them
 /// into days, seals the days that are old enough into the archive on disk
 /// and hands back the rest as live rows. Owns the archives so the store
-/// never touches a file.
+/// never touches a file. One ingest per provider runs at a time; a call
+/// that arrives while one is running gets that one's result, since the
+/// actor is reentrant across the wait on the source and two ingests
+/// racing to save could move `sealedThrough` backwards.
 actor HistoryIngestor {
     private let archives: HistoryArchiveStore
     private let calendar: Calendar
     private var loaded: [String: ProviderArchive] = [:]
+    private var running: [String: Task<ProviderHistory, any Error>] = [:]
 
-    init(archives: HistoryArchiveStore = .default, calendar: Calendar = .current) {
+    init(archives: HistoryArchiveStore = .default, calendar: Calendar = .localGregorian) {
         self.archives = archives
         self.calendar = calendar
     }
@@ -37,6 +41,18 @@ actor HistoryIngestor {
 
     func ingest(_ providerID: String, from source: any UsageHistorySource,
                 now: Date = .now) async throws -> ProviderHistory
+    {
+        if let running = running[providerID] {
+            return try await running.value
+        }
+        let task = Task { try await run(providerID, from: source, now: now) }
+        running[providerID] = task
+        defer { running[providerID] = nil }
+        return try await task.value
+    }
+
+    private func run(_ providerID: String, from source: any UsageHistorySource,
+                     now: Date) async throws -> ProviderHistory
     {
         var archive = archive(for: providerID) ?? ProviderArchive(providerID: providerID)
         let plan = SealPlan(sealedThrough: archive.sealedThrough, now: now, calendar: calendar)

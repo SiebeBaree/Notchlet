@@ -42,6 +42,13 @@ struct HistoryModelsTests {
         #expect(DayKey(lateEvening, calendar: brussels).string == "2026-09-04")
     }
 
+    @Test func theHistoryCalendarIsGregorianInTheLocalZone() {
+        let calendar = Calendar.localGregorian
+        #expect(calendar.identifier == .gregorian)
+        #expect(calendar.timeZone == Calendar.current.timeZone)
+        #expect(DayKey(date("2026-02-28T12:00:00Z"), calendar: calendar).year == 2026)
+    }
+
     @Test func dayKeyWalksAcrossMonths() {
         let day = DayKey(year: 2026, month: 3, day: 1)
         #expect(day.advanced(by: -1, calendar: utc).string == "2026-02-28")

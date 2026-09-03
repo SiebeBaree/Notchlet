@@ -139,7 +139,7 @@ final class UsageHistory {
     private(set) var failedProviderIDs: Set<String> = []
     private var loop: Task<Void, Never>?
 
-    init(store: UsageStore, archives: HistoryArchiveStore = .default, calendar: Calendar = .current) {
+    init(store: UsageStore, archives: HistoryArchiveStore = .default, calendar: Calendar = .localGregorian) {
         self.store = store
         self.calendar = calendar
         ingestor = HistoryIngestor(archives: archives, calendar: calendar)

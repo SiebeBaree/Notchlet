@@ -49,8 +49,10 @@ nonisolated struct UsageEvent: Hashable, Sendable {
     var reportedCost: Double?
 }
 
-/// A calendar day in the user's own time zone, "2026-09-03". The only place
-/// a `Date` becomes a day, so every rollup buckets the same way.
+/// A Gregorian calendar day in the user's own time zone, "2026-09-03". The
+/// only place a `Date` becomes a day, so every rollup buckets the same way.
+/// Always Gregorian, whatever calendar the Mac is set to: the archive
+/// stores these and parses them back with Gregorian month lengths.
 nonisolated struct DayKey: Hashable, Comparable, Sendable {
     let year: Int
     let month: Int
@@ -114,6 +116,18 @@ nonisolated struct DayKey: Hashable, Comparable, Sendable {
 
     static func < (lhs: DayKey, rhs: DayKey) -> Bool {
         (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
+    }
+}
+
+nonisolated extension Calendar {
+    /// Gregorian in the current time zone and locale, the calendar every
+    /// `DayKey` is made with. A Mac set to another calendar would otherwise
+    /// produce keys the archive cannot read back.
+    static var localGregorian: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = Calendar.current.timeZone
+        calendar.locale = Calendar.current.locale
+        return calendar
     }
 }
 
