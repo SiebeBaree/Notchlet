@@ -22,6 +22,10 @@ enum AnalyticsEvent {
     case historyOpened(scope: String)
     /// Booleans and enum values only, never free text.
     case settingChanged(key: String, value: String)
+    /// `scope` is "all" or a provider id.
+    case shareOpened(scope: String)
+    /// What left the app and how it was configured, never the numbers on it.
+    case shareExported(method: String, theme: String, period: String, graph: String, cost: Bool, models: Bool)
     case updateAvailable(fromVersion: String, toVersion: String)
     case updateInstallClicked(toVersion: String)
     case updateFailed(errorCode: Int)
@@ -38,6 +42,8 @@ enum AnalyticsEvent {
         case .settingsOpened: "settings_opened"
         case .historyOpened: "history_opened"
         case .settingChanged: "setting_changed"
+        case .shareOpened: "share_opened"
+        case .shareExported: "share_exported"
         case .updateAvailable: "update_available"
         case .updateInstallClicked: "update_install_clicked"
         case .updateFailed: "update_failed"
@@ -60,8 +66,10 @@ enum AnalyticsEvent {
             ["provider": provider, "state": state.rawValue]
         case let .settingChanged(key, value):
             ["key": key, "value": value]
-        case let .historyOpened(scope):
+        case let .historyOpened(scope), let .shareOpened(scope):
             ["scope": scope]
+        case let .shareExported(method, theme, period, graph, cost, models):
+            ["method": method, "theme": theme, "period": period, "graph": graph, "cost": cost, "models": models]
         case let .updateAvailable(fromVersion, toVersion):
             ["from_version": fromVersion, "to_version": toVersion]
         case let .updateInstallClicked(toVersion):

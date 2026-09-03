@@ -43,6 +43,25 @@ nonisolated struct UsageLedger: Sendable {
         Self.models(of: rows.filter { days.contains($0.day) })
     }
 
+    /// Days in the span with any tokens.
+    func activeDays(_ days: ClosedRange<DayKey>) -> Int {
+        Set(rows.filter { days.contains($0.day) && $0.tokens.total > 0 }.map(\.day)).count
+    }
+
+    /// The most consecutive active days inside the span.
+    func longestStreak(_ days: ClosedRange<DayKey>, calendar: Calendar) -> Int {
+        let active = Set(rows.filter { days.contains($0.day) && $0.tokens.total > 0 }.map(\.day))
+        var longest = 0
+        var current = 0
+        var day = days.lowerBound
+        while day <= days.upperBound {
+            current = active.contains(day) ? current + 1 : 0
+            longest = max(longest, current)
+            day = day.advanced(by: 1, calendar: calendar)
+        }
+        return longest
+    }
+
     /// Every day in the span that has rows.
     func byDay(_ days: ClosedRange<DayKey>) -> [DayKey: DayUsage] {
         let grouped = Dictionary(grouping: rows.filter { days.contains($0.day) }, by: \.day)
@@ -117,16 +136,20 @@ final class UsageHistory {
         }
     }
 
-    enum Range: CaseIterable {
+    /// The spans the pane's tiles and the share card sum over. The pane
+    /// shows the first three; the year exists for the card.
+    nonisolated enum Range: String, CaseIterable, Sendable {
         case today
         case week
         case month
+        case year
 
         var days: Int {
             switch self {
             case .today: 1
             case .week: 7
             case .month: 30
+            case .year: 365
             }
         }
 

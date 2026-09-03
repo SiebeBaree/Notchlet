@@ -52,6 +52,16 @@ nonisolated enum HistoryCopy {
         day.start(in: calendar).formatted(style(calendar).day().month(.abbreviated))
     }
 
+    /// "Aug 12, 2026" where the year matters, as on a shared image.
+    static func fullDay(_ day: DayKey, calendar: Calendar) -> String {
+        day.start(in: calendar).formatted(style(calendar).day().month(.abbreviated).year())
+    }
+
+    /// "Aug 2026".
+    static func monthYear(_ day: DayKey, calendar: Calendar) -> String {
+        day.start(in: calendar).formatted(style(calendar).month(.abbreviated).year())
+    }
+
     /// No fields until one is added, in the calendar's own time zone so
     /// midnight stays on its day.
     private static func style(_ calendar: Calendar) -> Date.FormatStyle {
@@ -70,7 +80,18 @@ nonisolated enum HistoryCopy {
     static func footer(unpricedModels: [String], coverageStart: DayKey?, graphStart: DayKey,
                        calendar: Calendar) -> String
     {
-        var parts = ["Cost at API list prices"]
+        (["Cost at API list prices"] + caveats(
+            unpricedModels: unpricedModels, coverageStart: coverageStart, graphStart: graphStart, calendar: calendar
+        )).joined(separator: " · ")
+    }
+
+    /// What could not be priced, then how far back the archive goes when
+    /// that is less than the graph shows. Empty when there is nothing to
+    /// caveat.
+    static func caveats(unpricedModels: [String], coverageStart: DayKey?, graphStart: DayKey,
+                        calendar: Calendar) -> [String]
+    {
+        var parts: [String] = []
         switch unpricedModels.count {
         case 0:
             break
@@ -84,6 +105,6 @@ nonisolated enum HistoryCopy {
         if let coverageStart, coverageStart > graphStart {
             parts.append("History since \(shortDay(coverageStart, calendar: calendar))")
         }
-        return parts.joined(separator: " · ")
+        return parts
     }
 }

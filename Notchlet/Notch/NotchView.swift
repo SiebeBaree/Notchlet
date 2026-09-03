@@ -26,6 +26,8 @@ struct NotchView: View {
     /// Tells the window controller to grow the window before the card
     /// expands and to shrink it once the collapse animation has ended.
     let resizePanel: (_ expanded: Bool) -> Void
+    /// Opens the share editor for a scope.
+    let share: (UsageHistory.Scope) -> Void
 
     @State private var isExpanded = false
     @State private var focusedProviderID: String?
@@ -140,9 +142,9 @@ struct NotchView: View {
         .overlay(alignment: .topTrailing) { cornerIcons }
     }
 
-    /// The history icon and the gear live in the strip beside the notch
+    /// The share, history and gear icons live in the strip beside the notch
     /// cutout, quiet until hovered. The update icon only exists when an
-    /// update is waiting.
+    /// update is waiting. Share is dimmed until some history exists.
     private var cornerIcons: some View {
         HStack(spacing: 6) {
             if updater.availableUpdateVersion != nil {
@@ -150,6 +152,11 @@ struct NotchView: View {
                     updater.installAvailableUpdate()
                 }
             }
+            NotchIconButton(systemName: "square.and.arrow.up") {
+                share(pane == .history ? resolvedScope : .all)
+            }
+            .disabled(history.providersWithHistory.isEmpty)
+            .opacity(history.providersWithHistory.isEmpty ? 0.4 : 1)
             NotchIconButton(systemName: "chart.bar.fill", isActive: pane == .history) {
                 toggle(.history)
             }
