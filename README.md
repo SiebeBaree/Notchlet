@@ -42,6 +42,12 @@ Every rate-limit window gets a ring.
 
 Run two or three agents and each gets a summary gauge. Hover one to unfold its full breakdown.
 
+## What you have used
+
+Click the bars icon in the corner, or any gauge, and the card turns into history: cost and tokens for today, the last 7 days and the last 30 days, a 12-month graph of tokens per day (hover a day for its models, or switch to cost per day over the last month), and every model with its input and output tokens.
+
+It all comes from the logs the CLIs keep on your Mac. Claude Code deletes those after 30 days, so Notchlet seals each finished day into its own archive and the graph keeps growing from the day you installed it. Cost is what the same tokens would cost at API list prices. A subscription does not bill per token, so read it as a value, not a bill.
+
 ## Install
 
 ```sh

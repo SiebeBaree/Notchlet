@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let updater = UpdateController()
         updateController = updater
-        notchController = NotchWindowController(store: store, updater: updater)
+        notchController = NotchWindowController(store: store, history: history, updater: updater)
         notchController?.showWindow(nil)
 
         Analytics.bootstrap()

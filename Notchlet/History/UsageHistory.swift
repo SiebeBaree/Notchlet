@@ -103,6 +103,18 @@ final class UsageHistory {
     enum Scope: Hashable, Sendable {
         case all
         case provider(String)
+
+        /// "all" or the provider id, as UserDefaults keeps it.
+        var storedValue: String {
+            switch self {
+            case .all: "all"
+            case let .provider(id): id
+            }
+        }
+
+        init(storedValue: String) {
+            self = storedValue == "all" ? .all : .provider(storedValue)
+        }
     }
 
     enum Range: CaseIterable {

@@ -4,20 +4,23 @@ import SwiftUI
 /// expands it into the usage card. With one active provider the card shows
 /// its full breakdown directly. With two or three it shows one summary gauge
 /// per provider (its primary window), and hovering a gauge unfolds that
-/// provider's breakdown below.
+/// provider's breakdown below. Clicking a gauge, or the history icon in the
+/// corner, swaps the card for the history pane at the same width.
 ///
 /// The hosting window is always `NotchGeometry.panelSize`, but only the
 /// notch shape is drawn: the panel is non-opaque and nothing else paints a
 /// background, so clicks in the transparent area go to the window below.
 struct NotchView: View {
-    /// What the expanded panel shows: usage, or in-notch settings behind the
-    /// small gear in the corner.
+    /// What the expanded panel shows: usage, past usage behind the history
+    /// icon, or in-notch settings behind the gear.
     private enum Pane {
         case usage
+        case history
         case settings
     }
 
     let store: UsageStore
+    let history: UsageHistory
     let updater: UpdateController
     let notchSize: CGSize
     /// Tells the window controller to grow the window before the card
@@ -27,6 +30,8 @@ struct NotchView: View {
     @State private var isExpanded = false
     @State private var focusedProviderID: String?
     @State private var pane: Pane = .usage
+    /// The history pane's scope, remembered across opens.
+    @AppStorage("historyScope") private var historyScope = "all"
     @State private var openedAt: Date?
     @State private var openDebounce: Task<Void, Never>?
 
@@ -116,9 +121,15 @@ struct NotchView: View {
             // Leave room for the physical notch cutout.
             Spacer().frame(height: notchSize.height)
 
-            if pane == .settings {
+            switch pane {
+            case .settings:
                 NotchSettingsView(store: store, updater: updater)
-            } else {
+            case .history:
+                HistoryPane(history: history, scope: Binding(
+                    get: { UsageHistory.Scope(storedValue: historyScope) },
+                    set: { historyScope = $0.storedValue }
+                ))
+            case .usage:
                 usageContent
                 freshnessFooter
             }
@@ -129,8 +140,9 @@ struct NotchView: View {
         .overlay(alignment: .topTrailing) { cornerIcons }
     }
 
-    /// The gear lives in the strip beside the notch cutout, quiet until
-    /// hovered. The update icon only exists when an update is waiting.
+    /// The history icon and the gear live in the strip beside the notch
+    /// cutout, quiet until hovered. The update icon only exists when an
+    /// update is waiting.
     private var cornerIcons: some View {
         HStack(spacing: 6) {
             if updater.availableUpdateVersion != nil {
@@ -138,17 +150,41 @@ struct NotchView: View {
                     updater.installAvailableUpdate()
                 }
             }
+            NotchIconButton(systemName: "chart.bar.fill", isActive: pane == .history) {
+                toggle(.history)
+            }
             NotchIconButton(systemName: "gearshape.fill", isActive: pane == .settings) {
-                withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
-                    pane = pane == .settings ? .usage : .settings
-                }
-                if pane == .settings {
-                    Analytics.capture(.settingsOpened)
-                }
+                toggle(.settings)
             }
         }
         .frame(height: notchSize.height)
         .padding(.trailing, 14)
+    }
+
+    /// A corner icon opens its pane, or closes it back to usage.
+    private func toggle(_ target: Pane) {
+        show(pane == target ? .usage : target)
+    }
+
+    /// A gauge opens history already scoped to its provider.
+    private func showHistory(for providerID: String) {
+        historyScope = UsageHistory.Scope.provider(providerID).storedValue
+        show(.history)
+    }
+
+    private func show(_ target: Pane) {
+        withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
+            pane = target
+        }
+        switch target {
+        case .settings:
+            Analytics.capture(.settingsOpened)
+        case .history:
+            history.ingestIfStale()
+            Analytics.capture(.historyOpened(scope: historyScope))
+        case .usage:
+            break
+        }
     }
 
     /// Fresh data shows nothing here. Data older than a couple of minutes
@@ -181,8 +217,12 @@ struct NotchView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.white.opacity(0.5))
         } else if active.count == 1, let entry = active.first, let snapshot = entry.snapshot {
-            BrandRow(provider: entry.provider)
-            WindowRow(windows: snapshot.windows, ringDiameter: 62)
+            VStack(alignment: .leading, spacing: 12) {
+                BrandRow(provider: entry.provider)
+                WindowRow(windows: snapshot.windows, ringDiameter: 62)
+            }
+            .contentShape(.rect)
+            .onTapGesture { showHistory(for: entry.id) }
         } else {
             HStack(alignment: .top, spacing: 0) {
                 ForEach(active) { entry in
@@ -192,6 +232,8 @@ struct NotchView: View {
                         isDimmed: focusedProviderID != nil && focusedProviderID != entry.id
                     )
                     .frame(maxWidth: .infinity)
+                    .contentShape(.rect)
+                    .onTapGesture { showHistory(for: entry.id) }
                     .onHover { hovering in
                         guard hovering else { return }
                         withAnimation(.spring(duration: 0.3, bounce: 0.1)) {
