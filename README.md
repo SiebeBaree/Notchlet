@@ -46,6 +46,8 @@ Run two or three agents and each gets a summary gauge. Hover one to unfold its f
 
 Click the bars icon in the corner, or any gauge, and the card turns into history: cost and tokens for today, the last 7 days and the last 30 days, a 12-month graph of tokens per day (hover a day for its models, or switch to cost per day over the last month), and every model with its input and output tokens.
 
+The share icon next to it turns those numbers into a picture: your cost or tokens for the period, the activity grid or the spend line, the models you used, on black glass with the notch cut out of the top. Switch off what you do not want to show, copy, paste it into a post.
+
 It comes from what each agent already keeps: Claude Code's transcripts, Codex's session rollouts and OpenCode's message database on your Mac, and Cursor's usage export from its dashboard, which covers the whole account. Claude Code deletes its transcripts after 30 days, so Notchlet seals each finished day into its own archive and the graph keeps growing from the day you installed it. Cost is what the same tokens would cost at API list prices. A subscription does not bill per token, so read it as a value, not a bill.
 
 ## Install

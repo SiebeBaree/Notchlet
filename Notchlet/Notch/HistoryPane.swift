@@ -39,7 +39,7 @@ struct HistoryPane: View {
                 ScopeChips(providers: providers, scope: $scope)
             }
             HStack(alignment: .top, spacing: 0) {
-                ForEach(UsageHistory.Range.allCases, id: \.self) { range in
+                ForEach([UsageHistory.Range.today, .week, .month], id: \.self) { range in
                     RangeTile(
                         range: range,
                         summary: ledger.summary(range.span(endingOn: today, calendar: calendar)),
@@ -223,6 +223,7 @@ private struct RangeTile: View {
         case .today: "Today"
         case .week: "7 days"
         case .month: "30 days"
+        case .year: "12 months"
         }
     }
 }

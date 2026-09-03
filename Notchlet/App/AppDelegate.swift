@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: UsageStore?
     private var history: UsageHistory?
     private var notchController: NotchWindowController?
+    private var shareController: ShareEditorWindowController?
     private var updateController: UpdateController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -40,7 +41,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let updater = UpdateController()
         updateController = updater
-        notchController = NotchWindowController(store: store, history: history, updater: updater)
+        let shareController = ShareEditorWindowController(history: history)
+        self.shareController = shareController
+        notchController = NotchWindowController(store: store, history: history, updater: updater) { scope in
+            Analytics.capture(.shareOpened(scope: scope.storedValue))
+            shareController.show(scope: scope)
+        }
         notchController?.showWindow(nil)
 
         Analytics.bootstrap()

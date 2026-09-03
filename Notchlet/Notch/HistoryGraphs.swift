@@ -14,8 +14,31 @@ enum ActivityPalette {
     static let empty = Color.white.opacity(0.06)
     static let unknown = Color(red: 0.16, green: 0.14, blue: 0.12)
     static let line = levels[2]
+}
 
-    static func color(for fill: ActivityGrid.Fill) -> Color {
+/// The colors and label size one drawing of a graph uses: the pane's, or a
+/// share card theme's. `unknown` is the fill for days before coverage; nil
+/// leaves them out.
+struct GraphStyle {
+    var levels: [Color]
+    var empty: Color
+    var unknown: Color?
+    var line: Color
+    var text: Color
+    var rule: Color
+    var labelSize: CGFloat
+
+    static let pane = GraphStyle(
+        levels: ActivityPalette.levels,
+        empty: ActivityPalette.empty,
+        unknown: ActivityPalette.unknown,
+        line: ActivityPalette.line,
+        text: .white.opacity(0.45),
+        rule: .white.opacity(0.15),
+        labelSize: 8
+    )
+
+    func color(for fill: ActivityGrid.Fill) -> Color? {
         switch fill {
         case .unknown: unknown
         case .empty: empty
@@ -54,19 +77,9 @@ struct ActivityHeatmap: View {
             let column = size.width / CGFloat(ActivityGrid.weeks)
             let top = column * GraphLayout.labelStripColumns
             Canvas { context, _ in
-                let gap = column * 0.22
-                for label in grid.monthLabels {
-                    let text = Text(label.text).font(.system(size: 8)).foregroundStyle(.white.opacity(0.45))
-                    context.draw(text, at: CGPoint(x: CGFloat(label.column) * column, y: 0), anchor: .topLeading)
-                }
-                for cell in grid.cells {
-                    let rect = Self.rect(of: cell, column: column, top: top, gap: gap)
-                    context.fill(
-                        Path(roundedRect: rect, cornerRadius: 1.5),
-                        with: .color(ActivityPalette.color(for: cell.fill))
-                    )
-                }
+                Self.draw(grid, style: .pane, in: &context, column: column, top: top)
                 if let hovered {
+                    let gap = column * 0.22
                     let rect = Self.rect(of: hovered, column: column, top: top, gap: gap).insetBy(dx: -1, dy: -1)
                     context.stroke(
                         Path(roundedRect: rect, cornerRadius: 2),
@@ -102,6 +115,28 @@ struct ActivityHeatmap: View {
         .aspectRatio(GraphLayout.aspectRatio, contentMode: .fit)
     }
 
+    /// Month labels along the top, then one rounded square per day. Shared
+    /// with the share card, which draws the same grid at its own size.
+    static func draw(
+        _ grid: ActivityGrid,
+        style: GraphStyle,
+        in context: inout GraphicsContext,
+        column: CGFloat,
+        top: CGFloat
+    ) {
+        let gap = column * 0.22
+        let radius = max(1.5, column * 0.16)
+        for label in grid.monthLabels {
+            let text = Text(label.text).font(.system(size: style.labelSize)).foregroundStyle(style.text)
+            context.draw(text, at: CGPoint(x: CGFloat(label.column) * column, y: 0), anchor: .topLeading)
+        }
+        for cell in grid.cells {
+            guard let color = style.color(for: cell.fill) else { continue }
+            let rect = rect(of: cell, column: column, top: top, gap: gap)
+            context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(color))
+        }
+    }
+
     private static func rect(of cell: ActivityGrid.Cell, column: CGFloat, top: CGFloat, gap: CGFloat) -> CGRect {
         CGRect(
             x: CGFloat(cell.column) * column + gap / 2,
@@ -129,67 +164,7 @@ struct SpendChart: View {
             let size = proxy.size
             let plot = CGRect(x: 0, y: 4, width: size.width, height: size.height - 4 - Self.axisHeight)
             Canvas { context, _ in
-                let baseline = Path { $0.move(to: CGPoint(x: 0, y: plot.maxY)); $0.addLine(to: CGPoint(
-                    x: size.width,
-                    y: plot.maxY
-                )) }
-                context.stroke(baseline, with: .color(.white.opacity(0.15)), lineWidth: 1)
-
-                var line = Path()
-                var area = Path()
-                var open = false
-                for (index, point) in series.points.enumerated() {
-                    guard let cost = point.cost else {
-                        if open {
-                            area.addLine(to: CGPoint(x: Self.x(index, in: plot), y: plot.maxY))
-                            area.closeSubpath()
-                        }
-                        open = false
-                        continue
-                    }
-                    let at = CGPoint(x: Self.x(index, in: plot), y: y(cost, in: plot))
-                    if open {
-                        line.addLine(to: at)
-                        area.addLine(to: at)
-                    } else {
-                        line.move(to: at)
-                        area.move(to: CGPoint(x: at.x, y: plot.maxY))
-                        area.addLine(to: at)
-                        open = true
-                    }
-                }
-                if open, let last = series.points.indices.last {
-                    area.addLine(to: CGPoint(x: Self.x(last, in: plot), y: plot.maxY))
-                    area.closeSubpath()
-                }
-                context.fill(area, with: .color(ActivityPalette.line.opacity(0.18)))
-                context.stroke(
-                    line,
-                    with: .color(ActivityPalette.line),
-                    style: StrokeStyle(lineWidth: 1.5, lineJoin: .round)
-                )
-
-                if series.maxCost > 0 {
-                    let top = Text(HistoryCopy.cost(series.maxCost)).font(.system(size: 8))
-                        .foregroundStyle(.white.opacity(0.45))
-                    context.draw(top, at: CGPoint(x: size.width, y: 0), anchor: .topTrailing)
-                }
-                if let first = series.points.first, let last = series.points.last {
-                    let font = Font.system(size: 8)
-                    context.draw(
-                        Text(HistoryCopy.shortDay(first.day, calendar: calendar)).font(font)
-                            .foregroundStyle(.white.opacity(0.45)),
-                        at: CGPoint(x: 0, y: size.height),
-                        anchor: .bottomLeading
-                    )
-                    context.draw(
-                        Text(HistoryCopy.shortDay(last.day, calendar: calendar)).font(font)
-                            .foregroundStyle(.white.opacity(0.45)),
-                        at: CGPoint(x: size.width, y: size.height),
-                        anchor: .bottomTrailing
-                    )
-                }
-
+                Self.draw(series, style: .pane, calendar: calendar, in: &context, plot: plot, size: size)
                 if let hoveredIndex, let cost = series.points[hoveredIndex].cost {
                     let at = CGPoint(x: Self.x(hoveredIndex, in: plot), y: y(cost, in: plot))
                     var hairline = Path()
@@ -226,6 +201,74 @@ struct SpendChart: View {
             }
         }
         .aspectRatio(GraphLayout.aspectRatio, contentMode: .fit)
+    }
+
+    /// The area, the line, the baseline, the peak at the top right and the
+    /// first and last day under the plot. Shared with the share card.
+    static func draw(
+        _ series: SpendSeries,
+        style: GraphStyle,
+        calendar: Calendar,
+        in context: inout GraphicsContext,
+        plot: CGRect,
+        size: CGSize
+    ) {
+        var baseline = Path()
+        baseline.move(to: CGPoint(x: plot.minX, y: plot.maxY))
+        baseline.addLine(to: CGPoint(x: plot.maxX, y: plot.maxY))
+        context.stroke(baseline, with: .color(style.rule), lineWidth: 1)
+
+        var line = Path()
+        var area = Path()
+        var open = false
+        for (index, point) in series.points.enumerated() {
+            guard let cost = point.cost else {
+                if open {
+                    area.addLine(to: CGPoint(x: x(index, in: plot), y: plot.maxY))
+                    area.closeSubpath()
+                }
+                open = false
+                continue
+            }
+            let at = CGPoint(x: x(index, in: plot), y: y(cost, in: plot, max: series.maxCost))
+            if open {
+                line.addLine(to: at)
+                area.addLine(to: at)
+            } else {
+                line.move(to: at)
+                area.move(to: CGPoint(x: at.x, y: plot.maxY))
+                area.addLine(to: at)
+                open = true
+            }
+        }
+        if open, let last = series.points.indices.last {
+            area.addLine(to: CGPoint(x: x(last, in: plot), y: plot.maxY))
+            area.closeSubpath()
+        }
+        context.fill(area, with: .color(style.line.opacity(0.18)))
+        context.stroke(
+            line,
+            with: .color(style.line),
+            style: StrokeStyle(lineWidth: max(1.5, size.width / 400), lineJoin: .round)
+        )
+
+        let font = Font.system(size: style.labelSize)
+        if series.maxCost > 0 {
+            let top = Text(HistoryCopy.cost(series.maxCost)).font(font).foregroundStyle(style.text)
+            context.draw(top, at: CGPoint(x: plot.maxX, y: 0), anchor: .topTrailing)
+        }
+        if let first = series.points.first, let last = series.points.last {
+            context.draw(
+                Text(HistoryCopy.shortDay(first.day, calendar: calendar)).font(font).foregroundStyle(style.text),
+                at: CGPoint(x: plot.minX, y: size.height),
+                anchor: .bottomLeading
+            )
+            context.draw(
+                Text(HistoryCopy.shortDay(last.day, calendar: calendar)).font(font).foregroundStyle(style.text),
+                at: CGPoint(x: plot.maxX, y: size.height),
+                anchor: .bottomTrailing
+            )
+        }
     }
 
     private static func x(_ index: Int, in plot: CGRect) -> CGFloat {

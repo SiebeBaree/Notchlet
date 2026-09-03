@@ -53,6 +53,29 @@ struct UsageLedgerTests {
         #expect(models[1].id == "codex/gpt-5.6-sol")
     }
 
+    @Test func activeDaysAndStreakCountDaysWithTokens() throws {
+        let ledger = UsageLedger(rows: [
+            Self.row("2026-08-30", output: 1),
+            Self.row("2026-08-31", output: 1),
+            Self.row("2026-09-01", output: 0),
+            Self.row("2026-09-02", output: 1),
+            Self.row("2026-09-03", output: 1),
+            Self.row("2026-09-04", output: 1),
+        ])
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let span = TestSupport.day("2026-08-29") ... TestSupport.day("2026-09-04")
+        #expect(ledger.activeDays(span) == 5)
+        #expect(ledger.longestStreak(span, calendar: calendar) == 3)
+        // The span bounds the streak: the last two days alone.
+        let tail = TestSupport.day("2026-09-03") ... TestSupport.day("2026-09-04")
+        #expect(ledger.longestStreak(tail, calendar: calendar) == 2)
+        #expect(ledger.longestStreak(
+            TestSupport.day("2026-07-01") ... TestSupport.day("2026-07-31"),
+            calendar: calendar
+        ) == 0)
+    }
+
     @Test func byDayKeepsEachDaysModels() throws {
         let days = ledger.byDay(span)
         #expect(Set(days.keys.map(\.string)) == ["2026-09-02", "2026-09-03"])
