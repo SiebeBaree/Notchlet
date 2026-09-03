@@ -11,17 +11,19 @@ import SwiftUI
 /// anywhere else.
 final class NotchWindowController: NSWindowController {
     private let store: UsageStore
+    private let history: UsageHistory
     private let updater: UpdateController
     private var notchSize: CGSize
     private var isExpanded = false
 
     private lazy var hostingView = NSHostingView(rootView: makeRootView())
 
-    init(store: UsageStore, updater: UpdateController) {
+    init(store: UsageStore, history: UsageHistory, updater: UpdateController) {
         let panel = NotchPanel()
         let notchSize = Self.targetScreen.map(Self.notchSize(of:)) ?? NotchGeometry.fallbackNotchSize
 
         self.store = store
+        self.history = history
         self.updater = updater
         self.notchSize = notchSize
 
@@ -64,7 +66,7 @@ final class NotchWindowController: NSWindowController {
     }
 
     private func makeRootView() -> NotchView {
-        NotchView(store: store, updater: updater, notchSize: notchSize) { [weak self] expanded in
+        NotchView(store: store, history: history, updater: updater, notchSize: notchSize) { [weak self] expanded in
             self?.setExpanded(expanded)
         }
     }

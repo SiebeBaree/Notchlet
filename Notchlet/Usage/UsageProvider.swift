@@ -32,8 +32,15 @@ protocol UsageProvider: Sendable {
     /// e.g. "Run claude to sign in". Shown after the reason on the settings
     /// page.
     var signInHint: String { get }
+    /// Where the provider's past usage can be read from, for the history
+    /// pane. Nil for a provider that only has live limits to show.
+    var history: (any UsageHistorySource)? { get }
 
     func fetchUsage() async throws -> UsageSnapshot
+}
+
+extension UsageProvider {
+    var history: (any UsageHistorySource)? { nil }
 }
 
 /// The declarative shape of an endpoint-backed provider. `fetchUsage` comes

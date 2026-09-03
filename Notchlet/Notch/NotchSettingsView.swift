@@ -364,26 +364,3 @@ private struct ProviderPage: View {
         }
     }
 }
-
-/// Quiet text button that brightens on hover.
-private struct HoverTextButton: View {
-    let title: String
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    init(_ title: String, action: @escaping () -> Void) {
-        self.title = title
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(isHovering ? 0.85 : 0.45))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-    }
-}

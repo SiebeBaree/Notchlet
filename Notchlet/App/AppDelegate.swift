@@ -4,6 +4,7 @@ import AppKit
 /// app.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: UsageStore?
+    private var history: UsageHistory?
     private var notchController: NotchWindowController?
     private var updateController: UpdateController?
 
@@ -22,6 +23,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ])
         self.store = store
         store.startRefreshing()
+        // History reads the CLIs' logs and seals finished days into the
+        // archive, so it runs from first launch whether or not the pane is
+        // ever opened.
+        let history = UsageHistory(store: store)
+        self.history = history
+        history.start()
         // Refetch whatever came due during sleep instead of trusting a
         // slept-through timer.
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -33,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let updater = UpdateController()
         updateController = updater
-        notchController = NotchWindowController(store: store, updater: updater)
+        notchController = NotchWindowController(store: store, history: history, updater: updater)
         notchController?.showWindow(nil)
 
         Analytics.bootstrap()
@@ -42,5 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func didWake() {
         store?.reschedule()
+        history?.reschedule()
     }
 }

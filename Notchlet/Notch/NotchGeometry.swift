@@ -15,7 +15,7 @@ enum NotchGeometry {
     /// Window size while the panel is expanded: a transparent window pinned
     /// to the top center of the screen, with room for the card to animate
     /// out of the notch.
-    static let panelSize = CGSize(width: 640, height: 400)
+    static let panelSize = CGSize(width: 640, height: 460)
 
     /// Window size while the panel is collapsed: exactly the notch
     /// silhouette including its outward fillets. The window shrinks to this

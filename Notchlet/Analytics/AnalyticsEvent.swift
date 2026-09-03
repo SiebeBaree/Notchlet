@@ -18,6 +18,8 @@ enum AnalyticsEvent {
     /// Only fired on transitions between states, never per refresh.
     case providerStateChanged(provider: String, state: UsageStore.ProviderState)
     case settingsOpened
+    /// `scope` is "all" or a provider id.
+    case historyOpened(scope: String)
     /// Booleans and enum values only, never free text.
     case settingChanged(key: String, value: String)
     case updateAvailable(fromVersion: String, toVersion: String)
@@ -34,6 +36,7 @@ enum AnalyticsEvent {
         case .notchClosed: "notch_closed"
         case .providerStateChanged: "provider_state_changed"
         case .settingsOpened: "settings_opened"
+        case .historyOpened: "history_opened"
         case .settingChanged: "setting_changed"
         case .updateAvailable: "update_available"
         case .updateInstallClicked: "update_install_clicked"
@@ -57,6 +60,8 @@ enum AnalyticsEvent {
             ["provider": provider, "state": state.rawValue]
         case let .settingChanged(key, value):
             ["key": key, "value": value]
+        case let .historyOpened(scope):
+            ["scope": scope]
         case let .updateAvailable(fromVersion, toVersion):
             ["from_version": fromVersion, "to_version": toVersion]
         case let .updateInstallClicked(toVersion):

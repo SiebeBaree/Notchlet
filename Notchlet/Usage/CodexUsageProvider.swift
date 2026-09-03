@@ -19,6 +19,7 @@ struct CodexUsageProvider: HTTPUsageProvider {
 
     static let cliOption = AuthOption(id: "cli", label: "Codex CLI")
     let authOptions = [Self.cliOption]
+    let history: (any UsageHistorySource)? = CodexHistorySource()
 
     var isInstalled: Bool {
         CredentialSupport.homePathExists(".codex")
