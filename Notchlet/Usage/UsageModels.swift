@@ -67,14 +67,22 @@ struct UsageSnapshot: Equatable {
     }
 }
 
-/// Date parsing shared by providers.
-enum UsageDate {
+/// Date parsing shared by providers and log parsers.
+nonisolated enum UsageDate {
     /// ISO 8601 with any fractional-second precision. `ISO8601DateFormatter`
     /// refuses fractions unless they are exactly three digits, and endpoints
     /// send three (Cursor) or six (Anthropic). Sub-second precision is
-    /// irrelevant here, so the fraction is stripped before parsing.
+    /// irrelevant here, so the fraction is stripped before parsing. This
+    /// runs once per log line during a history ingest, hence no regular
+    /// expression and one shared formatter (documented thread-safe).
     static func parse(_ string: String) -> Date? {
-        let stripped = string.replacingOccurrences(of: #"\.\d+"#, with: "", options: .regularExpression)
-        return ISO8601DateFormatter().date(from: stripped)
+        var stripped = string
+        if let dot = stripped.firstIndex(of: ".") {
+            let fractionEnd = stripped[stripped.index(after: dot)...].firstIndex { !$0.isNumber } ?? stripped.endIndex
+            stripped.removeSubrange(dot ..< fractionEnd)
+        }
+        return formatter.date(from: stripped)
     }
+
+    private nonisolated(unsafe) static let formatter = ISO8601DateFormatter()
 }
