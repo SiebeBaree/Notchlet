@@ -128,7 +128,7 @@ struct HistoryPane: View {
         let text: String = if providers.isEmpty {
             "No usage logs found"
         } else if !failed.isEmpty {
-            "Could not read \(failed.map(\.name).joined(separator: " and ")) logs"
+            "Could not load \(failed.map(\.name).joined(separator: " and ")) history"
         } else if history.lastIngestAt == nil {
             "Reading logs"
         } else {

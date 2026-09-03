@@ -67,7 +67,7 @@ enum ProviderAuthSettings {
 /// Why a provider had no usable credential, from least to most specific.
 /// When auto tries several options the most specific problem is the one
 /// reported, so an expired login is never masked by an empty fallback.
-enum AuthProblem: Int, Comparable, Sendable {
+nonisolated enum AuthProblem: Int, Comparable, Sendable {
     /// Nothing to read: the CLI is not signed in, or no secret was pasted.
     case signedOut
     /// A credential exists but is past its expiry and could not be renewed.

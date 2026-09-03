@@ -24,6 +24,7 @@ struct OpenCodeUsageProvider: HTTPUsageProvider {
     static let cliOption = AuthOption(id: "cli", label: "OpenCode CLI")
     static let keyOption = AuthOption(id: "key", label: "Pasted key", secretName: "API key")
     let authOptions = [Self.cliOption, Self.keyOption]
+    let history: (any UsageHistorySource)? = OpenCodeHistorySource()
 
     /// OpenCode's data directory, created on first run. `XDG_DATA_HOME` can
     /// move it, but a login-item app never sees the shell's exports, so only

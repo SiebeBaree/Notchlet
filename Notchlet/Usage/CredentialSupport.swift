@@ -102,19 +102,30 @@ enum CredentialSupport {
     /// dropping the NULs recovers the ASCII token either way.
     static func sqliteValue(homePath: String, table: String, key: String) async -> String? {
         guard homePathExists(homePath) else { return nil }
-        let path = FileManager.default.homeDirectoryForCurrentUser.appending(path: homePath).path
+        let path = FileManager.default.homeDirectoryForCurrentUser.appending(path: homePath)
         let sql = "SELECT hex(value) FROM \(table) WHERE key = '\(key)' LIMIT 1;"
-        let options = ["-batch", "-noheader", "-readonly", "-cmd", ".timeout 1000"]
-        var output = await run("/usr/bin/sqlite3", options + [path, sql])
-        if output == nil, !FileManager.default.fileExists(atPath: path + "-wal"),
-           let encoded = path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
-        {
-            output = await run("/usr/bin/sqlite3", options + ["file:\(encoded)?immutable=1", sql])
-        }
-        guard let output else { return nil }
+        guard let output = await sqlite(path, sql: sql, options: ["-noheader"]) else { return nil }
         let hex = String(decoding: output, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         let value = String(decoding: data(fromHex: hex).filter { $0 != 0 }, as: UTF8.self)
         return value.isEmpty ? nil : value
+    }
+
+    /// The rows of a read-only query as the JSON array `sqlite3 -json`
+    /// prints, empty when the query matches nothing. Nil when the database
+    /// could not be read at all. Same opening rules as `sqliteValue`.
+    static func sqliteRows(path: URL, sql: String) async -> Data? {
+        await sqlite(path, sql: sql, options: ["-json"])
+    }
+
+    private static func sqlite(_ path: URL, sql: String, options extra: [String]) async -> Data? {
+        let options = ["-batch", "-readonly", "-cmd", ".timeout 1000"] + extra
+        var output = await run("/usr/bin/sqlite3", options + [path.path, sql])
+        if output == nil, !FileManager.default.fileExists(atPath: path.path + "-wal"),
+           let encoded = path.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+        {
+            output = await run("/usr/bin/sqlite3", options + ["file:\(encoded)?immutable=1", sql])
+        }
+        return output
     }
 
     /// Bytes from a hex string as `hex()` prints it; empty when malformed.
