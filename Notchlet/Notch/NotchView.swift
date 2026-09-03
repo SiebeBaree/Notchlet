@@ -126,7 +126,7 @@ struct NotchView: View {
                 NotchSettingsView(store: store, updater: updater)
             case .history:
                 HistoryPane(history: history, scope: Binding(
-                    get: { UsageHistory.Scope(storedValue: historyScope) },
+                    get: { resolvedScope },
                     set: { historyScope = $0.storedValue }
                 ))
             case .usage:
@@ -161,6 +161,17 @@ struct NotchView: View {
         .padding(.trailing, 14)
     }
 
+    /// The remembered scope, or all when its provider no longer has
+    /// history (switched off, say): a scope with no data and no chips to
+    /// leave it would be a dead end.
+    private var resolvedScope: UsageHistory.Scope {
+        let scope = UsageHistory.Scope(storedValue: historyScope)
+        if case let .provider(id) = scope, !history.providersWithHistory.contains(where: { $0.id == id }) {
+            return .all
+        }
+        return scope
+    }
+
     /// A corner icon opens its pane, or closes it back to usage.
     private func toggle(_ target: Pane) {
         show(pane == target ? .usage : target)
@@ -181,7 +192,7 @@ struct NotchView: View {
             Analytics.capture(.settingsOpened)
         case .history:
             history.ingestIfStale()
-            Analytics.capture(.historyOpened(scope: historyScope))
+            Analytics.capture(.historyOpened(scope: resolvedScope.storedValue))
         case .usage:
             break
         }

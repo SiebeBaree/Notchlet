@@ -38,14 +38,16 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
     let monthLabels: [MonthLabel]
 
     init(today: DayKey, calendar: Calendar, tokens: [DayKey: Int], coverageStart: DayKey?) {
-        end = today
         // Back to the first day of the week 52 weeks before this one.
         let weekday = calendar.component(.weekday, from: today.start(in: calendar))
         let daysIntoWeek = (weekday - calendar.firstWeekday + 7) % 7
-        start = today.advanced(by: -(daysIntoWeek + (Self.weeks - 1) * 7), calendar: calendar)
+        let start = today.advanced(by: -(daysIntoWeek + (Self.weeks - 1) * 7), calendar: calendar)
+        self.start = start
+        end = today
 
+        // Only days the grid draws set its levels.
         let thresholds = Self.quartiles(of: tokens.compactMap { day, count in
-            count > 0 && (coverageStart.map { day >= $0 } ?? true) ? count : nil
+            day >= start && day <= today && count > 0 && (coverageStart.map { day >= $0 } ?? true) ? count : nil
         })
         // Month names in English like the rest of the pane, whatever the
         // calendar's locale.

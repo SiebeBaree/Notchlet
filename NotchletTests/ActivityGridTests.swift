@@ -47,6 +47,18 @@ struct ActivityGridTests {
         #expect(grid.cell(for: today.advanced(by: -9, calendar: calendar))?.fill == .empty)
     }
 
+    @Test func daysOutsideTheGridDoNotSetItsLevels() {
+        let inside = today.advanced(by: -3, calendar: calendar)
+        let before = TestSupport.day("2025-08-01")
+        let grid = ActivityGrid(
+            today: today,
+            calendar: calendar,
+            tokens: [inside: 1, before: 1_000_000],
+            coverageStart: nil
+        )
+        #expect(grid.cell(for: inside)?.fill == .level(4))
+    }
+
     @Test func daysBeforeCoverageAreUnknownNotEmpty() {
         let coverage = TestSupport.day("2026-07-24")
         let grid = ActivityGrid(today: today, calendar: calendar, tokens: [coverage: 5], coverageStart: coverage)
