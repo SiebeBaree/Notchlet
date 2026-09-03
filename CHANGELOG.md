@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - A history pane behind the bars icon in the corner, or a click on any
   gauge: cost and tokens for today, 7 days and 30 days, a 12-month activity
@@ -10,6 +10,10 @@
   export, sealed day by day into Notchlet's own archive, since Claude Code
   deletes transcripts after 30 days. Cost is what the tokens would cost at API list
   prices, never a bill.
+- Share your usage as an image. The share icon in the corner opens a card
+  with the numbers from the history pane, the activity graph or the cost line,
+  and every model's tokens, rendered as a PNG you can copy or save. Pick the
+  period, the theme and what to include.
 - Claude no longer goes stale while Claude Code is idle. An expired token is
   refreshed the way a second Claude Code process would do it, using Claude
   Code's own locks and write-back, so Claude Code stays signed in.
