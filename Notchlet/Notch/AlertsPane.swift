@@ -26,6 +26,7 @@ struct AlertsPane: View {
                         Text(UsageCopy.alertHeadline(windowLabel: window.label, percent: notice.rule.percent))
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
+                            .lineLimit(1)
                         if let reset = UsageCopy.resetText(for: window.resetsAt) {
                             Text(reset)
                                 .font(.system(size: 10.5))
@@ -45,8 +46,10 @@ struct AlertsPane: View {
                     }
                 }
             }
+            // Opens with the panel's own animation, like every other pane;
+            // only the swap to the next notice after Got it is a crossfade.
             .id(notice.id)
-            .transition(.opacity.combined(with: .move(edge: .trailing)))
+            .transition(.opacity)
         }
     }
 }
