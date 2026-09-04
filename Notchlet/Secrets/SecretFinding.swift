@@ -25,7 +25,7 @@ nonisolated struct SecretFinding: Codable, Identifiable, Equatable, Sendable {
         case falsePositive
     }
 
-    struct Location: Codable, Equatable, Sendable {
+    struct Location: Codable, Hashable, Sendable {
         var file: String?
         var line: Int
     }
@@ -62,6 +62,10 @@ nonisolated struct SecretFinding: Codable, Identifiable, Equatable, Sendable {
     ) -> (findings: [SecretFinding], new: Int) {
         var findings = known
         var index = Dictionary(findings.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+        // Every secret betterleaks saw on a line, accepted or not, so none
+        // of them can sit in another finding's context.
+        let secretsByLine = Dictionary(grouping: matches, by: { Location(file: $0.file?.path, line: $0.line) })
+            .mapValues { $0.map(\.secret) }
         var new = 0
         for match in matches where SecretPolicy.accepts(match, now: now) {
             let id = Self.id(of: match.secret)
@@ -80,7 +84,9 @@ nonisolated struct SecretFinding: Codable, Identifiable, Equatable, Sendable {
                 preview: preview,
                 length: match.secret.count,
                 providerID: providerID,
-                context: lineAt(match).map { context(around: match.secret, in: $0, preview: preview) } ?? preview,
+                context: lineAt(match).map {
+                    context(around: match.secret, in: $0, preview: preview, masking: secretsByLine[location] ?? [])
+                } ?? preview,
                 locations: [location],
                 firstSeenAt: now,
                 status: .pending
@@ -122,16 +128,22 @@ nonisolated struct SecretFinding: Codable, Identifiable, Equatable, Sendable {
 
     /// Up to 40 bytes either side of the secret in a raw transcript line,
     /// JSON escapes undone and whitespace collapsed. Every occurrence of the
-    /// secret becomes the preview first (a line can carry it twice), the
-    /// window never cuts through a token, and any other long key-shaped
-    /// run in the window is masked too, since an .env has neighbours. Just
-    /// the preview when the secret is not in the line as written
-    /// (betterleaks also decodes base64 it finds).
-    static func context(around secret: String, in line: Data, preview: String) -> String {
+    /// secret becomes the preview first (a line can carry it twice), every
+    /// other secret the scan found on the line is cut out, the window never
+    /// cuts through a token, and any other long key-shaped run in the
+    /// window is masked too, since an .env has neighbours the scanner may
+    /// not know. Just the preview when the secret is not in the line as
+    /// written (betterleaks also decodes base64 it finds).
+    static func context(around secret: String, in line: Data, preview: String,
+                        masking others: [String] = []) -> String
+    {
         // A control byte stands in for the secret until the end, so a key
         // glued to another token never drags the preview into the masking.
         let sentinel = Data([0x01])
-        let masked = line.replacing(Data(secret.utf8), with: sentinel)
+        var masked = line.replacing(Data(secret.utf8), with: sentinel)
+        for other in others where other != secret {
+            masked = masked.replacing(Data(other.utf8), with: Data("…".utf8))
+        }
         guard let range = masked.range(of: sentinel) else { return preview }
         var start = max(masked.startIndex, range.lowerBound - contextReach)
         var end = min(masked.endIndex, range.upperBound + contextReach)
@@ -152,8 +164,9 @@ nonisolated struct SecretFinding: Codable, Identifiable, Equatable, Sendable {
 
     private static let contextReach = 40
 
+    /// Letters, digits and what keys and base64 are made of.
     private static func isTokenByte(_ byte: UInt8) -> Bool {
-        byte == UInt8(ascii: "_") || byte == UInt8(ascii: "-")
+        "_-+/=".utf8.contains(byte)
             || (UInt8(ascii: "0") ... UInt8(ascii: "9")).contains(byte)
             || (UInt8(ascii: "A") ... UInt8(ascii: "Z")).contains(byte)
             || (UInt8(ascii: "a") ... UInt8(ascii: "z")).contains(byte)
@@ -162,7 +175,7 @@ nonisolated struct SecretFinding: Codable, Identifiable, Equatable, Sendable {
     /// Runs of twenty or more token characters mixing letters and digits
     /// keep their first four. Variable names have no digits and stay.
     private static func maskOtherKeys(in text: String) -> String {
-        text.replacing(/[A-Za-z0-9_-]{20,}/) { match in
+        text.replacing(/[A-Za-z0-9_+\/=-]{20,}/) { match in
             let run = match.output
             guard run.contains(where: \.isNumber), run.contains(where: \.isLetter) else { return String(run) }
             return String(run.prefix(4)) + "…"

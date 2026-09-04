@@ -14,10 +14,14 @@ final class SecretScanner {
     private let store: UsageStore
     private let stateStore: SecretStateStore
     private(set) var state: SecretScanState
+    /// True while betterleaks is running, not while the loop merely looks.
     private(set) var isScanning = false
+    /// Providers whose last scan threw; the next tick tries again.
+    private(set) var failedProviderIDs: Set<String> = []
     /// Bumped when new findings should open the notch.
     private(set) var alertGeneration = 0
     private var loop: Task<Void, Never>?
+    private var isTicking = false
     /// Waits for the first input after a scan that finished while the user
     /// was away, so the alert lands when they are back.
     private var activityMonitor: Any?
@@ -49,6 +53,36 @@ final class SecretScanner {
 
     func providerName(_ id: String) -> String? {
         store.entries.first { $0.id == id }?.provider.name
+    }
+
+    /// What the scanner is up to, for the pane and the settings line.
+    enum Status: Equatable {
+        case off
+        case unavailable
+        /// Some provider has never been scanned; the first pass waits for
+        /// an idle moment.
+        case waitingForIdle
+        case scanning
+        case failed
+        case scanned(Date)
+    }
+
+    var status: Status {
+        if !isAvailable {
+            return .unavailable
+        }
+        if !isEnabled {
+            return .off
+        }
+        if isScanning {
+            return .scanning
+        }
+        if !failedProviderIDs.isEmpty {
+            return .failed
+        }
+        let scans = providers.compactMap { state.lastScanAt[$0.id] }
+        guard scans.count == providers.count, let latest = scans.max() else { return .waitingForIdle }
+        return .scanned(latest)
     }
 
     /// Providers that are on and have chats on disk to read.
@@ -90,9 +124,9 @@ final class SecretScanner {
     }
 
     private func scanDue() async {
-        guard !isScanning else { return }
-        isScanning = true
-        defer { isScanning = false }
+        guard !isTicking else { return }
+        isTicking = true
+        defer { isTicking = false }
         let conditions = SecretScanSchedule.Conditions(
             idleSeconds: Self.idleSeconds,
             thermalState: ProcessInfo.processInfo.thermalState
@@ -103,6 +137,8 @@ final class SecretScanner {
             let action = SecretScanSchedule.action(lastScanAt: lastScanAt, now: .now, conditions: conditions)
             guard action != .wait else { continue }
             let startedAt = Date.now
+            isScanning = true
+            defer { isScanning = false }
             do {
                 let input = try await provider.source.input(since: lastScanAt)
                 let matches = input.isEmpty ? [] : try await Betterleaks.scan(input)
@@ -116,6 +152,7 @@ final class SecretScanner {
                 state.findings = merged.findings
                 state.lastScanAt[provider.id] = startedAt
                 try? stateStore.save(state)
+                failedProviderIDs.remove(provider.id)
                 new += merged.new
                 Analytics.capture(.secretScanCompleted(
                     provider: provider.id,
@@ -128,6 +165,7 @@ final class SecretScanner {
                 return
             } catch {
                 // Left undated, so the next tick tries again.
+                failedProviderIDs.insert(provider.id)
             }
         }
         if new > 0 {

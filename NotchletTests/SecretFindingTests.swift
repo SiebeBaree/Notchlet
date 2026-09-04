@@ -118,6 +118,33 @@ struct SecretFindingTests {
             == "u5KY…sk_dem…dc")
     }
 
+    @Test func otherSecretsOnTheLineAreCutOutWhateverTheirShape() {
+        // A base64 neighbour with / and + in it, which the run heuristic alone would split.
+        let other = "ab/cd+ef12/gh+ij34kl=="
+        let line = Data("key=sk_demo_4eC39HqLyjWDarjtT1zdp7dc other=\(other) end".utf8)
+        let context = SecretFinding.context(
+            around: "sk_demo_4eC39HqLyjWDarjtT1zdp7dc", in: line, preview: "sk_dem…dc", masking: [other]
+        )
+        #expect(context == "key=sk_dem…dc other=… end")
+
+        // Through merge, every match on the line masks the others.
+        let matches = [
+            SecretMatch(
+                ruleID: "a",
+                description: "Found a Key A, x.",
+                secret: "sk_demo_4eC39HqLyjWDarjtT1zdp7dc",
+                file: nil,
+                line: 1
+            ),
+            SecretMatch(ruleID: "b", description: "Found a Key B, x.", secret: other, file: nil, line: 1),
+        ]
+        let merged = SecretFinding.merge(matches, into: [], providerID: "p", now: now) { _ in line }
+        #expect(merged.findings.count == 2)
+        #expect(!merged.findings[0].context.contains("cd+ef"))
+        #expect(!merged.findings[1].context.contains("4eC39"))
+        #expect(merged.findings[1].context.contains("ab/cd+…=="))
+    }
+
     @Test func mergeReadsContextThroughTheLineReader() throws {
         let file = FileManager.default.temporaryDirectory.appending(path: "notchlet-secrets-\(UUID().uuidString).jsonl")
         defer { try? FileManager.default.removeItem(at: file) }

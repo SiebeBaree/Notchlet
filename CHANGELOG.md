@@ -3,9 +3,9 @@
 ## Unreleased
 
 - Leaked secrets in your chats. Notchlet ships betterleaks and scans the
-  Claude Code transcripts on this Mac for API keys and tokens, once when the
-  Mac is idle and then hourly over what changed, never sending anything
-  anywhere. A find opens the notch with the kind of key, the line it sits in
+  Claude Code and Codex transcripts on this Mac for API keys and tokens, once
+  when the Mac is idle and then hourly over what changed, never sending
+  anything anywhere. A find opens the notch with the kind of key, the line it sits in
   with the key masked, and a link to how to fix it. Ignore it or report a
   false positive. One toggle in settings turns scanning off.
 

@@ -15,7 +15,7 @@ struct SecretsPane: View {
         let pending = scanner.pending
         VStack(alignment: .leading, spacing: 12) {
             if pending.isEmpty {
-                Text("No leaked secrets pending")
+                Text(Self.statusText(scanner.status) ?? "No leaked secrets pending")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.5))
             } else {
@@ -107,6 +107,29 @@ struct SecretsPane: View {
         let place = providerName.map { "\($0) chats" } ?? "your chats"
         return "\(count) \(noun) in \(place)"
     }
+
+    /// One line on what the scanner is doing, for the empty pane, the
+    /// settings page and the spinner's tooltip. Nil when it is off.
+    static func statusText(_ status: SecretScanner.Status, now: Date = .now) -> String? {
+        switch status {
+        case .off, .unavailable:
+            nil
+        case .waitingForIdle:
+            "First scan starts once the Mac has been idle for two minutes and takes a few minutes"
+        case .scanning:
+            "Scanning your chats for leaked secrets, results in a few minutes"
+        case .failed:
+            "Last scan failed, retrying within five minutes"
+        case let .scanned(date):
+            "Last scan \(Self.relative.localizedString(for: date, relativeTo: now))"
+        }
+    }
+
+    private static let relative: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
 }
 
 private struct PagerButton: View {

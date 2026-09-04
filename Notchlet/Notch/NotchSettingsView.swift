@@ -126,8 +126,8 @@ struct NotchSettingsView: View {
                 )
             )
             .disabled(!scanner.isAvailable)
-            if !scanner.isAvailable {
-                Text("Needs Apple silicon")
+            if let status = scanner.isAvailable ? SecretsPane.statusText(scanner.status) : "Needs Apple silicon" {
+                Text(status)
                     .font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.4))
                     .padding(.top, -6)

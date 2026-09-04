@@ -172,12 +172,25 @@ struct NotchView: View {
     }
 
     /// The share, history and gear icons live in the strip beside the notch
-    /// cutout, quiet until hovered. The key icon only exists while a leaked
-    /// secret waits, the update icon only while an update does. Share is
-    /// dimmed until some history exists.
+    /// cutout, quiet until hovered. The key's slot holds a spinner while a
+    /// scan runs and the key only while a leaked secret waits; the update
+    /// icon only exists while an update does. Share is dimmed until some
+    /// history exists.
     private var cornerIcons: some View {
         HStack(spacing: 6) {
-            if !scanner.pending.isEmpty {
+            if scanner.isScanning {
+                Button {
+                    toggle(.secrets)
+                } label: {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .colorScheme(.dark)
+                        .frame(width: 18, height: 18)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .help(SecretsPane.statusText(.scanning) ?? "")
+            } else if !scanner.pending.isEmpty {
                 NotchIconButton(systemName: "key.fill", isActive: pane == .secrets, tint: SecretsPane.amber) {
                     toggle(.secrets)
                 }

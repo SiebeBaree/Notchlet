@@ -20,6 +20,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Fetch betterleaks
+        run: ./Scripts/fetch-betterleaks.sh
       - name: Build and test
         run: |
           set -o pipefail
