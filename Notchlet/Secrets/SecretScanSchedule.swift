@@ -10,8 +10,6 @@ nonisolated enum SecretScanSchedule {
     static let tickInterval: TimeInterval = 300
     static let interval: TimeInterval = 3600
     static let idleRequirement: TimeInterval = 120
-    /// Input this recent means someone is at the Mac to see an alert.
-    static let activeWithin: TimeInterval = 30
 
     enum Action: Equatable, Sendable {
         case full

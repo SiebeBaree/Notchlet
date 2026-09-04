@@ -14,6 +14,7 @@ final class NotchWindowController: NSWindowController {
     private let history: UsageHistory
     private let updater: UpdateController
     private let scanner: SecretScanner
+    private let alerts: UsageAlerts
     private let share: (UsageHistory.Scope) -> Void
     private var notchSize: CGSize
     private var isExpanded = false
@@ -25,6 +26,7 @@ final class NotchWindowController: NSWindowController {
         history: UsageHistory,
         updater: UpdateController,
         scanner: SecretScanner,
+        alerts: UsageAlerts,
         share: @escaping (UsageHistory.Scope) -> Void
     ) {
         let panel = NotchPanel()
@@ -34,6 +36,7 @@ final class NotchWindowController: NSWindowController {
         self.history = history
         self.updater = updater
         self.scanner = scanner
+        self.alerts = alerts
         self.share = share
         self.notchSize = notchSize
 
@@ -81,6 +84,7 @@ final class NotchWindowController: NSWindowController {
             history: history,
             updater: updater,
             scanner: scanner,
+            alerts: alerts,
             notchSize: notchSize,
             resizePanel: { [weak self] expanded in self?.setExpanded(expanded) },
             share: share

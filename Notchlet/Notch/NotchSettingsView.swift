@@ -6,17 +6,20 @@ import SwiftUI
 /// toggle per provider; at the cap the remaining toggles lock until one is
 /// turned off. Each provider row opens its own page: how it signs in, how
 /// that is going, and a place to paste a secret where the provider takes
-/// one.
+/// one. The alerts row opens one line per window the notch shows, with a
+/// chip per threshold.
 struct NotchSettingsView: View {
     private enum Page: Equatable {
         case main
         case providers
         case provider(String)
+        case alerts
     }
 
     let store: UsageStore
     let updater: UpdateController
     let scanner: SecretScanner
+    let alerts: UsageAlerts
 
     /// Same key Analytics uses; @AppStorage keeps the toggle in sync with it.
     @AppStorage("analyticsOptOut") private var analyticsOptOut = false
@@ -27,10 +30,11 @@ struct NotchSettingsView: View {
     @State private var autoChecksForUpdates: Bool
     @State private var page: Page = .main
 
-    init(store: UsageStore, updater: UpdateController, scanner: SecretScanner) {
+    init(store: UsageStore, updater: UpdateController, scanner: SecretScanner, alerts: UsageAlerts) {
         self.store = store
         self.updater = updater
         self.scanner = scanner
+        self.alerts = alerts
         _autoChecksForUpdates = State(initialValue: updater.automaticallyChecksForUpdates)
     }
 
@@ -42,6 +46,8 @@ struct NotchSettingsView: View {
             providersPage
         case let .provider(id):
             ProviderPage(store: store, providerID: id) { show(.providers) }
+        case .alerts:
+            AlertsPage(store: store, alerts: alerts) { show(.main) }
         }
     }
 
@@ -86,17 +92,8 @@ struct NotchSettingsView: View {
 
     private var mainPage: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Providers")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.85))
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.45))
-            }
-            .contentShape(.rect)
-            .onTapGesture { show(.providers) }
+            linkRow("Providers") { show(.providers) }
+            linkRow("Alerts") { show(.alerts) }
             toggleRow(
                 "Share anonymous usage stats",
                 isOn: Binding(
@@ -189,6 +186,20 @@ struct NotchSettingsView: View {
                 }
             }
         }
+    }
+
+    private func linkRow(_ label: String, action: @escaping () -> Void) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 11.5))
+                .foregroundStyle(.white.opacity(0.85))
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.45))
+        }
+        .contentShape(.rect)
+        .onTapGesture(perform: action)
     }
 
     private func toggleRow(_ label: String, isOn: Binding<Bool>) -> some View {
@@ -383,5 +394,84 @@ private struct ProviderPage: View {
                 notice = "Could not save the \(secretName) to the keychain"
             }
         }
+    }
+}
+
+/// Threshold alerts: every window the notch currently shows, one line
+/// each, with a chip per percentage. A lit chip is a rule; tapping it
+/// again removes it, and several on one window are fine.
+private struct AlertsPage: View {
+    let store: UsageStore
+    let alerts: UsageAlerts
+    let back: () -> Void
+
+    private var entries: [UsageStore.Entry] {
+        store.entries.filter { store.isEnabled($0.id) && $0.snapshot?.windows.isEmpty == false }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HoverTextButton("Back", action: back)
+            if entries.isEmpty {
+                Text("No usage data yet")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            ForEach(entries) { entry in
+                VStack(alignment: .leading, spacing: 6) {
+                    BrandRow(provider: entry.provider)
+                    ForEach(entry.snapshot?.windows ?? []) { window in
+                        HStack(spacing: 8) {
+                            Text(window.label)
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .padding(.leading, 20)
+                            Spacer()
+                            HStack(spacing: 4) {
+                                ForEach(UsageAlertRule.percentChoices, id: \.self) { percent in
+                                    let rule = UsageAlertRule(
+                                        providerID: entry.id,
+                                        windowID: window.id,
+                                        percent: percent
+                                    )
+                                    ThresholdChip(percent: percent, isOn: alerts.isOn(rule)) {
+                                        alerts.setRule(rule, on: !alerts.isOn(rule), window: window)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One percentage on one window. Amber when it is a rule, like the rest of
+/// the notch's attention colour.
+private struct ThresholdChip: View {
+    let percent: Int
+    let isOn: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text("\(percent)")
+                .font(.system(size: 10.5, weight: isOn ? .semibold : .regular))
+                .monospacedDigit()
+                .foregroundStyle(isOn ? .black : .white.opacity(isHovering ? 0.85 : 0.5))
+                .frame(width: 34)
+                .padding(.vertical, 2)
+                .background(
+                    isOn ? SecretsPane.amber : .white.opacity(isHovering ? 0.12 : 0.06),
+                    in: .capsule
+                )
+                .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: isOn)
     }
 }

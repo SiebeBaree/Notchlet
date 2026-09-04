@@ -12,12 +12,13 @@ import SwiftUI
 /// background, so clicks in the transparent area go to the window below.
 struct NotchView: View {
     /// What the expanded panel shows: usage, past usage behind the history
-    /// icon, leaked secrets behind the key, or in-notch settings behind the
-    /// gear.
+    /// icon, leaked secrets behind the key, a usage alert that opened the
+    /// notch on its own, or in-notch settings behind the gear.
     private enum Pane {
         case usage
         case history
         case secrets
+        case alerts
         case settings
     }
 
@@ -25,6 +26,7 @@ struct NotchView: View {
     let history: UsageHistory
     let updater: UpdateController
     let scanner: SecretScanner
+    let alerts: UsageAlerts
     let notchSize: CGSize
     /// Tells the window controller to grow the window before the card
     /// expands and to shrink it once the collapse animation has ended.
@@ -61,6 +63,11 @@ struct NotchView: View {
                     isHovering = hovering
                     if hovering {
                         autoCollapse?.cancel()
+                        // An alert nobody acknowledged is the first thing
+                        // a hover shows, until it is.
+                        if !isExpanded, alerts.current != nil {
+                            pane = .alerts
+                        }
                     }
                     setExpanded(hovering)
                     store.setPanelOpen(hovering)
@@ -69,17 +76,25 @@ struct NotchView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .onChange(of: scanner.alertGeneration) { _, _ in showAlert() }
+        .onChange(of: scanner.alertGeneration) { _, _ in showAlert(.secrets) }
+        .onChange(of: alerts.alertGeneration) { _, _ in showAlert(.alerts) }
+        .onChange(of: alerts.current == nil) { _, none in
+            // Got it on the last notice hands the panel back to usage.
+            if none, pane == .alerts {
+                show(.usage)
+            }
+        }
     }
 
-    /// A new leaked key opens the notch on its own for twelve seconds, or
-    /// for as long as the mouse is in it. Not through `setPanelOpen`: an
-    /// alert is not the user looking at usage, so it never speeds up the
-    /// polling. A panel already open on another pane keeps it, with the
-    /// key icon lit in the corner.
-    private func showAlert() {
+    /// A new leaked key or a usage alert opens the notch on its own for
+    /// twelve seconds, or for as long as the mouse is in it. Not through
+    /// `setPanelOpen`: an alert is not the user looking at usage, so it
+    /// never speeds up the polling. A panel already open on another pane
+    /// keeps it: the key icon lights up in the corner, and a usage alert
+    /// comes first on the next hover.
+    private func showAlert(_ target: Pane) {
         guard !isExpanded else { return }
-        pane = .secrets
+        pane = target
         setExpanded(true)
         autoCollapse = Task {
             try? await Task.sleep(for: .seconds(12))
@@ -152,9 +167,11 @@ struct NotchView: View {
 
             switch pane {
             case .settings:
-                NotchSettingsView(store: store, updater: updater, scanner: scanner)
+                NotchSettingsView(store: store, updater: updater, scanner: scanner, alerts: alerts)
             case .secrets:
                 SecretsPane(scanner: scanner)
+            case .alerts:
+                AlertsPane(alerts: alerts, store: store)
             case .history:
                 HistoryPane(history: history, scope: Binding(
                     get: { resolvedScope },
@@ -248,7 +265,7 @@ struct NotchView: View {
         case .history:
             history.ingestIfStale()
             Analytics.capture(.historyOpened(scope: resolvedScope.storedValue))
-        case .usage, .secrets:
+        case .usage, .secrets, .alerts:
             break
         }
     }
@@ -343,7 +360,7 @@ private struct NotchIconButton: View {
     }
 }
 
-private func paceColor(_ verdict: BurnProjection.Verdict?) -> Color {
+func paceColor(_ verdict: BurnProjection.Verdict?) -> Color {
     switch verdict {
     case .early: Color(red: 1.0, green: 0.42, blue: 0.34)
     case .onPace: Color(red: 1.0, green: 0.84, blue: 0.04)
@@ -353,7 +370,7 @@ private func paceColor(_ verdict: BurnProjection.Verdict?) -> Color {
 }
 
 /// Provider logo and name.
-private struct BrandRow: View {
+struct BrandRow: View {
     let provider: any UsageProvider
 
     var body: some View {
@@ -461,7 +478,7 @@ private struct WindowColumn: View {
 /// inside. The small tick across the track marks where the remaining arc
 /// should end right now at an even burn: halfway through the window puts it
 /// at the bottom of the ring.
-private struct UsageRing: View {
+struct UsageRing: View {
     let remainingFraction: Double
     var expectedRemainingFraction: Double?
     let color: Color

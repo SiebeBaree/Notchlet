@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: UsageStore?
     private var history: UsageHistory?
     private var scanner: SecretScanner?
+    private var alerts: UsageAlerts?
     private var notchController: NotchWindowController?
     private var shareController: ShareEditorWindowController?
     private var updateController: UpdateController?
@@ -36,6 +37,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let scanner = SecretScanner(store: store)
         self.scanner = scanner
         scanner.start()
+        // Threshold alerts ride on the store's own refreshes: every
+        // successful snapshot is checked against the rules, nothing polls.
+        let alerts = UsageAlerts()
+        self.alerts = alerts
+        store.snapshotObserver = { [alerts] providerID, previous, current in
+            alerts.snapshotDidChange(providerID: providerID, previous: previous, current: current)
+        }
         // Refetch whatever came due during sleep instead of trusting a
         // slept-through timer.
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -50,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shareController = ShareEditorWindowController(history: history)
         self.shareController = shareController
         notchController = NotchWindowController(
-            store: store, history: history, updater: updater, scanner: scanner
+            store: store, history: history, updater: updater, scanner: scanner, alerts: alerts
         ) { scope in
             Analytics.capture(.shareOpened(scope: scope.storedValue))
             shareController.show(scope: scope)

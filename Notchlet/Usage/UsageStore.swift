@@ -51,6 +51,9 @@ final class UsageStore {
     private var providerEnabled: [String: Bool]
     private var isPanelOpen = false
     private var refreshTask: Task<Void, Never>?
+    /// Told about every successful fetch, with the snapshot it replaced.
+    /// The usage alerts hang off this so they cost nothing beyond the poll.
+    var snapshotObserver: ((_ providerID: String, _ previous: UsageSnapshot?, _ current: UsageSnapshot) -> Void)?
 
     init(providers: [any UsageProvider]) {
         entries = providers.map { Entry(provider: $0, snapshot: nil) }
@@ -222,7 +225,9 @@ final class UsageStore {
     private func apply(_ outcome: FetchOutcome, at index: Int) {
         switch outcome {
         case let .success(snapshot):
+            let previous = entries[index].snapshot
             entries[index].snapshot = snapshot
+            snapshotObserver?(entries[index].id, previous, snapshot)
             entries[index].authProblem = nil
             entries[index].schedule.recordSuccess()
             transition(at: index, to: .ok)

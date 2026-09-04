@@ -39,6 +39,12 @@ enum UsageCopy {
         }
     }
 
+    /// Headline of a usage alert: the window's own label, then how far it
+    /// is. "5h limit past 80%", or "Weekly limit used up" at 100.
+    static func alertHeadline(windowLabel: String, percent: Int) -> String {
+        percent >= 100 ? "\(windowLabel) limit used up" : "\(windowLabel) limit past \(percent)%"
+    }
+
     /// Footer line for data old enough to mention; under 2 minutes counts as
     /// fresh and shows nothing.
     static func freshnessText(fetchedAt: Date?, now: Date = .now) -> String? {

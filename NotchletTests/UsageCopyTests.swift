@@ -109,4 +109,9 @@ struct UsageCopyTests {
         #expect(status(.error, retryAt: now.addingTimeInterval(120)) == "Request failed, retrying in 2m")
         #expect(status(.error) == "Request failed, retrying soon")
     }
+
+    @Test func alertHeadlineNamesTheWindowAndTheMark() {
+        #expect(UsageCopy.alertHeadline(windowLabel: "5h", percent: 80) == "5h limit past 80%")
+        #expect(UsageCopy.alertHeadline(windowLabel: "Weekly", percent: 100) == "Weekly limit used up")
+    }
 }
