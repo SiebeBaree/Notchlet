@@ -16,17 +16,21 @@ struct NotchSettingsView: View {
 
     let store: UsageStore
     let updater: UpdateController
+    let scanner: SecretScanner
 
     /// Same key Analytics uses; @AppStorage keeps the toggle in sync with it.
     @AppStorage("analyticsOptOut") private var analyticsOptOut = false
+    /// Same key SecretScanner reads; it owns the loop, this owns the switch.
+    @AppStorage(SecretScanner.enabledDefaultsKey) private var secretScanEnabled = true
     // Same key UsageStore reads for its closed-panel poll cadence.
     @AppStorage(UsageStore.intervalDefaultsKey) private var refreshMinutes = 10
     @State private var autoChecksForUpdates: Bool
     @State private var page: Page = .main
 
-    init(store: UsageStore, updater: UpdateController) {
+    init(store: UsageStore, updater: UpdateController, scanner: SecretScanner) {
         self.store = store
         self.updater = updater
+        self.scanner = scanner
         _autoChecksForUpdates = State(initialValue: updater.automaticallyChecksForUpdates)
     }
 
@@ -111,6 +115,23 @@ struct NotchSettingsView: View {
                     }
                 )
             )
+            toggleRow(
+                "Scan chats for leaked secrets",
+                isOn: Binding(
+                    get: { secretScanEnabled && scanner.isAvailable },
+                    set: { enabled in
+                        secretScanEnabled = enabled
+                        scanner.setEnabled(enabled)
+                    }
+                )
+            )
+            .disabled(!scanner.isAvailable)
+            if !scanner.isAvailable {
+                Text("Needs Apple silicon")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.top, -6)
+            }
             HStack {
                 Text("Refresh every")
                     .font(.system(size: 11.5))

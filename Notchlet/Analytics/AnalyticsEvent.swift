@@ -29,6 +29,15 @@ enum AnalyticsEvent {
     case updateAvailable(fromVersion: String, toVersion: String)
     case updateInstallClicked(toVersion: String)
     case updateFailed(errorCode: Int)
+    /// Counts only: raw matches in the scan and distinct secrets not seen
+    /// before. `kind` is "full" or "hourly".
+    case secretScanCompleted(provider: String, kind: String, findings: Int, new: Int, seconds: TimeInterval)
+    /// The one place a fragment of chat content leaves the machine, on an
+    /// explicit click: the first six and last two characters of a match the
+    /// user says is not a secret, so a noisy rule can be turned off.
+    case secretFalsePositive(provider: String, rule: String, preview: String, length: Int)
+    case secretIgnored(provider: String, rule: String)
+    case secretHelpOpened(provider: String, rule: String)
 
     var name: String {
         switch self {
@@ -47,6 +56,10 @@ enum AnalyticsEvent {
         case .updateAvailable: "update_available"
         case .updateInstallClicked: "update_install_clicked"
         case .updateFailed: "update_failed"
+        case .secretScanCompleted: "secret_scan_completed"
+        case .secretFalsePositive: "secret_false_positive"
+        case .secretIgnored: "secret_ignored"
+        case .secretHelpOpened: "secret_help_opened"
         }
     }
 
@@ -76,6 +89,18 @@ enum AnalyticsEvent {
             ["to_version": toVersion]
         case let .updateFailed(errorCode):
             ["error_code": errorCode]
+        case let .secretScanCompleted(provider, kind, findings, new, seconds):
+            [
+                "provider": provider,
+                "kind": kind,
+                "findings": findings,
+                "new": new,
+                "seconds": (seconds * 10).rounded() / 10,
+            ]
+        case let .secretFalsePositive(provider, rule, preview, length):
+            ["provider": provider, "rule": rule, "preview": preview, "length": length]
+        case let .secretIgnored(provider, rule), let .secretHelpOpened(provider, rule):
+            ["provider": provider, "rule": rule]
         }
     }
 }

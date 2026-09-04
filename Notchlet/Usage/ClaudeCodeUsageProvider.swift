@@ -26,6 +26,7 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     static let fileOption = AuthOption(id: "file", label: "Credentials file")
     let authOptions = [Self.keychainOption, Self.fileOption]
     let history: (any UsageHistorySource)? = ClaudeCodeHistorySource()
+    let secrets: (any SecretScanSource)? = ClaudeCodeSecretSource()
 
     var isInstalled: Bool {
         CredentialSupport.homePathExists(".claude")

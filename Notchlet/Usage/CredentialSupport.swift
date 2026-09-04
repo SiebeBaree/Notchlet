@@ -184,13 +184,13 @@ enum CredentialSupport {
     /// Expiry from a JWT's `exp` claim, without verifying the signature. We
     /// only decide whether a token is worth sending; the server does the
     /// real validation.
-    static func jwtExpiry(of token: String) -> Date? {
+    nonisolated static func jwtExpiry(of token: String) -> Date? {
         guard let exp = jwtClaims(of: token)?["exp"] as? TimeInterval else { return nil }
         return Date(timeIntervalSince1970: exp)
     }
 
     /// The decoded payload of a JWT, unverified.
-    static func jwtClaims(of token: String) -> [String: Any]? {
+    nonisolated static func jwtClaims(of token: String) -> [String: Any]? {
         let segments = token.split(separator: ".")
         guard segments.count == 3 else { return nil }
         var base64 = segments[1]

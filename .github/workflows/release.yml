@@ -69,6 +69,9 @@ jobs:
           test -n "$POSTHOG_API_KEY" || { echo "POSTHOG_API_KEY secret is empty"; exit 1; }
           printf 'POSTHOG_API_KEY = %s\n' "$POSTHOG_API_KEY" > Config/Secrets.xcconfig
 
+      - name: Fetch betterleaks
+        run: ./Scripts/fetch-betterleaks.sh
+
       - name: Archive
         run: |
           # Sparkle compares CFBundleVersion, not the marketing version, so the
@@ -89,8 +92,8 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--timestamp"
           cp -R build/Notchlet.xcarchive/Products/Applications/Notchlet.app build/
 
-      - name: Re-sign Sparkle's nested executables
-        run: ./Scripts/sign-sparkle.sh build/Notchlet.app "$SIGNING_IDENTITY"
+      - name: Re-sign the nested executables
+        run: ./Scripts/sign-nested.sh build/Notchlet.app "$SIGNING_IDENTITY"
 
       - name: Notarize the app and staple the ticket into it
         env:

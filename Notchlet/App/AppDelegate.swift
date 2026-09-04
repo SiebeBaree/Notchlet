@@ -5,6 +5,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: UsageStore?
     private var history: UsageHistory?
+    private var scanner: SecretScanner?
     private var notchController: NotchWindowController?
     private var shareController: ShareEditorWindowController?
     private var updateController: UpdateController?
@@ -30,6 +31,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let history = UsageHistory(store: store)
         self.history = history
         history.start()
+        // The same logs, scanned for leaked keys: once when the Mac is
+        // idle, then hourly over what changed.
+        let scanner = SecretScanner(store: store)
+        self.scanner = scanner
+        scanner.start()
         // Refetch whatever came due during sleep instead of trusting a
         // slept-through timer.
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -43,7 +49,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateController = updater
         let shareController = ShareEditorWindowController(history: history)
         self.shareController = shareController
-        notchController = NotchWindowController(store: store, history: history, updater: updater) { scope in
+        notchController = NotchWindowController(
+            store: store, history: history, updater: updater, scanner: scanner
+        ) { scope in
             Analytics.capture(.shareOpened(scope: scope.storedValue))
             shareController.show(scope: scope)
         }
@@ -56,5 +64,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func didWake() {
         store?.reschedule()
         history?.reschedule()
+        scanner?.reschedule()
     }
 }

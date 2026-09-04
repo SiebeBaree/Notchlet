@@ -35,12 +35,16 @@ protocol UsageProvider: Sendable {
     /// Where the provider's past usage can be read from, for the history
     /// pane. Nil for a provider that only has live limits to show.
     var history: (any UsageHistorySource)? { get }
+    /// Where the provider's chats can be scanned for leaked keys. Nil for
+    /// a provider without chat logs on disk.
+    var secrets: (any SecretScanSource)? { get }
 
     func fetchUsage() async throws -> UsageSnapshot
 }
 
 extension UsageProvider {
     var history: (any UsageHistorySource)? { nil }
+    var secrets: (any SecretScanSource)? { nil }
 }
 
 /// The declarative shape of an endpoint-backed provider. `fetchUsage` comes

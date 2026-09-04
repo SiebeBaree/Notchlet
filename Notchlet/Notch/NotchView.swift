@@ -12,16 +12,19 @@ import SwiftUI
 /// background, so clicks in the transparent area go to the window below.
 struct NotchView: View {
     /// What the expanded panel shows: usage, past usage behind the history
-    /// icon, or in-notch settings behind the gear.
+    /// icon, leaked secrets behind the key, or in-notch settings behind the
+    /// gear.
     private enum Pane {
         case usage
         case history
+        case secrets
         case settings
     }
 
     let store: UsageStore
     let history: UsageHistory
     let updater: UpdateController
+    let scanner: SecretScanner
     let notchSize: CGSize
     /// Tells the window controller to grow the window before the card
     /// expands and to shrink it once the collapse animation has ended.
@@ -36,6 +39,9 @@ struct NotchView: View {
     @AppStorage("historyScope") private var historyScope = "all"
     @State private var openedAt: Date?
     @State private var openDebounce: Task<Void, Never>?
+    @State private var isHovering = false
+    /// Folds an alert the user never hovered back into the notch.
+    @State private var autoCollapse: Task<Void, Never>?
 
     /// Providers with something to draw. A snapshot without windows (an
     /// unlimited plan, say) would be a brand row over nothing, so it counts
@@ -52,6 +58,10 @@ struct NotchView: View {
         VStack(spacing: 0) {
             shape
                 .onHover { hovering in
+                    isHovering = hovering
+                    if hovering {
+                        autoCollapse?.cancel()
+                    }
                     setExpanded(hovering)
                     store.setPanelOpen(hovering)
                     trackOpenClose(hovering: hovering)
@@ -59,6 +69,23 @@ struct NotchView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
+        .onChange(of: scanner.alertGeneration) { _, _ in showAlert() }
+    }
+
+    /// A new leaked key opens the notch on its own for twelve seconds, or
+    /// for as long as the mouse is in it. Not through `setPanelOpen`: an
+    /// alert is not the user looking at usage, so it never speeds up the
+    /// polling. A panel already open on another pane keeps it, with the
+    /// key icon lit in the corner.
+    private func showAlert() {
+        guard !isExpanded else { return }
+        pane = .secrets
+        setExpanded(true)
+        autoCollapse = Task {
+            try? await Task.sleep(for: .seconds(12))
+            guard !Task.isCancelled, !isHovering else { return }
+            setExpanded(false)
+        }
     }
 
     private var shape: some View {
@@ -125,7 +152,9 @@ struct NotchView: View {
 
             switch pane {
             case .settings:
-                NotchSettingsView(store: store, updater: updater)
+                NotchSettingsView(store: store, updater: updater, scanner: scanner)
+            case .secrets:
+                SecretsPane(scanner: scanner)
             case .history:
                 HistoryPane(history: history, scope: Binding(
                     get: { resolvedScope },
@@ -143,10 +172,16 @@ struct NotchView: View {
     }
 
     /// The share, history and gear icons live in the strip beside the notch
-    /// cutout, quiet until hovered. The update icon only exists when an
-    /// update is waiting. Share is dimmed until some history exists.
+    /// cutout, quiet until hovered. The key icon only exists while a leaked
+    /// secret waits, the update icon only while an update does. Share is
+    /// dimmed until some history exists.
     private var cornerIcons: some View {
         HStack(spacing: 6) {
+            if !scanner.pending.isEmpty {
+                NotchIconButton(systemName: "key.fill", isActive: pane == .secrets, tint: SecretsPane.amber) {
+                    toggle(.secrets)
+                }
+            }
             if updater.availableUpdateVersion != nil {
                 NotchIconButton(systemName: "arrow.down.circle.fill") {
                     updater.installAvailableUpdate()
@@ -200,7 +235,7 @@ struct NotchView: View {
         case .history:
             history.ingestIfStale()
             Analytics.capture(.historyOpened(scope: resolvedScope.storedValue))
-        case .usage:
+        case .usage, .secrets:
             break
         }
     }
@@ -272,10 +307,12 @@ struct NotchView: View {
     }
 }
 
-/// Small corner icon, grayish until hovered or active.
+/// Small corner icon, grayish until hovered or active. A tint keeps its
+/// colour at every opacity, for the one icon that has to be noticed.
 private struct NotchIconButton: View {
     let systemName: String
     var isActive = false
+    var tint: Color = .white
     let action: () -> Void
 
     @State private var isHovering = false
@@ -284,7 +321,7 @@ private struct NotchIconButton: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.white.opacity(isActive || isHovering ? 0.85 : 0.35))
+                .foregroundStyle(tint.opacity(isActive || isHovering ? 0.85 : tint == .white ? 0.35 : 0.7))
                 .frame(width: 18, height: 18)
                 .contentShape(.rect)
         }

@@ -65,10 +65,13 @@ Notchlet needs macOS 14 or newer. A notch is optional. On a Mac or external disp
 ```sh
 git clone https://github.com/SiebeBaree/Notchlet.git
 cd Notchlet
+./Scripts/fetch-betterleaks.sh
 open Notchlet.xcodeproj
 ```
 
-Run the `Notchlet` scheme in Xcode 26 or newer.
+Run the `Notchlet` scheme in Xcode 26 or newer. The script downloads the
+[betterleaks](https://github.com/betterleaks/betterleaks) binary the secret
+scanner runs, pinned by version and checksum; the build fails until it has.
 
 ## Supported agents
 
@@ -93,6 +96,11 @@ Notchlet reads the credentials the CLIs already wrote to your machine and calls 
 - It refreshes one token, Claude Code's, and only once it has expired while Claude Code is idle. It does that the way a second Claude Code process would: same locks, same compare-and-swap write to the same keychain item, so Claude Code picks the new token up instead of being signed out by it. Every other agent's token is left alone; the CLIs renew those themselves on use.
 - It never asks for your keychain password. Every keychain read and write goes through the same `security` tool the CLIs use.
 - Your usage numbers, credentials and account never leave your Mac.
+- The secret scanner reads the same chat logs, with a copy of
+  [betterleaks](https://github.com/betterleaks/betterleaks) inside the app,
+  once when your Mac is idle and then hourly. It never checks a key against
+  anyone's API, and it stores and shows the first six and last two
+  characters of a find, never the key. Off with one toggle in settings.
 
 Notchlet does send anonymous product analytics, a random UUID plus events like "the notch was opened". The full list of what leaves the machine is one file, [`AnalyticsEvent.swift`](Notchlet/Analytics/AnalyticsEvent.swift). Turn it off with one toggle in settings. Builds from source send nothing at all.
 

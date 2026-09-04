@@ -17,5 +17,8 @@ build/
 # Local build secrets
 Config/Secrets.xcconfig
 
+# Vendored betterleaks binary, fetched by Scripts/fetch-betterleaks.sh
+Vendor/
+
 # Release artifacts, produced by the release workflow
 releases/

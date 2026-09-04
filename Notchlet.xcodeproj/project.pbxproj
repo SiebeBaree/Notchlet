@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		AA0000000000000000000100 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000102 /* PostHog */; };
 		AA0000000000000000000101 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000103 /* Sparkle */; };
+		AA0000000000000000000104 /* betterleaks in Embed Helpers */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000023 /* betterleaks */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		AA0000000000000000000105 /* betterleaks-LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000024 /* betterleaks-LICENSE */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,10 +23,26 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		AA0000000000000000000082 /* Embed Helpers */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				AA0000000000000000000104 /* betterleaks in Embed Helpers */,
+			);
+			name = "Embed Helpers";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		AA0000000000000000000020 /* Notchlet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Notchlet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000021 /* NotchletTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NotchletTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000022 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Base.xcconfig; path = Config/Base.xcconfig; sourceTree = SOURCE_ROOT; };
+		AA0000000000000000000023 /* betterleaks */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = betterleaks; path = Vendor/betterleaks/betterleaks; sourceTree = SOURCE_ROOT; };
+		AA0000000000000000000024 /* betterleaks-LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; name = "betterleaks-LICENSE"; path = "Vendor/betterleaks/betterleaks-LICENSE"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -79,6 +97,7 @@
 				AA0000000000000000000030 /* Notchlet */,
 				AA0000000000000000000031 /* NotchletTests */,
 				AA0000000000000000000022 /* Base.xcconfig */,
+				AA0000000000000000000052 /* Vendor */,
 				AA0000000000000000000051 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -92,6 +111,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		AA0000000000000000000052 /* Vendor */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000023 /* betterleaks */,
+				AA0000000000000000000024 /* betterleaks-LICENSE */,
+			);
+			name = Vendor;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -102,6 +130,7 @@
 				AA0000000000000000000070 /* Sources */,
 				AA0000000000000000000040 /* Frameworks */,
 				AA0000000000000000000080 /* Resources */,
+				AA0000000000000000000082 /* Embed Helpers */,
 			);
 			buildRules = (
 			);
@@ -190,6 +219,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA0000000000000000000105 /* betterleaks-LICENSE in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
