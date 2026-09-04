@@ -12,16 +12,18 @@ const segmentClass =
 
 // Two tabs hanging from the top corners, shaped like the ends of the macOS menu bar. Fixed so they ride along
 // while scrolling; over the hero they blend with the wallpaper, past it they turn into light glass over the page.
-export function MenuBar() {
-    const [scrolled, setScrolled] = useState(false);
+// Pages without the dark hero pass `light` and start in the glass state.
+export function MenuBar({ light = false }: { light?: boolean }) {
+    const [scrolled, setScrolled] = useState(light);
 
     useEffect(() => {
+        if (light) return;
         // Flip to light glass only once the shrinking hero has ceded most of the viewport to the white page.
         const onScroll = () => setScrolled(window.scrollY > window.innerHeight * 0.75);
         onScroll();
         window.addEventListener("scroll", onScroll, { passive: true });
         return () => window.removeEventListener("scroll", onScroll);
-    }, []);
+    }, [light]);
 
     return (
         <nav
