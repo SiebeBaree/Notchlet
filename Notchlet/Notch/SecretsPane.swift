@@ -1,9 +1,8 @@
 import SwiftUI
 
 /// The secrets pane: one leaked key at a time, newest first. What kind of
-/// key betterleaks thinks it is, the line of the chat it sits in with the
-/// key masked to its preview, and the three things to do about it. A pager
-/// in the header walks the rest.
+/// key betterleaks thinks it is, its masked preview, and the three things
+/// to do about it. A pager in the header walks the rest.
 struct SecretsPane: View {
     static let amber = Color(red: 0.85, green: 0.64, blue: 0.26)
 
@@ -25,7 +24,7 @@ struct SecretsPane: View {
                 Text(finding.kind)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white)
-                contextLine(finding)
+                previewLine(finding)
                 actions(finding, pending: pending)
             }
         }
@@ -52,17 +51,11 @@ struct SecretsPane: View {
         }
     }
 
-    /// The preview stands out in amber inside the line it was found on.
-    private func contextLine(_ finding: SecretFinding) -> some View {
-        var text = AttributedString(finding.context)
-        if let range = text.range(of: finding.preview) {
-            text[range].foregroundColor = Self.amber
-        }
-        return Text(text)
+    /// The first and last characters of the key, enough to know which one.
+    private func previewLine(_ finding: SecretFinding) -> some View {
+        Text(finding.preview)
             .font(.system(size: 11, design: .monospaced))
-            .foregroundStyle(.white.opacity(0.6))
-            .lineLimit(1)
-            .truncationMode(.tail)
+            .foregroundStyle(Self.amber)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)

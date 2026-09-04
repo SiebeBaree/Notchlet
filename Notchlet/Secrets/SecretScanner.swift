@@ -142,13 +142,7 @@ final class SecretScanner {
             do {
                 let input = try await provider.source.input(since: lastScanAt)
                 let matches = input.isEmpty ? [] : try await Betterleaks.scan(input)
-                let known = state.findings
-                let merged = await Task.detached {
-                    SecretFinding.merge(
-                        matches, into: known, providerID: provider.id, now: startedAt,
-                        lineAt: SecretContext.reader(for: input, matches: matches)
-                    )
-                }.value
+                let merged = SecretFinding.merge(matches, into: state.findings, providerID: provider.id, now: startedAt)
                 state.findings = merged.findings
                 state.lastScanAt[provider.id] = startedAt
                 try? stateStore.save(state)
