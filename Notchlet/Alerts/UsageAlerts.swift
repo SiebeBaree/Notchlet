@@ -83,6 +83,17 @@ final class UsageAlerts {
         }
     }
 
+    #if DEBUG
+        /// A notice out of thin air for checking the card: 80% on the given
+        /// window. Not saved; Got it drops it like any other.
+        func showTestNotice(providerID: String, window: UsageWindow) {
+            let rule = UsageAlertRule(providerID: providerID, windowID: window.id, percent: 80)
+            state.pending.removeAll { $0.rule == rule }
+            state.pending.insert(UsageAlertNotice(rule: rule, window: window, firedAt: .now), at: 0)
+            alertGeneration += 1
+        }
+    #endif
+
     private static func load(from defaults: UserDefaults) -> UsageAlertState? {
         guard let data = defaults.data(forKey: defaultsKey),
               let state = try? JSONDecoder().decode(UsageAlertState.self, from: data),

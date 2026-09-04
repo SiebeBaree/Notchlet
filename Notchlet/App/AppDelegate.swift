@@ -1,4 +1,5 @@
 import AppKit
+import notify
 
 /// Owns the notch panel, the updater and analytics for the lifetime of the
 /// app.
@@ -44,6 +45,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.snapshotObserver = { [alerts] providerID, previous, current in
             alerts.snapshotDidChange(providerID: providerID, previous: previous, current: current)
         }
+        #if DEBUG
+            // `notifyutil -p com.notchlet.debug.alert` while running from
+            // Xcode shows an alert on the first window with data, to check
+            // the card without waiting for real usage to cross a mark.
+            var token: Int32 = 0
+            notify_register_dispatch("com.notchlet.debug.alert", &token, .main) { _ in
+                MainActor.assumeIsolated {
+                    guard let entry = store.entries.first(where: { store.isEnabled($0.id) && $0.snapshot != nil }),
+                          let window = entry.snapshot?.primaryWindow
+                    else { return }
+                    alerts.showTestNotice(providerID: entry.id, window: window)
+                }
+            }
+        #endif
         // Refetch whatever came due during sleep instead of trusting a
         // slept-through timer.
         NSWorkspace.shared.notificationCenter.addObserver(
