@@ -31,7 +31,8 @@ creating the release or touching the feed.
 1. Imports the Developer ID certificate into a throwaway keychain.
 2. Writes `Config/Secrets.xcconfig` from the `POSTHOG_API_KEY` secret, failing
    if it is empty rather than shipping a build that silently reports nothing.
-3. Archives with the version numbers injected.
+3. Fetches the pinned betterleaks binary with `Scripts/fetch-betterleaks.sh`,
+   checksum verified, and archives with the version numbers injected.
 4. Notarizes the `.app` and staples the ticket into the bundle, so a copy
    installed by Sparkle passes Gatekeeper with no network.
 5. Builds a DMG, signs it, notarizes and staples that too, so the download
@@ -133,9 +134,9 @@ Regenerate it as App Manager.
 
 **notarytool returns Invalid right after the archive.** Most likely something
 in the bundle is still ad-hoc signed. Sparkle ships its XPC services,
-`Updater.app` and `Autoupdate` ad-hoc, and Xcode signs the framework bundle
-without recursing into them, so `Scripts/sign-sparkle.sh` re-signs them before
-notarization. Check with:
+`Updater.app` and `Autoupdate` ad-hoc, betterleaks arrives unsigned from its
+release, and Xcode signs the framework bundle without recursing into them, so
+`Scripts/sign-nested.sh` re-signs them before notarization. Check with:
 
 ```sh
 codesign -dvv <path> 2>&1 | grep flags
