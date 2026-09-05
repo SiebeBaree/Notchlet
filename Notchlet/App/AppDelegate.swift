@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var history: UsageHistory?
     private var scanner: SecretScanner?
     private var alerts: UsageAlerts?
+    private var waits: AgentWaits?
     private var notchController: NotchWindowController?
     private var shareController: ShareEditorWindowController?
     private var updateController: UpdateController?
@@ -45,6 +46,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.snapshotObserver = { [alerts] providerID, previous, current in
             alerts.snapshotDidChange(providerID: providerID, previous: previous, current: current)
         }
+        // Agents that stopped or need an answer, told to us by the CLIs'
+        // own hooks; the switch in settings installs those.
+        let waits = AgentWaits { store.entries.filter(\.provider.isInstalled).map(\.id) }
+        self.waits = waits
+        waits.start()
         #if DEBUG
             // `notifyutil -p com.notchlet.debug.alert` while running from
             // Xcode shows an alert on the first window with data, to check
@@ -73,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shareController = ShareEditorWindowController(history: history)
         self.shareController = shareController
         notchController = NotchWindowController(
-            store: store, history: history, updater: updater, scanner: scanner, alerts: alerts
+            store: store, history: history, updater: updater, scanner: scanner, alerts: alerts, waits: waits
         ) { scope in
             Analytics.capture(.shareOpened(scope: scope.storedValue))
             shareController.show(scope: scope)

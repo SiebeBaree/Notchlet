@@ -15,9 +15,11 @@ final class NotchWindowController: NSWindowController {
     private let updater: UpdateController
     private let scanner: SecretScanner
     private let alerts: UsageAlerts
+    private let waits: AgentWaits
     private let share: (UsageHistory.Scope) -> Void
     private var notchSize: CGSize
     private var isExpanded = false
+    private var isWaiting = false
 
     private lazy var hostingView = NSHostingView(rootView: makeRootView())
 
@@ -27,6 +29,7 @@ final class NotchWindowController: NSWindowController {
         updater: UpdateController,
         scanner: SecretScanner,
         alerts: UsageAlerts,
+        waits: AgentWaits,
         share: @escaping (UsageHistory.Scope) -> Void
     ) {
         let panel = NotchPanel()
@@ -37,6 +40,7 @@ final class NotchWindowController: NSWindowController {
         self.updater = updater
         self.scanner = scanner
         self.alerts = alerts
+        self.waits = waits
         self.share = share
         self.notchSize = notchSize
 
@@ -85,22 +89,26 @@ final class NotchWindowController: NSWindowController {
             updater: updater,
             scanner: scanner,
             alerts: alerts,
+            waits: waits,
             notchSize: notchSize,
-            resizePanel: { [weak self] expanded in self?.setExpanded(expanded) },
+            resizePanel: { [weak self] expanded, waiting in self?.setPanelState(expanded: expanded, waiting: waiting) },
             share: share
         )
     }
 
-    /// The view grows the window before it expands and shrinks it after the
-    /// collapse animation ends, so the card always has room to draw.
-    private func setExpanded(_ expanded: Bool) {
-        guard expanded != isExpanded else { return }
+    /// The view grows the window before it expands or outlines and shrinks
+    /// it after the animation back ends, so the drawing always has room.
+    private func setPanelState(expanded: Bool, waiting: Bool) {
+        guard expanded != isExpanded || waiting != isWaiting else { return }
         isExpanded = expanded
+        isWaiting = waiting
         reposition()
     }
 
     private var panelSize: CGSize {
-        isExpanded ? NotchGeometry.panelSize : NotchGeometry.collapsedPanelSize(notchSize: notchSize)
+        isExpanded
+            ? NotchGeometry.panelSize
+            : NotchGeometry.collapsedPanelSize(notchSize: notchSize, waiting: isWaiting)
     }
 
     /// Moves the panel onto the current target screen at the size the
@@ -114,6 +122,7 @@ final class NotchWindowController: NSWindowController {
             notchSize = currentNotchSize
             // A fresh root view starts collapsed, so the window must too.
             isExpanded = false
+            isWaiting = false
             hostingView.rootView = makeRootView()
         }
         window.setFrame(NotchGeometry.panelFrame(screenFrame: screen.frame, panelSize: panelSize), display: true)

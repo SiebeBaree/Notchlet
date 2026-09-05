@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 @testable import Notchlet
+import SwiftUI
 import Testing
 
 struct NotchGeometryTests {
@@ -34,6 +35,36 @@ struct NotchGeometryTests {
         #expect(collapsed.size == CGSize(width: 212, height: 32))
         #expect(collapsed.midX == expanded.midX)
         #expect(collapsed.maxY == expanded.maxY)
+    }
+
+    @Test func waitingNotchGrowsOnThreeSidesAndKeepsItsCenter() {
+        let screen = CGRect(x: 0, y: 0, width: 3456, height: 2234)
+        let notch = CGSize(width: 200, height: 32)
+        let waiting = NotchGeometry.panelFrame(
+            screenFrame: screen,
+            panelSize: NotchGeometry.collapsedPanelSize(notchSize: notch, waiting: true)
+        )
+        let collapsed = NotchGeometry.panelFrame(
+            screenFrame: screen,
+            panelSize: NotchGeometry.collapsedPanelSize(notchSize: notch)
+        )
+        #expect(waiting.size == CGSize(width: 218, height: 35))
+        #expect(waiting.midX == collapsed.midX)
+        #expect(waiting.maxY == collapsed.maxY)
+    }
+
+    @Test func waitLineRunsStraightToTheTopEdgeInsideTheSides() {
+        let rect = CGRect(x: 0, y: 0, width: 218, height: 35)
+        let line = NotchShape.waitLine(in: rect, topRadius: 6, bottomRadius: 13, inset: 1.75)
+        let bounds = line.boundingRect
+        // Starts and ends on the top edge, 1.75 inside the straight sides
+        // (which sit the fillet radius in from the rect), and never reaches
+        // the fillets or the outer edge.
+        #expect(bounds.minY == 0)
+        #expect(bounds.minX == 7.75)
+        #expect(bounds.maxX == 218 - 7.75)
+        #expect(bounds.maxY == 35 - 1.75)
+        #expect(line.currentPoint == CGPoint(x: 218 - 7.75, y: 0))
     }
 }
 

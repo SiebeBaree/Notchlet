@@ -12,17 +12,30 @@ enum NotchGeometry {
     /// aligned with the physical cutout.
     static let notchTopCornerRadius: CGFloat = 6
 
+    /// How far the notch grows on each side and at the bottom while an
+    /// agent waits: a 1pt black rim, the line, and half a point of black
+    /// before the physical cutout.
+    static let waitInset: CGFloat = 3
+    static let waitLineWidth: CGFloat = 1.5
+    /// Distance from the grown edge to the centre of the line.
+    static let waitLineInset: CGFloat = 1 + waitLineWidth / 2
+
     /// Window size while the panel is expanded: a transparent window pinned
     /// to the top center of the screen, with room for the card to animate
     /// out of the notch.
     static let panelSize = CGSize(width: 640, height: 460)
 
     /// Window size while the panel is collapsed: exactly the notch
-    /// silhouette including its outward fillets. The window shrinks to this
-    /// when closed so cursor movement anywhere else never reaches the app
-    /// and the window server has no larger transparent layer to composite.
-    static func collapsedPanelSize(notchSize: CGSize) -> CGSize {
-        CGSize(width: notchSize.width + 2 * notchTopCornerRadius, height: notchSize.height)
+    /// silhouette including its outward fillets, plus the wait line's
+    /// growth while an agent waits. The window shrinks to this when closed
+    /// so cursor movement anywhere else never reaches the app and the
+    /// window server has no larger transparent layer to composite.
+    static func collapsedPanelSize(notchSize: CGSize, waiting: Bool = false) -> CGSize {
+        let growth = waiting ? waitInset : 0
+        return CGSize(
+            width: notchSize.width + 2 * notchTopCornerRadius + 2 * growth,
+            height: notchSize.height + growth
+        )
     }
 
     /// Frame for the panel in screen coordinates (origin at bottom-left,

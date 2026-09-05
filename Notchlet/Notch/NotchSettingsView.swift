@@ -7,7 +7,8 @@ import SwiftUI
 /// turned off. Each provider row opens its own page: how it signs in, how
 /// that is going, and a place to paste a secret where the provider takes
 /// one. The alerts row opens one line per window the notch shows, with a
-/// chip per threshold.
+/// chip per threshold. The agent switch hooks Notchlet into the CLIs, or
+/// takes those hooks out again.
 struct NotchSettingsView: View {
     private enum Page: Equatable {
         case main
@@ -20,6 +21,7 @@ struct NotchSettingsView: View {
     let updater: UpdateController
     let scanner: SecretScanner
     let alerts: UsageAlerts
+    let waits: AgentWaits
 
     /// Same key Analytics uses; @AppStorage keeps the toggle in sync with it.
     @AppStorage("analyticsOptOut") private var analyticsOptOut = false
@@ -30,11 +32,12 @@ struct NotchSettingsView: View {
     @State private var autoChecksForUpdates: Bool
     @State private var page: Page = .main
 
-    init(store: UsageStore, updater: UpdateController, scanner: SecretScanner, alerts: UsageAlerts) {
+    init(store: UsageStore, updater: UpdateController, scanner: SecretScanner, alerts: UsageAlerts, waits: AgentWaits) {
         self.store = store
         self.updater = updater
         self.scanner = scanner
         self.alerts = alerts
+        self.waits = waits
         _autoChecksForUpdates = State(initialValue: updater.automaticallyChecksForUpdates)
     }
 
@@ -129,6 +132,13 @@ struct NotchSettingsView: View {
                     .foregroundStyle(.white.opacity(0.4))
                     .padding(.top, -6)
             }
+            toggleRow(
+                "Show when an agent needs you",
+                isOn: Binding(
+                    get: { waits.isEnabled },
+                    set: { waits.setEnabled($0) }
+                )
+            )
             HStack {
                 Text("Refresh every")
                     .font(.system(size: 11.5))

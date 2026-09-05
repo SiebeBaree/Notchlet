@@ -41,4 +41,23 @@ struct NotchShape: Shape {
         path.closeSubpath()
         return path
     }
+
+    /// The wait line's centre line: `inset` inside the straight sides and
+    /// the bottom of the silhouette drawn in `rect`, with concentric bottom
+    /// corners. The sides run straight to the top edge and stop there; the
+    /// fillets belong to the notch meeting the menu bar, not to the line.
+    static func waitLine(in rect: CGRect, topRadius: CGFloat, bottomRadius: CGFloat, inset: CGFloat) -> Path {
+        let left = rect.minX + topRadius + inset
+        let right = rect.maxX - topRadius - inset
+        let bottom = rect.maxY - inset
+        let radius = max(bottomRadius - inset, 0)
+        var path = Path()
+        path.move(to: CGPoint(x: left, y: rect.minY))
+        path.addLine(to: CGPoint(x: left, y: bottom - radius))
+        path.addQuadCurve(to: CGPoint(x: left + radius, y: bottom), control: CGPoint(x: left, y: bottom))
+        path.addLine(to: CGPoint(x: right - radius, y: bottom))
+        path.addQuadCurve(to: CGPoint(x: right, y: bottom - radius), control: CGPoint(x: right, y: bottom))
+        path.addLine(to: CGPoint(x: right, y: rect.minY))
+        return path
+    }
 }
