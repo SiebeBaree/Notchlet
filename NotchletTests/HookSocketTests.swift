@@ -29,7 +29,6 @@ struct HookSocketTests {
         process.environment = ["HOME": home.path, "PATH": "/usr/bin:/bin", "__CFBundleIdentifier": "com.t3tools.t3code"]
         let stdin = Pipe()
         process.standardInput = stdin
-        let started = Date.now
         try process.run()
         stdin.fileHandleForWriting.write(Data(#"{"session_id":"s1","hook_event_name":"Stop","cwd":"/tmp"}"#.utf8))
         try stdin.fileHandleForWriting.close()
@@ -37,6 +36,7 @@ struct HookSocketTests {
         // Both waits have deadlines, so a broken socket or a stuck script
         // fails the test instead of hanging the run.
         let data = try #require(await Self.first(of: received.stream, within: .seconds(5)))
+        let receivedAt = Date.now
         let message = try #require(AgentWaitRules.parse(data))
         #expect(message.provider == "claude-code")
         #expect(message.sessionID == "s1")
@@ -54,7 +54,10 @@ struct HookSocketTests {
         }
         process.waitUntilExit()
         #expect(process.terminationStatus == 0)
-        #expect(Date.now.timeIntervalSince(started) < 2)
+        // `nc` returns once the listener closes, well inside its own 2s
+        // idle timeout. Measured from receipt so a slow CI runner's process
+        // spawn does not count against it.
+        #expect(Date.now.timeIntervalSince(receivedAt) < 1.5)
     }
 
     /// The stream's first element, or nil once the deadline passes.
