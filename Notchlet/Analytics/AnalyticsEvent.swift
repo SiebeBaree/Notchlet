@@ -7,9 +7,8 @@ enum AnalyticsEvent {
     case appLaunched
     case appUpdated(fromVersion: String, toVersion: String)
     /// Once per calendar day. A login-item agent rarely relaunches, so DAU
-    /// and retention come from this, not launches. `usagePressure` maps
-    /// provider id to a bucket ("0-25"..."75-100"), never real numbers.
-    case appHeartbeat(uptimeHours: Double, usagePressure: [String: String])
+    /// and retention come from this, not launches.
+    case appHeartbeat(uptimeHours: Double)
     case notchOpened
     case notchClosed(openSeconds: TimeInterval)
     case providerStateChanged(provider: String, state: UsageStore.ProviderState)
@@ -72,10 +71,8 @@ enum AnalyticsEvent {
             [:]
         case let .appUpdated(fromVersion, toVersion):
             ["from_version": fromVersion, "to_version": toVersion]
-        case let .appHeartbeat(uptimeHours, usagePressure):
-            usagePressure.reduce(into: ["uptime_hours": (uptimeHours * 10).rounded() / 10]) {
-                $0["pressure_\($1.key)"] = $1.value
-            }
+        case let .appHeartbeat(uptimeHours):
+            ["uptime_hours": (uptimeHours * 10).rounded() / 10]
         case let .notchClosed(openSeconds):
             ["open_seconds": (openSeconds * 10).rounded() / 10]
         case let .providerStateChanged(provider, state):

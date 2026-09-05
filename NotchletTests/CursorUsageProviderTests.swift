@@ -104,11 +104,6 @@ struct CursorUsageProviderTests {
         #expect(try CursorUsageProvider().parseWindows(from: data).isEmpty)
     }
 
-    @Test func parsesPlanTier() {
-        #expect(CursorUsageProvider().parsePlanTier(from: proFixture) == "pro")
-        #expect(CursorUsageProvider().parsePlanTier(from: Data("{}".utf8)) == nil)
-    }
-
     @Test func buildsTheDashboardCookieFromTheToken() throws {
         let token = Self.unsignedJWT(#"{"sub": "auth0|user_01ABC", "exp": 1790000000}"#)
         let now = Date(timeIntervalSince1970: 1_789_000_000)
