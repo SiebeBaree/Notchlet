@@ -48,11 +48,6 @@ struct CodexUsageProviderTests {
         #expect(windows.map(\.usedFraction) == [0.4, 0.65])
     }
 
-    @Test func parsesPlanTier() {
-        #expect(CodexUsageProvider().parsePlanTier(from: goPlanFixture) == "go")
-        #expect(CodexUsageProvider().parsePlanTier(from: Data("{}".utf8)) == nil)
-    }
-
     @Test func missingRateLimitGivesNoWindows() throws {
         #expect(try CodexUsageProvider().parseWindows(from: Data("{}".utf8)).isEmpty)
     }

@@ -188,12 +188,7 @@ final class UsageStore {
             }
         }
         Analytics.updateProviderContext(
-            activeProviders: entries.filter { isEnabled($0.id) && $0.state == .ok }.map(\.id),
-            planTiers: entries.reduce(into: [:]) { tiers, entry in
-                if let tier = entry.snapshot?.planTier {
-                    tiers[entry.id] = tier
-                }
-            }
+            activeProviders: entries.filter { isEnabled($0.id) && $0.state == .ok }.map(\.id)
         )
     }
 
@@ -228,26 +223,6 @@ final class UsageStore {
             // No state change and no backoff; the recorded attempt still
             // holds the 30s spacing.
             break
-        }
-    }
-
-    /// Bucketed usage pressure per provider, sent with the daily heartbeat.
-    /// The longest window (weekly or monthly) is the stable "how constrained
-    /// is this user" signal; the 5-hour one swings too much to sample daily.
-    var usagePressure: [String: String] {
-        entries.reduce(into: [:]) { pressure, entry in
-            guard let window = entry.snapshot?.windows.max(by: { $0.duration < $1.duration })
-            else { return }
-            pressure[entry.id] = Self.pressureBucket(window.usedFraction)
-        }
-    }
-
-    static func pressureBucket(_ usedFraction: Double) -> String {
-        switch usedFraction {
-        case ..<0.25: "0-25"
-        case ..<0.5: "25-50"
-        case ..<0.75: "50-75"
-        default: "75-100"
         }
     }
 
