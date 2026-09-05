@@ -34,8 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWorkspace.didWakeNotification,
             object: nil
         )
+        LoginItem.seedIfNeeded()
         Analytics.bootstrap()
-        Analytics.startDailyHeartbeat { services.store.usagePressure }
+        Analytics.startDailyHeartbeat()
         #if DEBUG
             Self.registerDebugAlert(services)
         #endif

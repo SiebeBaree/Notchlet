@@ -21,6 +21,8 @@ struct NotchSettingsView: View {
     @AppStorage(SecretScanner.enabledDefaultsKey) private var secretScanEnabled = true
     @AppStorage(UsageStore.intervalDefaultsKey) private var refreshMinutes = 10
     @State private var autoChecksForUpdates: Bool
+    /// Mirrors SMAppService, which the system can overrule.
+    @State private var startsAtLogin = LoginItem.isEnabled
     @State private var page: Page = .main
 
     init(store: UsageStore, updater: UpdateController, scanner: SecretScanner, alerts: UsageAlerts, waits: AgentWaits) {
@@ -80,6 +82,19 @@ struct NotchSettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             linkRow("Providers") { show(.providers) }
             linkRow("Alerts") { show(.alerts) }
+            toggleRow(
+                "Start at login",
+                isOn: Binding(
+                    get: { startsAtLogin },
+                    set: { enabled in
+                        startsAtLogin = LoginItem.setEnabled(enabled)
+                        Analytics.capture(.settingChanged(key: "start_at_login", value: String(startsAtLogin)))
+                    }
+                )
+            )
+            // System Settings owns this too, so re-read rather than trust
+            // what the switch was last set to.
+            .onAppear { startsAtLogin = LoginItem.isEnabled }
             toggleRow(
                 "Share anonymous usage stats",
                 isOn: Binding(
