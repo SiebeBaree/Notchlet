@@ -25,6 +25,9 @@ jobs:
     runs-on: macos-26
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      sha256: ${{ steps.release.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -147,6 +150,7 @@ jobs:
           xcrun stapler validate "build/Notchlet-$VERSION.dmg"
 
       - name: Publish the GitHub release
+        id: release
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -156,6 +160,12 @@ jobs:
           gh release create "$GITHUB_REF_NAME" "build/Notchlet-$VERSION.dmg" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
+          # The cask pins a checksum, so hash the file that was just uploaded.
+          # Stapling rewrote the DMG, so anything measured before that differs.
+          {
+            echo "version=$VERSION"
+            echo "sha256=$(shasum -a 256 "build/Notchlet-$VERSION.dmg" | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Sign the update and build the appcast
         env:
@@ -202,3 +212,46 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  tap:
+    name: Update the Homebrew cask
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      # A fine-grained PAT with contents:write on SiebeBaree/homebrew-tap.
+      # github.token cannot reach another repository.
+      - uses: actions/checkout@v4
+        with:
+          repository: SiebeBaree/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Point the cask at this release
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          test -n "$SHA256" || { echo "no checksum came out of the build job"; exit 1; }
+          sed -i -E \
+            -e "s|^  version \".*\"$|  version \"$VERSION\"|" \
+            -e "s|^  sha256 \".*\"$|  sha256 \"$SHA256\"|" \
+            Casks/notchlet.rb
+          # A sed that matched nothing exits 0 and leaves the cask pinned to
+          # the last release, so check both lines landed. The tap's own CI runs
+          # brew style and brew audit --online on the push this makes, which is
+          # what proves the cask still installs.
+          grep -qx "  version \"$VERSION\"" Casks/notchlet.rb
+          grep -qx "  sha256 \"$SHA256\"" Casks/notchlet.rb
+
+      - name: Commit and push
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          if git diff --quiet; then
+            echo "the cask already points at this release"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "notchlet $VERSION"
+          git push
