@@ -1,30 +1,22 @@
 import Foundation
 
-/// Per-provider fetch timing: minimum spacing between fetches, escalating
-/// backoff after rate limits and a short flat retry after other failures.
-/// Pure and clock-injected so the schedule math stays unit-testable.
-///
-/// The ambient poll interval (fast while the panel is open, the user's
-/// setting while it is closed) lives in `UsageStore`; this type only answers
-/// "when is this provider due next" given that interval. Shrinking the
-/// interval when the panel opens is what pulls stale providers forward into
-/// an immediate fetch.
+/// One provider's fetch timing: minimum spacing, escalating backoff after
+/// rate limits, a flat retry after other failures. The ambient poll
+/// interval comes from `UsageStore`; shrinking it when the panel opens is
+/// what pulls stale providers forward.
 struct RefreshSchedule {
-    /// No trigger may fetch the same provider more often than this.
     static let minSpacing: TimeInterval = 30
-    /// Flat retry after a network or server error, no escalation.
     static let errorRetryDelay: TimeInterval = 120
-    /// Backoff per consecutive 429 when the response has no Retry-After.
+    /// Per consecutive 429 without a Retry-After.
     static let rateLimitDelays: [TimeInterval] = [300, 600, 1200, 1800]
 
     private(set) var lastAttemptAt: Date?
-    /// Pending retry after a failure; overrides the regular cadence.
+    /// Overrides the regular cadence.
     private(set) var retryAt: Date?
     private(set) var rateLimitStreak = 0
 
     var isRateLimited: Bool { rateLimitStreak > 0 }
 
-    /// When the next fetch is due given the ambient poll interval.
     func nextDue(interval: TimeInterval) -> Date {
         guard let lastAttemptAt else { return .distantPast }
         let scheduled = retryAt ?? lastAttemptAt.addingTimeInterval(interval)
@@ -40,8 +32,8 @@ struct RefreshSchedule {
         rateLimitStreak = 0
     }
 
-    /// Retry-After is honored within 30s...1h; without it the delay escalates
-    /// per consecutive 429, with jitter so providers don't sync up.
+    /// Retry-After is honored within 30s...1h; without it the delay
+    /// escalates per consecutive 429, with jitter so providers don't sync up.
     mutating func recordRateLimit(retryAfter: TimeInterval?, now: Date = .now) {
         let delay: TimeInterval = if let retryAfter {
             min(max(retryAfter, Self.minSpacing), 3600)

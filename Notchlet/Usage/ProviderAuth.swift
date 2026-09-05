@@ -1,16 +1,12 @@
 import Foundation
 
 /// One way a provider can obtain credentials: the CLI's own login, a file,
-/// or a secret the user pasted into settings. Providers list their options
-/// in order of preference; `AuthSelection.auto` walks that list and the
-/// first option with a usable credential wins.
+/// or a secret the user pasted into settings.
 struct AuthOption: Identifiable, Hashable, Sendable {
     let id: String
-    /// Short label for the settings picker, e.g. "Claude Code".
     let label: String
-    /// For options where the user supplies the secret, what to call it in
-    /// the UI ("session token", "API key"). Nil for options that read the
-    /// CLI's own state.
+    /// What to call a secret the user supplies ("session token", "API key").
+    /// Nil for options that read the CLI's own state.
     var secretName: String?
 }
 
@@ -86,15 +82,11 @@ enum ProviderAuthSettings {
     }
 }
 
-/// Why a provider had no usable credential, from least to most specific.
-/// When auto tries several options the most specific problem is the one
-/// reported, so an expired login is never masked by an empty fallback.
+/// Why a provider had no usable credential, least to most specific.
 nonisolated enum AuthProblem: Int, Comparable, Sendable {
-    /// Nothing to read: the CLI is not signed in, or no secret was pasted.
     case signedOut
-    /// A credential exists but is past its expiry and could not be renewed.
+    /// Past its expiry and could not be renewed.
     case expired
-    /// The usage endpoint rejected the credential.
     case rejected
 
     static func < (lhs: Self, rhs: Self) -> Bool {

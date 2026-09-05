@@ -1,10 +1,9 @@
 import Foundation
 
-/// Secrets the user pasted, in Notchlet's own keychain items. Written and
-/// read through `/usr/bin/security` like every other keychain access here,
-/// so no build of Notchlet, ad-hoc signed or not, ever sees a prompt for
-/// them. A UserDefaults flag records that a secret exists, so the settings
-/// page and the providers can tell without spawning `security`.
+/// Secrets the user pasted, in Notchlet's own keychain items, through
+/// `/usr/bin/security` like every other keychain access here so no build
+/// ever sees a prompt for them. A UserDefaults flag records that a secret
+/// exists, so callers can tell without spawning `security`.
 enum PastedSecrets {
     static let service = "Notchlet"
 
@@ -28,8 +27,7 @@ enum PastedSecrets {
         )
     }
 
-    /// Stores a trimmed secret and reports whether it was saved. Blank input
-    /// is never saved.
+    /// Blank input is never saved.
     @discardableResult
     static func save(_ secret: String, providerID: String, optionID: String) async -> Bool {
         let trimmed = secret.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -45,9 +43,8 @@ enum PastedSecrets {
         return saved
     }
 
-    /// Removes a stored secret and reports whether it is gone. The flag is
-    /// only cleared once the keychain confirms, so settings never claim a
-    /// secret is removed while it is still there.
+    /// The flag clears only once the keychain confirms, so settings never
+    /// claim a secret is gone while it is still there.
     @discardableResult
     static func remove(providerID: String, optionID: String) async -> Bool {
         let removed = await CredentialSupport.deleteKeychainItem(

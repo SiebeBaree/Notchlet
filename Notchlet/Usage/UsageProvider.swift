@@ -1,40 +1,21 @@
 import Foundation
 
-/// A source of usage data for one agent CLI.
-///
-/// Implementations read the CLI's local state (credentials, config) or call
-/// the same usage endpoint the CLI itself calls. They must never consume
-/// usage: fetching a snapshot cannot count against any limit.
-///
-/// Nearly every CLI exposes usage as an authenticated GET returning JSON.
-/// Those providers adopt `HTTPUsageProvider` and only supply the endpoint,
-/// the auth headers per option and the response mapping. Adopt this base
-/// protocol directly only for a provider that is not HTTP-shaped (say, one
-/// that reads session logs).
+/// One agent CLI's live limits. Reads only the CLI's own state and its
+/// usage endpoint, and never spends usage to do it. Endpoint-backed
+/// providers adopt `HTTPUsageProvider`; adopt this directly only for one
+/// that is not HTTP-shaped.
 protocol UsageProvider: Sendable {
-    /// Stable identifier, used as a dictionary key and for settings.
     var id: String { get }
-    /// Display name shown in the UI.
     var name: String { get }
-    /// Asset catalog name of the provider's logo, a template image so the UI
-    /// can tint it.
+    /// A template image, so the UI can tint it.
     var logoAssetName: String { get }
-    /// Whether the CLI appears to be installed on this machine. Only decides
-    /// the default of the provider's settings toggle; a stored user choice
-    /// always wins.
+    /// Decides the default of the settings toggle; a stored choice wins.
     var isInstalled: Bool { get }
-    /// Ways to obtain credentials, in the order auto tries them. The
-    /// settings page offers them as a picker when there is more than one.
+    /// In the order auto tries them.
     var authOptions: [AuthOption] { get }
-    /// What to do when there is no usable login, without trailing period,
-    /// e.g. "Run claude to sign in". Shown after the reason on the settings
-    /// page.
+    /// "Run claude to sign in", no trailing period.
     var signInHint: String { get }
-    /// Where the provider's past usage can be read from, for the history
-    /// pane. Nil for a provider that only has live limits to show.
     var history: (any UsageHistorySource)? { get }
-    /// Where the provider's chats can be scanned for leaked keys. Nil for
-    /// a provider without chat logs on disk.
     var secrets: (any SecretScanSource)? { get }
 
     func fetchUsage() async throws -> UsageSnapshot
@@ -45,25 +26,18 @@ extension UsageProvider {
     var secrets: (any SecretScanSource)? { nil }
 }
 
-/// The declarative shape of an endpoint-backed provider. `fetchUsage` comes
-/// for free, so a new provider is a few small members.
+/// An endpoint-backed provider: the URL, the headers per auth option and
+/// the response mapping. `fetchUsage` is shared.
 protocol HTTPUsageProvider: UsageProvider {
     var usageURL: URL { get }
-    /// Headers authenticating the request for one auth option, built from
-    /// the CLI's local state or a pasted secret. Throws `notAvailable` with
-    /// the reason when the option has no usable credential. Async because a
-    /// keychain read goes through a child process.
+    /// Throws `notAvailable` when the option has no usable credential.
     func authHeaders(for option: AuthOption) async throws -> [String: String]
-    /// Maps the endpoint's response body to usage windows.
     func parseWindows(from data: Data) throws -> [UsageWindow]
-    /// Plan tier from the same response, if it exposes one. Feeds anonymous
-    /// analytics only; defaults to nil.
+    /// Anonymous analytics only.
     func parsePlanTier(from data: Data) -> String?
-    /// Drops any credentials the provider caches between fetches for this
-    /// option and reports whether there was anything to drop. Called when
-    /// the endpoint rejects them, to decide whether a retry with a fresh
-    /// read could say anything new. Defaults to false for providers that
-    /// read credentials every time.
+    /// Drops credentials cached between fetches for this option and reports
+    /// whether there were any, so a rejection can be retried with a fresh
+    /// read once.
     func forgetCredentials(for option: AuthOption) -> Bool
 }
 
@@ -127,13 +101,10 @@ extension HTTPUsageProvider {
 }
 
 enum ProviderError: Error {
-    /// No usable credential: the CLI is not installed or signed in, the
-    /// login expired, or the endpoint rejected it. The problem says which.
     case notAvailable(AuthProblem)
-    /// The usage endpoint returned a non-success response, or a transient
-    /// step such as a token refresh could not complete.
+    /// A non-success response, or a transient step such as a token refresh
+    /// that could not complete.
     case requestFailed
-    /// The usage endpoint returned 429; `retryAfter` is its Retry-After
-    /// header in seconds, when present and parseable.
+    /// `retryAfter` is the Retry-After header in seconds, when parseable.
     case rateLimited(retryAfter: TimeInterval?)
 }

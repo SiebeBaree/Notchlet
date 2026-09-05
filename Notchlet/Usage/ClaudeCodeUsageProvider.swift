@@ -1,18 +1,11 @@
 import Foundation
 import os
 
-/// Usage for Claude Code.
-///
-/// Reads the OAuth access token Claude Code stored at login (macOS keychain,
-/// with `~/.claude/.credentials.json` as fallback) and calls the same usage
-/// endpoint Claude Code's `/usage` screen calls. Claude Code rotates the
-/// token every 8 hours while it runs, rewriting the keychain item each time;
-/// see `CredentialSupport.keychainData` for why that read stays silent.
-///
-/// While Claude Code is idle the token expires, and Notchlet refreshes it
-/// the way a second Claude Code process would, following Claude Code's own
-/// lock and compare-and-swap protocol (see `ClaudeCodeCredentialStore`), so
-/// Claude Code picks the new token up instead of being signed out by it.
+/// Reads the OAuth token Claude Code stored at login (keychain, with
+/// `~/.claude/.credentials.json` as fallback) and calls the endpoint behind
+/// its `/usage` screen. Claude Code rotates the token every 8 hours while
+/// it runs; once it has expired, Notchlet refreshes it the way a second
+/// Claude Code process would (`ClaudeCodeCredentialStore`).
 struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     let id = "claude-code"
     let name = "Claude"
@@ -40,16 +33,11 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         let credentials: ClaudeTokenRefresh.Credentials
     }
 
-    /// The last credentials read, reused until they expire. The keychain
-    /// read spawns a process and a token lasts hours, so reading once per
-    /// token instead of once per refresh keeps the open panel's 60s cadence
-    /// from forking `security` every minute. A rejected request clears this
-    /// (see `HTTPUsageProvider.fetchUsage`) in case the server retired the
-    /// old token when Claude Code rotated it.
+    /// Reused until it expires: the keychain read spawns a process and a
+    /// token lasts hours. A rejected request clears it.
     private let cache = OSAllocatedUnfairLock<Cached?>(initialState: nil)
-    /// A refresh token the server already rejected. Trying it again every
-    /// poll would only hammer the endpoint, so it is skipped until Claude
-    /// Code stores a different one.
+    /// A refresh token the server rejected, skipped until Claude Code
+    /// stores a different one.
     private let deadRefreshToken = OSAllocatedUnfairLock<String?>(initialState: nil)
 
     func authHeaders(for option: AuthOption) async throws -> [String: String] {
@@ -71,9 +59,9 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         return Self.headers(token: current.accessToken)
     }
 
-    /// Runs the refresh detached so a cancelled poll cannot abandon it
-    /// halfway: once the server has rotated the token, the write-back has
-    /// to happen or Claude Code is left with a dead refresh token.
+    /// Detached so a cancelled poll cannot abandon it halfway: once the
+    /// server has rotated the token, the write-back has to happen or Claude
+    /// Code is left with a dead refresh token.
     private func refresh(
         _ backend: ClaudeCodeCredentialStore.Backend,
         expired: ClaudeTokenRefresh.Credentials
@@ -111,9 +99,8 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         ]
     }
 
-    /// Maps the endpoint's `limits` array to usage windows: the rolling
-    /// session, the weekly all-models window and any model-scoped weekly
-    /// window (currently "Fable").
+    /// The rolling session, the weekly all-models window and any
+    /// model-scoped weekly window.
     func parseWindows(from data: Data) throws -> [UsageWindow] {
         struct Response: Decodable {
             struct Limit: Decodable {

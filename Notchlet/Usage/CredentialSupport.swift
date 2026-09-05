@@ -1,17 +1,14 @@
 import Foundation
 
-/// Shared plumbing for reading CLI credentials: JSON files in the home
-/// directory, keychain items, Electron state databases and JWT claims.
-/// Providers compose these instead of each rewriting them.
+/// Reading CLI credentials: home directory files, keychain items, Electron
+/// state databases and JWT claims.
 enum CredentialSupport {
-    /// Whether a path relative to the home directory exists. Providers use
-    /// this to tell if their CLI is installed at all (its state directory
-    /// exists), independent of whether the login is still valid.
+    /// Paths are relative to the home directory. Providers use this to tell
+    /// whether their CLI is installed.
     static func homePathExists(_ relativePath: String) -> Bool {
         FileManager.default.fileExists(atPath: homeURL(relativePath).path)
     }
 
-    /// Decodes a JSON file at a path relative to the user's home directory.
     static func homeJSON<T: Decodable>(_ relativePath: String) -> T? {
         guard let data = try? Data(contentsOf: homeURL(relativePath)) else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
@@ -21,15 +18,11 @@ enum CredentialSupport {
         FileManager.default.homeDirectoryForCurrentUser.appending(path: relativePath)
     }
 
-    /// The payload of a keychain generic password item, read through
-    /// `/usr/bin/security` rather than the Security framework.
-    ///
-    /// CLIs write their items with that same tool, which puts it on the
-    /// item's access list for good. Reading as Notchlet instead would show
-    /// the keychain password prompt again after every token rotation: the
-    /// CLI's rewrite of the item drops the "Always Allow" grant the user
-    /// gave us, while `security` keeps its access. Notchlet's own items go
-    /// through the same tool for the same reason.
+    /// Read through `/usr/bin/security` rather than the Security framework:
+    /// CLIs write their items with that tool, which keeps it on the access
+    /// list, whereas a read as Notchlet prompts for the keychain password
+    /// again after every token rotation. Notchlet's own items go through it
+    /// for the same reason.
     static func keychainData(service: String, account: String? = nil) async -> Data? {
         var arguments = ["find-generic-password", "-s", service]
         if let account {
@@ -59,12 +52,10 @@ enum CredentialSupport {
         return data(fromHex: String(hex))
     }
 
-    /// Creates or replaces a generic password item. The command goes in on
-    /// stdin with the value hex-encoded, the way Claude Code writes its own
-    /// item, so nothing secret ever appears in an argument list. The names
-    /// are quoted on that command line, so a name that could break the
-    /// quoting is refused rather than escaped by guesswork; every name
-    /// Notchlet uses is plain ASCII anyway.
+    /// The command goes in on stdin with the value hex-encoded, the way
+    /// Claude Code writes its own item, so nothing secret appears in an
+    /// argument list. A name that could break the quoting is refused rather
+    /// than escaped by guesswork.
     static func writeKeychainItem(service: String, account: String, value: Data) async -> Bool {
         guard isPlainKeychainName(service), isPlainKeychainName(account) else { return false }
         let hex = value.map { String(format: "%02x", $0) }.joined()
@@ -72,14 +63,12 @@ enum CredentialSupport {
         return await run(security, ["-i"], input: Data(command.utf8)) != nil
     }
 
-    /// Whether a service or account name can go inside double quotes on a
-    /// `security -i` command line unchanged.
     static func isPlainKeychainName(_ name: String) -> Bool {
         !name.isEmpty && !name.contains { $0 == "\"" || $0 == "\\" || $0.isNewline }
     }
 
-    /// Removes a generic password item. An item that is already gone counts
-    /// as removed; anything else, a locked keychain say, does not.
+    /// An item that is already gone counts as removed; a locked keychain
+    /// does not.
     static func deleteKeychainItem(service: String, account: String) async -> Bool {
         let itemNotFound: Int32 = 44
         guard let exit = try? await ChildProcess.run(
@@ -90,20 +79,15 @@ enum CredentialSupport {
         return exit.status == 0 || exit.status == itemNotFound
     }
 
-    /// One value from the key-value table of a SQLite database at a path
-    /// relative to the home directory, read through `/usr/bin/sqlite3`.
-    /// Electron apps (Cursor, VS Code) keep their login state in such a
-    /// table.
+    /// One value from an Electron app's key-value state table, through
+    /// `/usr/bin/sqlite3` read-only so the app's database is never touched.
     ///
-    /// Opened read-only with a short busy timeout, so a write by the running
-    /// app never fails the read and the app's database is never touched.
     /// With the app closed, a WAL-mode database has no `-shm` sidecar and a
-    /// read-only connection cannot create one, so SQLite refuses to open it;
-    /// the retry with `immutable=1` skips locking, which is safe exactly
-    /// when no `-wal` file exists (otherwise unwritten rows would be
-    /// missed). The value comes back as hex because the shell truncates the
-    /// UTF-16 blobs these stores sometimes hold at the first NUL byte;
-    /// dropping the NULs recovers the ASCII token either way.
+    /// read-only connection cannot create one, so SQLite refuses to open
+    /// it; the retry with `immutable=1` skips locking, which is safe exactly
+    /// when no `-wal` file exists. The value comes back as hex because the
+    /// shell truncates the UTF-16 blobs these stores sometimes hold at the
+    /// first NUL; dropping the NULs recovers the ASCII token either way.
     static func sqliteValue(homePath: String, table: String, key: String) async -> String? {
         guard homePathExists(homePath) else { return nil }
         let path = homeURL(homePath)
@@ -114,9 +98,9 @@ enum CredentialSupport {
         return value.isEmpty ? nil : value
     }
 
-    /// The rows of a read-only query as the JSON array `sqlite3 -json`
-    /// prints, empty when the query matches nothing. Nil when the database
-    /// could not be read at all. Same opening rules as `sqliteValue`.
+    /// The JSON array `sqlite3 -json` prints, empty when nothing matches,
+    /// nil when the database could not be read. Same opening rules as
+    /// `sqliteValue`.
     static func sqliteRows(path: URL, sql: String) async -> Data? {
         await sqlite(path, sql: sql, options: ["-json"])
     }
@@ -154,15 +138,12 @@ enum CredentialSupport {
         return exit.output
     }
 
-    /// Expiry from a JWT's `exp` claim, without verifying the signature. We
-    /// only decide whether a token is worth sending; the server does the
-    /// real validation.
+    /// Unverified: the server does the real validation.
     nonisolated static func jwtExpiry(of token: String) -> Date? {
         guard let exp = jwtClaims(of: token)?["exp"] as? TimeInterval else { return nil }
         return Date(timeIntervalSince1970: exp)
     }
 
-    /// The decoded payload of a JWT, unverified.
     nonisolated static func jwtClaims(of token: String) -> [String: Any]? {
         let segments = token.split(separator: ".")
         guard segments.count == 3 else { return nil }

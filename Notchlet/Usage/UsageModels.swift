@@ -1,17 +1,14 @@
 import Foundation
 
-/// One rate-limit window, e.g. a rolling 5-hour session or a weekly cap.
+/// One rate-limit window: a rolling 5-hour session, a weekly cap, a billing
+/// cycle.
 nonisolated struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
-    /// Stable identifier within one provider, e.g. "session" or "weekly".
+    /// Stable within one provider, e.g. "session" or "weekly".
     let id: String
-    /// Short display label, e.g. "5h", "Weekly", "Fable".
     var label: String
-    /// Length of the rolling window. Feeds the burn-rate projection: elapsed
-    /// time is derived from the reset time and this.
     var duration: TimeInterval
-    /// Fraction of the window already used, clamped to 0...1 by providers.
+    /// Clamped to 0...1 by providers.
     var usedFraction: Double
-    /// When the window resets, if the provider reports it.
     var resetsAt: Date?
 
     var remainingFraction: Double {
@@ -26,10 +23,9 @@ nonisolated struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
         return min(max(resetsAt.timeIntervalSince(now) / duration, 0), 1)
     }
 
-    /// Label for a window known only by its length. Which windows exist is
-    /// decided server-side per plan (Codex plans variously get 5h+weekly,
-    /// weekly only, or monthly), so this mirrors the Codex CLI: match the
-    /// known window lengths with ±5% tolerance, fall back to the raw length.
+    /// Mirrors the Codex CLI, whose plans variously get 5h+weekly, weekly
+    /// only or monthly: known lengths match with 5% tolerance, anything
+    /// else reads as its raw length.
     static func label(forDuration duration: TimeInterval) -> String {
         let known: [(length: TimeInterval, label: String)] = [
             (5 * 3600, "5h"),
@@ -45,36 +41,29 @@ nonisolated struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// Everything Notchlet knows about one agent's limits at a point in time.
 struct UsageSnapshot: Equatable {
     var windows: [UsageWindow]
     var fetchedAt: Date
-    /// Plan tier ("plus", "max", ...) when the endpoint exposes one. Only
-    /// used for anonymous analytics breakdowns, never shown in the UI.
+    /// Anonymous analytics only, never shown.
     var planTier: String?
-    /// Which of the provider's auth options produced this snapshot, for the
-    /// status line on its settings page.
+    /// Which auth option produced this snapshot, for the settings status
+    /// line.
     var authOptionID: String?
 
-    /// What a provider's summary gauge shows: the shortest window, because
-    /// that is the one that runs out in normal use (the 5h session when the
-    /// plan has one, else the plan's only window). Static per plan, never
-    /// swayed by which window currently has the lowest percentage. Among
-    /// windows of equal length the first wins, so providers whose windows
-    /// all share one cycle put the headline first.
+    /// What the summary gauge shows: the shortest window, the one that runs
+    /// out in normal use. Among equals the first wins, so a provider whose
+    /// windows share one cycle lists the headline first.
     var primaryWindow: UsageWindow? {
         windows.min { $0.duration < $1.duration }
     }
 }
 
-/// Date parsing shared by providers and log parsers.
 nonisolated enum UsageDate {
     /// ISO 8601 with any fractional-second precision. `ISO8601DateFormatter`
     /// refuses fractions unless they are exactly three digits, and endpoints
-    /// send three (Cursor) or six (Anthropic). Sub-second precision is
-    /// irrelevant here, so the fraction is stripped before parsing. This
-    /// runs once per log line during a history ingest, hence no regular
-    /// expression and one shared formatter (documented thread-safe).
+    /// send three (Cursor) or six (Anthropic), so the fraction is stripped.
+    /// Runs once per log line during an ingest, hence no regular expression
+    /// and one shared formatter (documented thread-safe).
     static func parse(_ string: String) -> Date? {
         var stripped = string
         if let dot = stripped.firstIndex(of: ".") {
