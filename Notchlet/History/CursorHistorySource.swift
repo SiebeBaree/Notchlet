@@ -1,13 +1,9 @@
 import Foundation
 
-/// Cursor's usage as a history source.
-///
-/// Cursor keeps no log on the Mac; the dashboard's usage export does the
-/// job, fetched with the same session cookie the live provider builds. It
-/// is a CSV of per-model token aggregates with a date each, account-wide,
-/// so this history covers every machine the account is used on. Without
-/// an archive yet the first read asks for a year, enough for the graph;
-/// after that only the days since the last sealed one.
+/// Cursor keeps no log on the Mac, so this fetches the dashboard's usage
+/// export CSV with the live provider's session cookie. It is account-wide.
+/// The first read asks for a year, enough for the graph; after that only
+/// the days since the last sealed one.
 nonisolated struct CursorHistorySource: UsageHistorySource {
     static let exportURL = URL(string: "https://cursor.com/api/dashboard/export-usage-events-csv")!
     static let firstWindow: TimeInterval = 366 * 24 * 3600
@@ -30,29 +26,19 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
         }
         request.setValue("text/csv", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw UsageProviderError.requestFailed }
+        guard let http = response as? HTTPURLResponse else { throw ProviderError.requestFailed }
         if http.statusCode == 401 || http.statusCode == 403 {
-            throw UsageProviderError.notAvailable(.rejected)
+            throw ProviderError.notAvailable(.rejected)
         }
-        guard http.statusCode == 200 else { throw UsageProviderError.requestFailed }
+        guard http.statusCode == 200 else { throw ProviderError.requestFailed }
         return try Self.events(fromCSV: String(decoding: data, as: UTF8.self))
     }
 
-    /// The first sign-in option the user's selection allows that has a
-    /// usable session, as `HTTPUsageProvider.fetchUsage` walks them.
+    /// The same sign-in walk the live provider does.
     private static func sessionHeaders() async throws -> [String: String] {
-        let options = await ProviderAuthSettings
-            .selection(for: CursorUsageProvider.providerID, options: CursorUsageProvider.allAuthOptions)
-            .resolve(CursorUsageProvider.allAuthOptions)
-        var problem = AuthProblem.signedOut
-        for option in options {
-            do {
-                return try await CursorUsageProvider.sessionHeaders(for: option)
-            } catch let UsageProviderError.notAvailable(found) {
-                problem = max(problem, found)
-            }
-        }
-        throw UsageProviderError.notAvailable(problem)
+        let provider = await CursorUsageProvider()
+        return try await ProviderAuthSettings.selection(for: provider.id, options: provider.authOptions)
+            .firstUsable(provider.authOptions, CursorUsageProvider.sessionHeaders)
     }
 
     private enum Column {
@@ -65,11 +51,10 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
         static let required = [date, model, inputWithCacheWrite, input, cacheRead, output]
     }
 
-    /// One event per row. "Input (w/ Cache Write)" is the prompt tokens
-    /// that were written to the cache, "Input (w/o Cache Write)" the rest;
-    /// both as OpenUsage reads them. A row with a broken date or count is
-    /// skipped rather than counted as zero; a header missing a column is
-    /// an export we do not understand and throws.
+    /// "Input (w/ Cache Write)" is the prompt tokens written to the cache,
+    /// "Input (w/o Cache Write)" the rest, as OpenUsage reads them. A broken
+    /// row is skipped rather than counted as zero; a header missing a
+    /// column throws.
     static func events(fromCSV csv: String) throws -> [UsageEvent] {
         let rows = CSV.rows(csv)
         guard let header = rows.first else { return [] }
@@ -78,7 +63,7 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
             columns[name.trimmingCharacters(in: .whitespaces)] = index
         }
         guard Column.required.allSatisfy({ columns[$0] != nil }) else {
-            throw UsageProviderError.requestFailed
+            throw ProviderError.requestFailed
         }
         func field(_ row: [String], _ name: String) -> String? {
             guard let index = columns[name], index < row.count else { return nil }
@@ -116,10 +101,9 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
     }
 }
 
-/// Cursor names models its own way: `claude-4.5-sonnet-thinking`,
-/// `gpt-5.6-sol-high`, `claude-opus-4-7-max-fast`. This folds the effort
-/// and thinking tags away and puts Anthropic's ids in Anthropic's order,
-/// so the price table finds them. Fast stays, it is priced apart.
+/// Folds Cursor's model labels (`claude-4.5-sonnet-thinking`,
+/// `gpt-5.6-sol-high`) into the vendors' ids so the price table finds
+/// them. Fast stays, it is priced apart.
 nonisolated enum CursorModelNames {
     private static let effortTags = ["none", "low", "medium", "high", "xhigh", "extra-high", "max", "ultra", "thinking"]
 

@@ -1,18 +1,12 @@
 import Foundation
 import PostHog
 
-/// Thin wrapper around the PostHog SDK (EU cloud).
-///
-/// Everything is anonymous: a random UUID minted on first launch is the only
-/// identity, `identify()` is never called and person profiles are disabled.
-/// Analytics is off entirely in DEBUG builds so development never pollutes
-/// the data, and the user can opt out in settings. Every call is a safe
-/// no-op until `bootstrap()` runs.
+/// The PostHog SDK (EU cloud). Anonymous: a random UUID is the only
+/// identity, `identify()` is never called and person profiles are off.
+/// Off entirely in DEBUG builds; every call is a no-op until `bootstrap()`.
 enum Analytics {
-    /// Public write-only project key from the PostHog project settings.
-    /// Substituted into Info.plist at build time from Config/Secrets.xcconfig
-    /// so it never lives in source. Empty in checkouts without that file,
-    /// which leaves analytics off.
+    /// Substituted into Info.plist from Config/Secrets.xcconfig; empty in a
+    /// checkout without that file, which leaves analytics off.
     private static var apiKey: String {
         Bundle.main.object(forInfoDictionaryKey: "POSTHOG_API_KEY") as? String ?? ""
     }
@@ -29,8 +23,6 @@ enum Analytics {
     private static var heartbeatTimer: Timer?
     private static var providerContext: NSDictionary = [:]
 
-    /// Whether the user shares anonymous usage stats. On by default; the
-    /// settings toggle flips it.
     static var isEnabled: Bool {
         !UserDefaults.standard.bool(forKey: optOutKey)
     }
@@ -48,11 +40,8 @@ enum Analytics {
         }
     }
 
-    /// Configures PostHog, registers the device context as super properties
-    /// and fires the launch events. Call once at app launch.
     static func bootstrap() {
         #if DEBUG
-        // Development builds never send analytics.
         #else
             guard !apiKey.isEmpty else { return }
 
@@ -60,9 +49,8 @@ enum Analytics {
             let config = PostHogConfig(apiKey: apiKey, host: host)
             config.personProfiles = .never
             config.captureApplicationLifecycleEvents = false
-            // The SDK's flush timer fires whether or not anything is queued.
-            // Events here are rare and nothing is time-sensitive, so wake
-            // every five minutes instead of the default 30 seconds.
+            // The SDK's flush timer fires whether or not anything is
+            // queued; events are rare, so every five minutes rather than 30s.
             config.flushIntervalSeconds = 5 * 60
             config.getAnonymousId = { _ in distinctID }
             PostHogSDK.shared.setup(config)
@@ -81,9 +69,8 @@ enum Analytics {
         PostHogSDK.shared.capture(event.name, properties: event.properties)
     }
 
-    /// Keeps the provider super properties current so any event can be
-    /// sliced by provider mix and plan tier. Called after every refresh;
-    /// only re-registers when something changed.
+    /// Super properties so any event can be sliced by provider mix and
+    /// plan tier; re-registered only when something changed.
     static func updateProviderContext(activeProviders: [String], planTiers: [String: String]) {
         var context: [String: Any] = [
             "provider_count_active": activeProviders.count,
@@ -97,8 +84,8 @@ enum Analytics {
         PostHogSDK.shared.register(context)
     }
 
-    /// Sends `app_heartbeat` once per calendar day while the app runs.
-    /// `usagePressure` is sampled at beat time, not at call time.
+    /// Once per calendar day while the app runs; `usagePressure` is sampled
+    /// at beat time.
     static func startDailyHeartbeat(usagePressure: @escaping @MainActor () -> [String: String]) {
         beatIfNewDay(usagePressure: usagePressure)
         heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { _ in
@@ -106,8 +93,6 @@ enum Analytics {
                 beatIfNewDay(usagePressure: usagePressure)
             }
         }
-        // Once a day is the precision that matters; let the system fold
-        // this wakeup into others.
         heartbeatTimer?.tolerance = 5 * 60
     }
 
@@ -135,8 +120,7 @@ enum Analytics {
         UserDefaults.standard.set(version, forKey: lastRunVersionKey)
     }
 
-    /// The anonymous identity: a random UUID, stored on first use. Not
-    /// derived from hardware or anything Apple considers identifying.
+    /// A random UUID stored on first use, never derived from hardware.
     private static func stableDistinctID() -> UUID {
         if let stored = UserDefaults.standard.string(forKey: distinctIDKey),
            let uuid = UUID(uuidString: stored)

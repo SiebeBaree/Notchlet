@@ -1,14 +1,7 @@
 import SwiftUI
 
-/// Settings, rendered inside the expanded notch. There is no settings
-/// window and no menu bar item; the notch is the whole surface, so quitting
-/// lives here too. The providers row opens a list with one visibility
-/// toggle per provider; at the cap the remaining toggles lock until one is
-/// turned off. Each provider row opens its own page: how it signs in, how
-/// that is going, and a place to paste a secret where the provider takes
-/// one. The alerts row opens one line per window the notch shows, with a
-/// chip per threshold. The agent switch hooks Notchlet into the CLIs, or
-/// takes those hooks out again.
+/// Settings inside the expanded notch. There is no settings window and no
+/// menu bar item, so quitting lives here too.
 struct NotchSettingsView: View {
     private enum Page: Equatable {
         case main
@@ -23,11 +16,9 @@ struct NotchSettingsView: View {
     let alerts: UsageAlerts
     let waits: AgentWaits
 
-    /// Same key Analytics uses; @AppStorage keeps the toggle in sync with it.
+    /// The keys Analytics, SecretScanner and UsageStore read.
     @AppStorage("analyticsOptOut") private var analyticsOptOut = false
-    /// Same key SecretScanner reads; it owns the loop, this owns the switch.
     @AppStorage(SecretScanner.enabledDefaultsKey) private var secretScanEnabled = true
-    // Same key UsageStore reads for its closed-panel poll cadence.
     @AppStorage(UsageStore.intervalDefaultsKey) private var refreshMinutes = 10
     @State private var autoChecksForUpdates: Bool
     @State private var page: Page = .main
@@ -48,9 +39,9 @@ struct NotchSettingsView: View {
         case .providers:
             providersPage
         case let .provider(id):
-            ProviderPage(store: store, providerID: id) { show(.providers) }
+            ProviderSettingsPage(store: store, providerID: id) { show(.providers) }
         case .alerts:
-            AlertsPage(store: store, alerts: alerts) { show(.main) }
+            AlertSettingsPage(store: store, alerts: alerts) { show(.main) }
         }
     }
 
@@ -66,15 +57,7 @@ struct NotchSettingsView: View {
             ForEach(store.entries) { entry in
                 HStack(spacing: 7) {
                     HStack(spacing: 7) {
-                        Image(entry.provider.logoAssetName)
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 12, height: 12)
-                            .foregroundStyle(.white.opacity(0.85))
-                        Text(entry.provider.name)
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.white.opacity(0.85))
+                        BrandRow(provider: entry.provider, muted: true)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 8, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.45))
@@ -162,12 +145,10 @@ struct NotchSettingsView: View {
                 }
             }
 
-            Rectangle()
-                .fill(.white.opacity(0.15))
-                .frame(height: 1)
+            NotchRule()
 
-            // The only way out of the app: no dock icon, no menu bar item,
-            // and the panel never activates, so Cmd+Q never reaches us.
+            // The only way out: the panel never activates, so Cmd+Q never
+            // reaches us.
             HStack(spacing: 14) {
                 if let version = updater.availableUpdateVersion {
                     Text("Version \(version) available")
@@ -226,8 +207,8 @@ struct NotchSettingsView: View {
     }
 }
 
-/// A provider's visibility switch, locked when the cap is reached.
-private struct ProviderToggle: View {
+/// Locked when the cap is reached.
+struct ProviderToggle: View {
     let store: UsageStore
     let entry: UsageStore.Entry
 
@@ -243,245 +224,5 @@ private struct ProviderToggle: View {
         .toggleStyle(.switch)
         .controlSize(.mini)
         .disabled(!store.isEnabled(entry.id) && !store.canEnableMore)
-    }
-}
-
-/// One provider's page: its toggle, the sign-in picker when it has more
-/// than one way in, a status line, and a paste row per option that takes a
-/// secret. Pasting reads the clipboard rather than opening a text field:
-/// typing a token into a notch is no fun, and a button needs no keyboard
-/// focus.
-private struct ProviderPage: View {
-    let store: UsageStore
-    let providerID: String
-    let back: () -> Void
-
-    /// Seeded in `init` rather than `onAppear`: a state change on appear
-    /// would fire `onChange`, which rewrites the setting, refetches and logs
-    /// a change that never happened.
-    @State private var selection: AuthSelection
-    @State private var storedSecrets: Set<String>
-    @State private var notice: String?
-
-    private static let problemColor = Color(red: 0.85, green: 0.64, blue: 0.26)
-
-    init(store: UsageStore, providerID: String, back: @escaping () -> Void) {
-        self.store = store
-        self.providerID = providerID
-        self.back = back
-        let options = store.entries.first { $0.id == providerID }?.provider.authOptions ?? []
-        _selection = State(initialValue: ProviderAuthSettings.selection(for: providerID, options: options))
-        _storedSecrets = State(initialValue: Set(options.filter {
-            SecretStore.hasSecret(providerID: providerID, optionID: $0.id)
-        }.map(\.id)))
-    }
-
-    private var entry: UsageStore.Entry? {
-        store.entries.first { $0.id == providerID }
-    }
-
-    var body: some View {
-        if let entry {
-            let provider = entry.provider
-            VStack(alignment: .leading, spacing: 10) {
-                HoverTextButton("Back", action: back)
-                HStack(spacing: 7) {
-                    Image(provider.logoAssetName)
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 13, height: 13)
-                        .foregroundStyle(.white)
-                    Text(provider.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Spacer()
-                    ProviderToggle(store: store, entry: entry)
-                }
-                if provider.authOptions.count > 1 {
-                    HStack {
-                        Text("Sign in with")
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.white.opacity(0.85))
-                        Spacer()
-                        Picker("Sign in with", selection: $selection) {
-                            Text("Auto").tag(AuthSelection.auto)
-                            ForEach(provider.authOptions) { option in
-                                Text(option.label).tag(AuthSelection.option(option.id))
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .controlSize(.small)
-                        .fixedSize()
-                        .onChange(of: selection) { _, selection in
-                            ProviderAuthSettings.setSelection(selection, for: providerID)
-                            store.refreshNow(providerID)
-                            Analytics.capture(.settingChanged(
-                                key: "provider_\(providerID)_auth",
-                                value: selection.storedValue
-                            ))
-                        }
-                    }
-                }
-                Text(statusText(for: entry))
-                    .font(.system(size: 10))
-                    .foregroundStyle(entry.state == .notAvailable ? Self.problemColor : .white.opacity(0.5))
-                ForEach(provider.authOptions.filter { $0.secretName != nil }) { option in
-                    secretRow(option)
-                }
-                if let notice {
-                    Text(notice)
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.4))
-                }
-            }
-        }
-    }
-
-    private func statusText(for entry: UsageStore.Entry) -> String {
-        UsageCopy.providerStatusText(
-            state: entry.state,
-            problem: entry.authProblem,
-            option: entry.provider.authOptions.first { $0.id == entry.snapshot?.authOptionID },
-            signInHint: entry.provider.signInHint,
-            retryAt: entry.schedule.retryAt
-        )
-    }
-
-    private func secretRow(_ option: AuthOption) -> some View {
-        let secretName = option.secretName ?? "secret"
-        return HStack {
-            if storedSecrets.contains(option.id) {
-                Text("\(secretName.prefix(1).uppercased() + secretName.dropFirst()) saved")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.85))
-                Spacer()
-                HoverTextButton("Remove") {
-                    Task {
-                        guard await SecretStore.remove(providerID: providerID, optionID: option.id) else {
-                            notice = "Could not remove the \(secretName) from the keychain"
-                            return
-                        }
-                        storedSecrets.remove(option.id)
-                        notice = nil
-                        store.refreshNow(providerID)
-                        Analytics.capture(.settingChanged(
-                            key: "provider_\(providerID)_secret_\(option.id)",
-                            value: "removed"
-                        ))
-                    }
-                }
-            } else {
-                Text("Copy your \(secretName), then")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.85))
-                Spacer()
-                HoverTextButton("Paste \(secretName)") {
-                    paste(option, secretName: secretName)
-                }
-            }
-        }
-    }
-
-    private func paste(_ option: AuthOption, secretName: String) {
-        let text = NSPasteboard.general.string(forType: .string)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !text.isEmpty else {
-            notice = "Nothing on the clipboard"
-            return
-        }
-        Task {
-            if await SecretStore.save(text, providerID: providerID, optionID: option.id) {
-                storedSecrets.insert(option.id)
-                notice = nil
-                store.refreshNow(providerID)
-                Analytics.capture(.settingChanged(
-                    key: "provider_\(providerID)_secret_\(option.id)",
-                    value: "saved"
-                ))
-            } else {
-                notice = "Could not save the \(secretName) to the keychain"
-            }
-        }
-    }
-}
-
-/// Threshold alerts: every window the notch currently shows, one line
-/// each, with a chip per percentage. A lit chip is a rule; tapping it
-/// again removes it, and several on one window are fine.
-private struct AlertsPage: View {
-    let store: UsageStore
-    let alerts: UsageAlerts
-    let back: () -> Void
-
-    private var entries: [UsageStore.Entry] {
-        store.entries.filter { store.isEnabled($0.id) && $0.snapshot?.windows.isEmpty == false }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HoverTextButton("Back", action: back)
-            if entries.isEmpty {
-                Text("No usage data yet")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.5))
-            }
-            ForEach(entries) { entry in
-                VStack(alignment: .leading, spacing: 6) {
-                    BrandRow(provider: entry.provider)
-                    ForEach(entry.snapshot?.windows ?? []) { window in
-                        HStack(spacing: 8) {
-                            Text(window.label)
-                                .font(.system(size: 11.5))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .padding(.leading, 20)
-                            Spacer()
-                            HStack(spacing: 4) {
-                                ForEach(UsageAlertRule.percentChoices, id: \.self) { percent in
-                                    let rule = UsageAlertRule(
-                                        providerID: entry.id,
-                                        windowID: window.id,
-                                        percent: percent
-                                    )
-                                    ThresholdChip(percent: percent, isOn: alerts.isOn(rule)) {
-                                        alerts.setRule(rule, on: !alerts.isOn(rule), window: window)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// One percentage on one window. Amber when it is a rule, like the rest of
-/// the notch's attention colour.
-private struct ThresholdChip: View {
-    let percent: Int
-    let isOn: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Text("\(percent)")
-                .font(.system(size: 10.5, weight: isOn ? .semibold : .regular))
-                .monospacedDigit()
-                .foregroundStyle(isOn ? .black : .white.opacity(isHovering ? 0.85 : 0.5))
-                .frame(width: 34)
-                .padding(.vertical, 2)
-                .background(
-                    isOn ? SecretsPane.amber : .white.opacity(isHovering ? 0.12 : 0.06),
-                    in: .capsule
-                )
-                .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: isOn)
     }
 }

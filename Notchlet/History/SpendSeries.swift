@@ -1,14 +1,12 @@
 import Foundation
 
-/// The last 30 days of cost, one point per day, for the spend line. A day
-/// before the archive's coverage has no point at all, so the line breaks
-/// there instead of drawing a zero that was never measured.
+/// The last 30 days of cost. A day before coverage has no cost, so the line
+/// breaks there instead of drawing a zero that was never measured.
 nonisolated struct SpendSeries: Equatable, Sendable {
     static let days = 30
 
     struct Point: Equatable, Sendable {
         let day: DayKey
-        /// Nil for a day nothing can vouch for.
         let cost: Double?
     }
 

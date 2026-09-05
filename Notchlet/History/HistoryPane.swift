@@ -1,10 +1,8 @@
 import SwiftUI
 
-/// The history pane: how much was used rather than how much is left. Scope
-/// chips when more than one provider has history, cost and tokens for
-/// today, the week and the month, the activity or spend graph, then the
-/// models of the selected range. Same card width as the other panes; the
-/// graph fills it.
+/// How much was used rather than how much is left: scope chips, a tile per
+/// range, the activity or spend graph, then the models of the selected
+/// range.
 struct HistoryPane: View {
     enum Graph: String {
         case activity
@@ -17,8 +15,6 @@ struct HistoryPane: View {
     @AppStorage("historyGraph") private var graph: Graph = .activity
     @State private var range: UsageHistory.Range = .month
     @State private var showsAllModels = false
-
-    private static let visibleModels = 4
 
     var body: some View {
         let providers = history.providersWithHistory
@@ -50,9 +46,9 @@ struct HistoryPane: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            rule
+            NotchRule()
             graphSection(ledger: ledger, grid: grid, today: today, calendar: calendar, coverageStart: coverageStart)
-            rule
+            NotchRule()
             ModelTable(
                 models: ledger.models(range.span(endingOn: today, calendar: calendar)),
                 showsProvider: scope == .all && providers.count > 1,
@@ -66,12 +62,6 @@ struct HistoryPane: View {
                 providers: providers
             )
         }
-    }
-
-    private var rule: some View {
-        Rectangle()
-            .fill(.white.opacity(0.15))
-            .frame(height: 1)
     }
 
     @ViewBuilder
@@ -116,8 +106,7 @@ struct HistoryPane: View {
         Analytics.capture(.settingChanged(key: "history_graph", value: graph.rawValue))
     }
 
-    /// The pricing caveat, unpriced models and the archive's age, or what
-    /// is standing in the way of any numbers at all.
+    /// The caveats, or what is standing in the way of any numbers at all.
     private func footer(
         unpricedModels: [String],
         coverageStart: DayKey?,
@@ -139,46 +128,12 @@ struct HistoryPane: View {
         }
         return Text(text)
             .font(.system(size: 10))
-            .foregroundStyle(failed.isEmpty ? .white.opacity(0.4) : Color(red: 0.85, green: 0.64, blue: 0.26))
+            .foregroundStyle(failed.isEmpty ? .white.opacity(0.4) : NotchPalette.amber)
             .lineLimit(1)
     }
 }
 
-/// All, or one provider. A single choice, remembered across opens.
-private struct ScopeChips: View {
-    let providers: [any UsageProvider]
-    @Binding var scope: UsageHistory.Scope
-
-    var body: some View {
-        HStack(spacing: 4) {
-            chip("All", scope: .all)
-            ForEach(providers, id: \.id) { provider in
-                chip(provider.name, scope: .provider(provider.id))
-            }
-        }
-    }
-
-    private func chip(_ title: String, scope: UsageHistory.Scope) -> some View {
-        let isOn = self.scope == scope
-        return Button {
-            withAnimation(.spring(duration: 0.25, bounce: 0.1)) {
-                self.scope = scope
-            }
-        } label: {
-            Text(title)
-                .font(.system(size: 10.5))
-                .foregroundStyle(isOn ? .white : .white.opacity(0.55))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(isOn ? .white.opacity(0.12) : .clear, in: .capsule)
-                .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-/// Cost over tokens for one range. The selected range feeds the model
-/// table below. A range with nothing in it says so rather than $0.00.
+/// Cost over tokens for one range; the selected one feeds the model table.
 private struct RangeTile: View {
     let range: UsageHistory.Range
     let summary: UsageLedger.Summary
@@ -228,8 +183,7 @@ private struct RangeTile: View {
     }
 }
 
-/// Models of the selected range, input and output apart. The first few
-/// show; the rest unfold in place.
+/// The first few models show; the rest unfold in place.
 private struct ModelTable: View {
     let models: [UsageLedger.ModelUsage]
     let showsProvider: Bool
@@ -291,31 +245,5 @@ private struct ModelTable: View {
             output
                 .frame(width: Self.numberWidth, alignment: .trailing)
         }
-    }
-}
-
-/// Quiet text button that brightens on hover, or stays bright while it is
-/// the active choice.
-struct HoverTextButton: View {
-    let title: String
-    var isActive = false
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    init(_ title: String, isActive: Bool = false, action: @escaping () -> Void) {
-        self.title = title
-        self.isActive = isActive
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(isActive || isHovering ? 0.85 : 0.45))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
     }
 }

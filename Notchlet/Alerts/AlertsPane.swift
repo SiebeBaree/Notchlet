@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// A usage alert, one at a time: the provider, the window's gauge as the
-/// usage card draws it, what mark it passed, and Got it. Acknowledging
-/// shows the next notice or hands the panel back to usage.
+/// One usage alert at a time; Got it shows the next or hands the panel
+/// back to usage.
 struct AlertsPane: View {
     let alerts: UsageAlerts
     let store: UsageStore
@@ -19,7 +18,7 @@ struct AlertsPane: View {
                     UsageRing(
                         remainingFraction: window.remainingFraction,
                         expectedRemainingFraction: window.expectedRemainingFraction(),
-                        color: paceColor(projection?.verdict),
+                        color: NotchPalette.pace(projection?.verdict),
                         diameter: 62
                     )
                     VStack(alignment: .leading, spacing: 2) {
@@ -35,7 +34,7 @@ struct AlertsPane: View {
                         if let pace = UsageCopy.paceText(projection: projection, resetsAt: window.resetsAt) {
                             Text(pace)
                                 .font(.system(size: 10.5))
-                                .foregroundStyle(paceColor(projection?.verdict))
+                                .foregroundStyle(NotchPalette.pace(projection?.verdict))
                         }
                     }
                     Spacer(minLength: 0)
@@ -50,40 +49,6 @@ struct AlertsPane: View {
             // only the swap to the next notice after Got it is a crossfade.
             .id(notice.id)
             .transition(.opacity)
-        }
-    }
-}
-
-/// The one action on an alert: a capsule that lifts on hover and drops
-/// back when clicked. Quiet enough to sit in the notch, unmistakable as a
-/// button.
-struct NotchPillButton: View {
-    let title: String
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    init(_ title: String, action: @escaping () -> Void) {
-        self.title = title
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(isHovering ? .black : .white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(isHovering ? .white.opacity(0.9) : .white.opacity(0.14), in: .capsule)
-                .overlay(Capsule().strokeBorder(.white.opacity(isHovering ? 0 : 0.18), lineWidth: 1))
-                .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.15)) {
-                isHovering = hovering
-            }
         }
     }
 }

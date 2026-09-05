@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// The black notch silhouette. The real notch meets the menu bar with a small
-/// outward fillet instead of a 90° corner, so the top corners curve out to the
-/// rect's edges while the straight sides sit `topRadius` in from them. Bottom
-/// corners are regular rounded corners.
+/// The real notch meets the menu bar with a small outward fillet instead
+/// of a 90° corner, so the top corners curve out to the rect's edges while
+/// the straight sides sit `topRadius` in from them.
 struct NotchShape: Shape {
     var topRadius: CGFloat
     var bottomRadius: CGFloat
@@ -42,10 +41,9 @@ struct NotchShape: Shape {
         return path
     }
 
-    /// The wait line's centre line: `inset` inside the straight sides and
-    /// the bottom of the silhouette drawn in `rect`, with concentric bottom
-    /// corners. The sides run straight to the top edge and stop there; the
-    /// fillets belong to the notch meeting the menu bar, not to the line.
+    /// The wait line's centre line, `inset` inside the silhouette with
+    /// concentric bottom corners. The sides run straight to the top edge:
+    /// the fillets belong to the notch meeting the menu bar, not the line.
     static func waitLine(in rect: CGRect, topRadius: CGFloat, bottomRadius: CGFloat, inset: CGFloat) -> Path {
         let left = rect.minX + topRadius + inset
         let right = rect.maxX - topRadius - inset

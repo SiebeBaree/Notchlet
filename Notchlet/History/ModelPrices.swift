@@ -1,8 +1,6 @@
 import Foundation
 
-/// API list prices for one model, in dollars per million tokens. What the
-/// same tokens would have cost on the API: a subscription does not bill per
-/// token, so this is a value, never a bill.
+/// Dollars per million tokens at API list price: a value, never a bill.
 nonisolated struct ModelPrice: Hashable, Sendable {
     var input: Double
     var output: Double
@@ -18,8 +16,8 @@ nonisolated struct ModelPrice: Hashable, Sendable {
             + Double(tokens.output) * output) / 1_000_000
     }
 
-    /// Anthropic's multipliers, the same for every model: cache reads at
-    /// 10% of input, 5-minute cache writes at 125%, 1-hour writes at 200%.
+    /// Cache reads at 10% of input, 5-minute writes at 125%, 1-hour writes
+    /// at 200%, the same for every model.
     static func anthropic(input: Double, output: Double) -> ModelPrice {
         ModelPrice(
             input: input,
@@ -30,13 +28,11 @@ nonisolated struct ModelPrice: Hashable, Sendable {
         )
     }
 
-    /// OpenAI charges nothing extra to write the cache, so cache writes are
-    /// ordinary input. Cache reads vary per model.
+    /// Cache writes are ordinary input.
     static func openAI(input: Double, output: Double, cacheRead: Double) -> ModelPrice {
         ModelPrice(input: input, output: output, cacheRead: cacheRead, cacheWrite5m: input, cacheWrite1h: input)
     }
 
-    /// Cursor's own models: a cache-read and a cache-write rate each.
     static func cursor(input: Double, output: Double, cacheRead: Double, cacheWrite: Double) -> ModelPrice {
         ModelPrice(
             input: input,
@@ -48,23 +44,17 @@ nonisolated struct ModelPrice: Hashable, Sendable {
     }
 }
 
-/// The bundled price table and how a logged model name finds its entry.
-///
-/// One entry per model id as the vendor's API names it. Lookup is exact
-/// after normalizing (lower case, no vendor prefix, no date suffix), never
-/// fuzzy: a guess between `gpt-5.7` and `gpt-5.7-mini` would be off by a
-/// factor of five, and an unpriced model is named in the pane instead. The
-/// public catalogs (LiteLLM, models.dev) lag new models by weeks, so this
-/// table is kept by hand and ships with each release; adding a model is one
-/// line. Sources: each vendor's pricing page, cross-checked against
-/// LiteLLM's `model_prices_and_context_window.json` and OpenUsage's
-/// supplement, September 2026.
+/// Lookup is exact after normalizing, never fuzzy: a guess between
+/// `gpt-5.7` and `gpt-5.7-mini` would be off by a factor of five, so an
+/// unpriced model is named in the pane instead. Kept by hand because the
+/// public catalogs lag new models by weeks. Sources: each vendor's pricing
+/// page, cross-checked against LiteLLM and OpenUsage, September 2026.
 nonisolated enum ModelPrices {
     static func price(for model: String) -> ModelPrice? {
         table[normalize(model)]
     }
 
-    /// The cost of a row: what its CLI reported, else the table.
+    /// What the CLI reported, else the table.
     static func cost(of row: DailyUsage) -> Double? {
         if let reported = row.reportedCost {
             return reported
@@ -74,8 +64,7 @@ nonisolated enum ModelPrices {
     }
 
     /// `anthropic/claude-sonnet-4-5-20250929[1m]` becomes
-    /// `claude-sonnet-4-5`: vendor prefixes, a context-window tag and a
-    /// release date carry no price of their own.
+    /// `claude-sonnet-4-5`.
     static func normalize(_ model: String) -> String {
         var name = model.lowercased().trimmingCharacters(in: .whitespaces)
         for prefix in ["anthropic/", "openai/", "anthropic."] where name.hasPrefix(prefix) {

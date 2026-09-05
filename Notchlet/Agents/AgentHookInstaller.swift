@@ -1,20 +1,11 @@
 import Foundation
 
-/// Writes the hook script and puts it into each CLI's own hook config, and
-/// takes exactly those entries out again. Claude Code and Codex share one
-/// JSON shape (event to matcher groups to command hooks), Cursor has a flat
-/// list per event, OpenCode loads a plugin file. Every other key in those
-/// files is left as it was; a file that does not parse is left alone.
+/// Writes the hook script into each CLI's own hook config and takes exactly
+/// those entries out again. Claude Code and Codex share one JSON shape,
+/// Cursor has a flat list per event, OpenCode loads a plugin file. A file
+/// that does not parse is left alone.
 struct AgentHookInstaller {
-    enum Target: String, CaseIterable {
-        case claudeCode = "claude-code"
-        case codex
-        case cursor
-        case opencode
-    }
-
-    /// Home for the CLI configs and the dot folder. Tests point it at a
-    /// temp directory.
+    /// Tests point this at a temp directory.
     var home = FileManager.default.homeDirectoryForCurrentUser
 
     var directory: URL { home.appending(path: ".notchlet") }
@@ -47,7 +38,7 @@ struct AgentHookInstaller {
         """
     }
 
-    func install(_ targets: [Target]) {
+    func install(_ targets: [AgentCLI]) {
         do {
             try FileManager.default.createDirectory(
                 at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
@@ -67,10 +58,9 @@ struct AgentHookInstaller {
         }
     }
 
-    /// Removes the hooks from every CLI that has them, whether or not it
-    /// is still installed, then the script.
+    /// From every CLI, whether or not it is still installed.
     func remove() {
-        for target in Target.allCases {
+        for target in AgentCLI.allCases {
             do {
                 try apply(target, install: false)
             } catch {
@@ -80,7 +70,7 @@ struct AgentHookInstaller {
         try? FileManager.default.removeItem(at: scriptURL)
     }
 
-    func configURL(for target: Target) -> URL {
+    func configURL(for target: AgentCLI) -> URL {
         switch target {
         case .claudeCode: home.appending(path: ".claude/settings.json")
         case .codex: home.appending(path: ".codex/hooks.json")
@@ -89,11 +79,11 @@ struct AgentHookInstaller {
         }
     }
 
-    private func command(for target: Target) -> String {
+    private func command(for target: AgentCLI) -> String {
         "\(scriptURL.path) \(target.rawValue)"
     }
 
-    private func apply(_ target: Target, install: Bool) throws {
+    private func apply(_ target: AgentCLI, install: Bool) throws {
         let url = configURL(for: target)
         switch target {
         case .opencode:
@@ -124,10 +114,8 @@ struct AgentHookInstaller {
         }
     }
 
-    /// Rewrites the `hooks` object of a JSON file: for each event, drops the
-    /// entries that are Notchlet's and appends a fresh one when installing.
-    /// Removing from a file that does not exist is a no-op; installing
-    /// creates it.
+    /// For each event, drops the entries that are Notchlet's and appends a
+    /// fresh one when installing. Every other key stays as it was.
     private func edit(
         _ url: URL, install: Bool, events: [String], version: Int? = nil, entry: () -> [String: Any]
     ) throws {
@@ -166,10 +154,10 @@ struct AgentHookInstaller {
         try data.write(to: url, options: .atomic)
     }
 
-    /// An entry is Notchlet's when its command, or every command in its
-    /// group, is exactly the hook script with one of the provider tags.
+    /// Its command, or every command in its group, is exactly the hook
+    /// script with one of the provider tags.
     static func isNotchlet(_ entry: [String: Any], script: String) -> Bool {
-        let commands = Set(Target.allCases.map { "\(script) \($0.rawValue)" })
+        let commands = Set(AgentCLI.allCases.map { "\(script) \($0.rawValue)" })
         if let command = entry["command"] as? String {
             return commands.contains(command)
         }

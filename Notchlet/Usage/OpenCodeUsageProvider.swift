@@ -1,19 +1,10 @@
 import Foundation
 
-/// Usage for OpenCode.
-///
-/// OpenCode's subscription, OpenCode Go, meters a rolling 5-hour window, a
-/// weekly one (Monday to Monday, UTC) and a monthly one anchored to the
-/// subscription date. The API key OpenCode stores after `/connect` in
-/// `~/.local/share/opencode/auth.json` is the static key the CLI itself
-/// sends; it never expires and there is no refresh flow, so a rejected key
-/// means the user rotated it and has to reconnect. A key pasted from the
-/// OpenCode dashboard works the same way, for a data directory Notchlet
-/// cannot see (`XDG_DATA_HOME` moved it) or a machine without the CLI.
-///
-/// Zen pay-as-you-go credits have no key-authenticated endpoint, only the
-/// browser dashboard shows them, so a workspace without a Go subscription
-/// answers 403 and reports `notAvailable`. There is nothing to show for it.
+/// OpenCode Go meters a rolling 5-hour window, a weekly one (Monday to
+/// Monday, UTC) and a monthly one anchored to the subscription date. The
+/// key in `~/.local/share/opencode/auth.json` never expires, so a rejected
+/// key means the user rotated it. Zen credits have no key-authenticated
+/// endpoint, so a workspace without Go answers 403.
 struct OpenCodeUsageProvider: HTTPUsageProvider {
     let id = "opencode"
     let name = "OpenCode"
@@ -26,9 +17,8 @@ struct OpenCodeUsageProvider: HTTPUsageProvider {
     let authOptions = [Self.cliOption, Self.keyOption]
     let history: (any UsageHistorySource)? = OpenCodeHistorySource()
 
-    /// OpenCode's data directory, created on first run. `XDG_DATA_HOME` can
-    /// move it, but a login-item app never sees the shell's exports, so only
-    /// the default location is checked.
+    /// `XDG_DATA_HOME` can move this, but a login-item app never sees the
+    /// shell's exports, so only the default location is checked.
     private static let dataDirectory = ".local/share/opencode"
 
     var isInstalled: Bool {
@@ -37,18 +27,18 @@ struct OpenCodeUsageProvider: HTTPUsageProvider {
 
     func authHeaders(for option: AuthOption) async throws -> [String: String] {
         let key: String? = if option.id == Self.keyOption.id {
-            await SecretStore.read(providerID: id, optionID: option.id)
+            await PastedSecrets.read(providerID: id, optionID: option.id)
         } else {
             Self.cliKey()
         }
         guard let key, !key.isEmpty else {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
         return ["Authorization": "Bearer \(key)"]
     }
 
-    /// The Go key first; a Zen key from the workspace member who holds the
-    /// Go subscription is accepted by the endpoint too.
+    /// The Go key first; the endpoint accepts a Zen key from the member who
+    /// holds the Go subscription too.
     private static func cliKey() -> String? {
         struct Entry: Decodable {
             var key: String?
@@ -60,10 +50,7 @@ struct OpenCodeUsageProvider: HTTPUsageProvider {
         return auth["opencode-go"]?.key ?? auth["opencode"]?.key
     }
 
-    /// Maps `usage.rolling` / `weekly` / `monthly`, each
-    /// `{status, percent, resetsAt}`. `percent` is a whole number 0...100
-    /// and `resetsAt` is absolute, computed server-side per request. The
-    /// window lengths come from the plan, not the response; the monthly one
+    /// Window lengths come from the plan, not the response; the monthly one
     /// is approximated at 30 days since only its reset is known.
     func parseWindows(from data: Data) throws -> [UsageWindow] {
         struct Response: Decodable {

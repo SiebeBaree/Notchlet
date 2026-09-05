@@ -10,11 +10,20 @@ The app is an `LSUIElement` agent: no dock icon, no main window. After launching
 
 ```
 Notchlet/
-  App/       app entry point, delegate, settings
-  Notch/     the panel over the notch: window, positioning, SwiftUI views
-  Usage/     provider protocol, models and one provider per agent CLI
+  App/        entry point and the delegate that builds every service
+  Notch/      the panel over the notch: window, positioning, root view, settings, shared controls
+  Usage/      provider protocol, models, the store and one provider per agent CLI
+  History/    past usage read from the CLIs' logs, and its pane
+  Secrets/    leaked keys in the CLIs' chats, and their pane
+  Alerts/     threshold alerts, and their pane
+  Agents/     the wait line fed by the CLIs' hooks
+  Share/      the share card and its editor window
+  Analytics/  anonymous PostHog events
+  Updates/    Sparkle
 NotchletTests/
 ```
+
+Each feature folder owns its logic and its pane. `CLAUDE.md` at the repo root is the architecture doc; read it before changing how a feature is put together.
 
 The Xcode project uses file-system-synced groups. Add a file to the right folder on disk and it is part of the target, no pbxproj edits needed. This keeps merge conflicts out of pull requests, so please don't restructure targets without opening an issue first.
 
@@ -29,7 +38,7 @@ Implement `UsageProvider` in a new file under `Notchlet/Usage/` and register it 
 
 - Swift 6 language mode with main-actor default isolation. Follow what the compiler tells you.
 - Format with [SwiftFormat](https://github.com/nicklockwood/SwiftFormat): `swiftformat .` before committing. CI runs `swiftformat --lint`.
-- Comments explain intent and constraints, not what the next line does.
+- Comments say why, never what. A type gets a doc comment only when its name and members do not say what it is, one or two sentences. An inline comment only for a reason the code cannot express: a platform quirk, another program's protocol, a number that was measured. No comment restates a name, narrates a past change or repeats `CLAUDE.md`.
 
 ## Tests
 

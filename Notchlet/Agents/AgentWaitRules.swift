@@ -1,37 +1,32 @@
 import Foundation
 
-/// What one hook message does to the wait list.
 nonisolated enum AgentHookEffect: Equatable, Sendable {
     case wait(AgentWait.Kind)
     case clear
     case ignore
 }
 
-/// A hook message after parsing: the script's header line resolved against
-/// the CLI's own payload.
 nonisolated struct AgentHookMessage: Equatable, Sendable {
-    let provider: String
+    let provider: AgentCLI
     let sessionID: String
-    /// The CLI's pid as the script saw it, the start of the parent walk.
+    /// The CLI's pid, where the parent walk starts.
     let pid: pid_t
-    /// `__CFBundleIdentifier` of the process, set by LaunchServices for
-    /// everything a GUI app starts. Empty when the CLI came from ssh or a
-    /// launchd job.
+    /// `__CFBundleIdentifier`; nil when the CLI came from ssh or launchd.
     let bundleID: String?
     let effect: AgentHookEffect
+
+    /// The matching `AgentWait.id`.
+    var waitID: String { "\(provider.rawValue)/\(sessionID)" }
 }
 
-/// The pure side of agent waits: turning the bytes the hook script sends
-/// into a message, and deciding what each CLI's event means. Nothing here
-/// touches AppKit or the file system, so every branch has a test.
+/// What the bytes the hook script sends mean, per CLI.
 nonisolated enum AgentWaitRules {
-    /// Claude Code notification types that mean a person has to answer.
     static let claudeNeedsInputTypes: Set<String> = [
         "permission_prompt", "elicitation_dialog", "elicitation_url_dialog", "agent_needs_input",
     ]
 
-    /// Apps that host a CLI. The fallback for a wait with no host: when any
-    /// of these comes to the front, the person went to look at a terminal.
+    /// The fallback for a wait with no host: any of these coming to the
+    /// front means the person went to look at a terminal.
     static let terminalHosts: Set<String> = [
         "com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
         "net.kovidgoyal.kitty", "org.alacritty", "com.github.wez.wezterm", "co.zeit.hyper", "org.tabby",
@@ -40,7 +35,6 @@ nonisolated enum AgentWaitRules {
         "com.anthropic.claudefordesktop", "com.openai.codex", "com.conductor.app",
     ]
 
-    /// Whether an app coming to the front should clear a wait.
     static func clears(_ wait: AgentWait, activated bundleID: String) -> Bool {
         if let host = wait.host {
             return host == bundleID
@@ -48,9 +42,8 @@ nonisolated enum AgentWaitRules {
         return terminalHosts.contains(bundleID) || bundleID.hasPrefix("com.jetbrains.")
     }
 
-    /// Parses `provider pid bundleid\n{json}`. The provider tag is the
-    /// script's argument; Cursor also runs hooks it finds in Claude Code's
-    /// settings, so the payload has the final say.
+    /// `provider pid bundleid\n{json}`. Cursor also runs the hooks it finds
+    /// in Claude Code's settings, so the payload has the final say.
     static func parse(_ data: Data) -> AgentHookMessage? {
         guard let newline = data.firstIndex(of: UInt8(ascii: "\n")),
               let header = String(data: data[data.startIndex ..< newline], encoding: .utf8)
@@ -60,8 +53,9 @@ nonisolated enum AgentWaitRules {
         let body = data[data.index(after: newline)...]
         guard let payload = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
         let bundleID = fields.count > 2 ? String(fields[2]).trimmingCharacters(in: .whitespaces) : ""
-        let provider = resolveProvider(tag: String(fields[0]), payload: payload)
-        guard let sessionID = sessionID(provider: provider, payload: payload) else { return nil }
+        guard let provider = resolveProvider(tag: String(fields[0]), payload: payload),
+              let sessionID = sessionID(provider: provider, payload: payload)
+        else { return nil }
         return AgentHookMessage(
             provider: provider,
             sessionID: sessionID,
@@ -71,25 +65,25 @@ nonisolated enum AgentWaitRules {
         )
     }
 
-    static func resolveProvider(tag: String, payload: [String: Any]) -> String {
-        payload["cursor_version"] != nil ? "cursor" : tag
+    static func resolveProvider(tag: String, payload: [String: Any]) -> AgentCLI? {
+        payload["cursor_version"] != nil ? .cursor : AgentCLI(rawValue: tag)
     }
 
-    static func sessionID(provider: String, payload: [String: Any]) -> String? {
+    static func sessionID(provider: AgentCLI, payload: [String: Any]) -> String? {
         switch provider {
-        case "cursor":
+        case .cursor:
             payload["conversation_id"] as? String
-        case "opencode":
+        case .opencode:
             (payload["properties"] as? [String: Any])?["sessionID"] as? String
-        default:
+        case .claudeCode, .codex:
             payload["session_id"] as? String
         }
     }
 
-    static func effect(provider: String, payload: [String: Any]) -> AgentHookEffect {
+    static func effect(provider: AgentCLI, payload: [String: Any]) -> AgentHookEffect {
         let event = payload["hook_event_name"] as? String
         switch provider {
-        case "claude-code":
+        case .claudeCode:
             switch event {
             case "Stop": return .wait(.finished)
             case "Notification":
@@ -98,20 +92,20 @@ nonisolated enum AgentWaitRules {
             case "UserPromptSubmit", "SessionEnd": return .clear
             default: return .ignore
             }
-        case "codex":
+        case .codex:
             switch event {
             case "Stop": return .wait(.finished)
             case "PermissionRequest": return .wait(.needsInput)
             case "UserPromptSubmit", "SessionEnd", "Interrupt": return .clear
             default: return .ignore
             }
-        case "cursor":
+        case .cursor:
             switch event {
             case "stop": return payload["status"] as? String == "completed" ? .wait(.finished) : .clear
             case "beforeSubmitPrompt", "sessionEnd": return .clear
             default: return .ignore
             }
-        case "opencode":
+        case .opencode:
             let properties = payload["properties"] as? [String: Any]
             switch payload["type"] as? String {
             case "session.idle": return .wait(.finished)
@@ -125,8 +119,6 @@ nonisolated enum AgentWaitRules {
             case "session.deleted", "permission.replied": return .clear
             default: return .ignore
             }
-        default:
-            return .ignore
         }
     }
 }

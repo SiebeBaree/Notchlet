@@ -1,12 +1,8 @@
 import Foundation
 
-/// Claude Code's transcripts as a history source.
-///
 /// Every session is a JSONL file under `~/.claude/projects/<project>/`, and
-/// every subagent a file under `<session>/subagents/`. Each API reply is an
-/// `assistant` line carrying the model, the message id and the usage as
-/// the API returned it. Claude Code deletes transcripts after 30 days by
-/// default (`cleanupPeriodDays`), which is why the archive exists.
+/// every subagent a file under `<session>/subagents/`. Claude Code deletes
+/// them after 30 days by default, which is why the archive exists.
 nonisolated struct ClaudeCodeHistorySource: UsageHistorySource {
     static let defaultProjectsDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appending(path: ".claude/projects")
@@ -22,21 +18,16 @@ nonisolated struct ClaudeCodeHistorySource: UsageHistorySource {
     }
 }
 
-/// One transcript line.
-///
-/// A reply with several content blocks is written as one line per block,
-/// each repeating the message id and the full usage, so the event id is the
-/// message id and the rollup keeps one per id. `<synthetic>` is Claude
-/// Code's own filler (an error notice, a compaction summary) and never a
-/// billed request. Cache writes come split by tier when the line has
-/// `cache_creation`; older lines only have the total, all of it 5-minute.
+/// A reply with several content blocks is one line per block, each with
+/// the message id and the full usage, so the event id is the message id.
+/// `<synthetic>` is Claude Code's own filler and never a billed request.
+/// Older lines have only the cache-write total, all of it 5-minute.
 nonisolated enum ClaudeCodeLogParser: LogLineParser {
     struct State: Sendable {}
 
     static var initialState: State { State() }
 
-    /// Only assistant lines carry this; user lines, attachments and
-    /// bookkeeping records are skipped before any JSON is decoded.
+    /// Skips user lines and bookkeeping before any JSON is decoded.
     private static let marker = Data("\"usage\":{".utf8)
 
     static func parse(_ line: Data, state: inout State) -> UsageEvent? {

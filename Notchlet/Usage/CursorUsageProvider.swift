@@ -1,25 +1,14 @@
 import Foundation
 
-/// Usage for Cursor.
-///
-/// Reads the access token Cursor.app keeps in its state database (the VS
-/// Code style SQLite store every Electron editor has) and calls the endpoint
-/// behind the dashboard's usage page. That endpoint takes the token as the
-/// `WorkosCursorSessionToken` cookie, prefixed with the user id from the
-/// token's `sub` claim, which is how Cursor's own dashboard sends it. A
-/// session token pasted from the browser works the same way, for anyone
-/// who uses Cursor without the app on this Mac.
-///
-/// Included usage is a monthly budget split in two pools, Cursor's own
-/// models (Composer, Grok) and third-party models, both reset with the
-/// billing cycle. The dashboard headline blends the two, so it leads and the
-/// pools follow. On-demand spend past the budget is a bill, not a limit, and
-/// is left out. The token is never refreshed: Cursor.app rotates it itself
-/// and rewrites the row, which the next poll picks up.
+/// Reads the token Cursor.app keeps in its state database and calls the
+/// endpoint behind the dashboard's usage page, which takes the token as the
+/// `WorkosCursorSessionToken` cookie prefixed with the user id from its
+/// `sub` claim. Included usage is a monthly budget in two pools, Cursor's
+/// own models and third-party models, on one billing cycle; on-demand
+/// spend past it is a bill, not a limit, and is left out. The token is
+/// never refreshed: Cursor.app rotates it itself.
 struct CursorUsageProvider: HTTPUsageProvider {
-    static let providerID = "cursor"
-
-    let id = Self.providerID
+    let id = "cursor"
     let name = "Cursor"
     let logoAssetName = "CursorLogo"
     let usageURL = URL(string: "https://cursor.com/api/usage-summary")!
@@ -27,8 +16,7 @@ struct CursorUsageProvider: HTTPUsageProvider {
 
     static let appOption = AuthOption(id: "app", label: "Cursor app")
     static let tokenOption = AuthOption(id: "token", label: "Pasted token", secretName: "session token")
-    static let allAuthOptions = [appOption, tokenOption]
-    let authOptions = Self.allAuthOptions
+    let authOptions = [Self.appOption, Self.tokenOption]
     let history: (any UsageHistorySource)? = CursorHistorySource()
 
     private static let stateDatabase = "Library/Application Support/Cursor/User/globalStorage/state.vscdb"
@@ -42,11 +30,10 @@ struct CursorUsageProvider: HTTPUsageProvider {
         try await Self.sessionHeaders(for: option)
     }
 
-    /// The dashboard cookie for one sign-in option; the history source
-    /// sends the same one to the usage export.
+    /// The history source sends the same cookie to the usage export.
     static func sessionHeaders(for option: AuthOption) async throws -> [String: String] {
         let token: String? = if option.id == tokenOption.id {
-            await SecretStore.read(providerID: providerID, optionID: option.id)
+            await PastedSecrets.read(providerID: "cursor", optionID: option.id)
         } else {
             await CredentialSupport.sqliteValue(
                 homePath: stateDatabase,
@@ -55,19 +42,17 @@ struct CursorUsageProvider: HTTPUsageProvider {
             )
         }
         guard let token else {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
         guard let cookie = sessionCookie(token: token) else {
-            throw UsageProviderError.notAvailable(.expired)
+            throw ProviderError.notAvailable(.expired)
         }
         return ["Accept": "application/json", "Cookie": cookie]
     }
 
-    /// The dashboard's session cookie: user id and token joined by an
-    /// encoded "::". Takes the bare JWT Cursor.app stores, or the cookie as
-    /// a user copies it from a browser: the value alone or with its name,
-    /// separator raw or percent-encoded. Nil when the token is expired or
-    /// has no usable subject.
+    /// Takes the bare JWT Cursor.app stores, or the cookie as copied from a
+    /// browser: the value alone or with its name, separator raw or
+    /// percent-encoded. Nil when the token is expired or has no subject.
     static func sessionCookie(token: String, now: Date = .now) -> String? {
         var pasted = token.trimmingCharacters(in: .whitespacesAndNewlines)
         if let separator = pasted.firstIndex(of: "="), pasted[..<separator] == "WorkosCursorSessionToken" {
@@ -83,8 +68,6 @@ struct CursorUsageProvider: HTTPUsageProvider {
         return "WorkosCursorSessionToken=\(userID)%3A%3A\(jwt)"
     }
 
-    /// `membershipType` is the plan: "free", "pro", "pro_plus", "ultra",
-    /// "team", "enterprise" and a few regional variants.
     func parsePlanTier(from data: Data) -> String? {
         struct Response: Decodable {
             var membershipType: String?
@@ -93,12 +76,10 @@ struct CursorUsageProvider: HTTPUsageProvider {
         return (try? JSONDecoder().decode(Response.self, from: data))?.membershipType
     }
 
-    /// Maps `individualUsage.plan`: the three percent fields become the
-    /// headline and the two pools, all on the billing cycle. Accounts without
-    /// percentages (team, enterprise) fall back to the first spend meter with
-    /// a cap: the personal plan, the personal overall budget, then the team's
-    /// pooled one. Money fields are cents; percent fields are already
-    /// percentages, even below 1.
+    /// The three percent fields of `individualUsage.plan` are the headline
+    /// and the two pools. Accounts without percentages (team, enterprise)
+    /// fall back to the first spend meter with a cap. Percent fields are
+    /// already percentages, even below 1.
     func parseWindows(from data: Data) throws -> [UsageWindow] {
         struct Response: Decodable {
             struct Meter: Decodable {

@@ -1,17 +1,12 @@
 import AppKit
 import Sparkle
 
-/// Wraps Sparkle behind the notch's gentle update flow.
-///
-/// Scheduled checks run daily in the background and never pop a window.
-/// When one finds an update, `availableUpdateVersion` is set and the notch
-/// shows a small update icon; clicking it hands off to Sparkle's standard
-/// download, verify, install and relaunch flow. Manual checks from settings
-/// use the standard flow directly.
+/// Sparkle behind the notch's gentle flow: a scheduled check never pops a
+/// window, the notch shows an icon instead, and clicking it hands off to
+/// Sparkle's standard install.
 @Observable
 final class UpdateController: NSObject {
-    /// Version found by a scheduled background check, waiting for the user
-    /// to notice the notch icon. Nil once the update got attention.
+    /// Nil once the update got attention.
     private(set) var availableUpdateVersion: String?
 
     @ObservationIgnored private var updaterController: SPUStandardUpdaterController!
@@ -31,13 +26,12 @@ final class UpdateController: NSObject {
         set { updaterController.updater.automaticallyChecksForUpdates = newValue }
     }
 
-    /// The user clicked the notch's update icon or install row.
     func installAvailableUpdate() {
         Analytics.capture(.updateInstallClicked(toVersion: availableUpdateVersion ?? "unknown"))
         updaterController.checkForUpdates(nil)
     }
 
-    /// Manual check from settings; Sparkle reports the result in its own UI.
+    /// Sparkle reports the result in its own UI.
     func checkForUpdates() {
         updaterController.checkForUpdates(nil)
     }
@@ -53,8 +47,7 @@ extension UpdateController: SPUUpdaterDelegate {
 
     func updater(_ updater: SPUUpdater, didAbortWithError error: Error) {
         let error = error as NSError
-        // "No update found" and a cancelled install are not failures. The
-        // feed 404ing before the repo is public lands here too.
+        // "No update found" and a cancelled install are not failures.
         guard error.domain == SUSparkleErrorDomain,
               error.code != Int(Sparkle.SUError.noUpdateError.rawValue),
               error.code != Int(Sparkle.SUError.installationCanceledError.rawValue)
@@ -70,8 +63,6 @@ extension UpdateController: @preconcurrency SPUStandardUserDriverDelegate {
         _ update: SUAppcastItem,
         andInImmediateFocus immediateFocus: Bool
     ) -> Bool {
-        // Never let Sparkle pop scheduled updates; the notch icon is the
-        // whole reminder.
         false
     }
 

@@ -1,7 +1,7 @@
 import AppKit
 
-/// Borderless, non-activating panel that floats over the menu bar area and
-/// stays put across spaces and full-screen apps.
+/// Floats over the menu bar and stays put across spaces and full-screen
+/// apps.
 final class NotchPanel: NSPanel {
     init() {
         super.init(

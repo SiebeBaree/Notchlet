@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// One blue, dark to bright, on the black card. Blue stays clear of the
-/// green, yellow and red the rings use for pace. Unknown days get a warmer
-/// dark gray that is neither empty nor a level, so the edge of coverage
-/// reads without a legend entry.
+/// One blue, dark to bright, clear of the green, yellow and red the rings
+/// use for pace. Unknown days get a warmer dark gray that is neither empty
+/// nor a level, so the edge of coverage reads without a legend.
 enum ActivityPalette {
     static let levels = [
         Color(red: 0.07, green: 0.25, blue: 0.48),
@@ -16,9 +15,8 @@ enum ActivityPalette {
     static let line = levels[2]
 }
 
-/// The colors and label size one drawing of a graph uses: the pane's, or a
-/// share card theme's. `unknown` is the fill for days before coverage; nil
-/// leaves them out.
+/// The pane's colours or a share card theme's. A nil `unknown` leaves the
+/// days before coverage out.
 struct GraphStyle {
     var levels: [Color]
     var empty: Color
@@ -47,23 +45,21 @@ struct GraphStyle {
     }
 }
 
-/// Both graphs share one height for a given width, so switching between
-/// them never moves the rows below. Measured in columns of the heatmap:
-/// 53 columns wide, 7 rows plus a strip of 1.6 columns for month labels.
+/// Both graphs share one aspect ratio, so switching never moves the rows
+/// below: 53 columns wide, 7 rows plus a strip for month labels.
 enum GraphLayout {
     static let labelStripColumns: CGFloat = 1.6
     static let aspectRatio = CGFloat(ActivityGrid.weeks) / (CGFloat(ActivityGrid.rows) + labelStripColumns)
     static let tooltipWidth: CGFloat = 156
 
-    /// Where a tooltip for a mark at `x` goes so it stays inside the graph.
+    /// Keeps the tooltip inside the graph.
     static func tooltipX(for x: CGFloat, width: CGFloat) -> CGFloat {
         min(max(x - tooltipWidth / 2, 0), max(width - tooltipWidth, 0))
     }
 }
 
-/// Twelve months of tokens as a grid of days. One `Canvas` and one hover
-/// handler: 371 cells as views would each hit-test on every cursor move,
-/// which is the CPU cost the collapsed notch was built to avoid.
+/// One `Canvas` and one hover handler: 371 cells as views would each
+/// hit-test on every cursor move.
 struct ActivityHeatmap: View {
     let grid: ActivityGrid
     let days: [DayKey: UsageLedger.DayUsage]
@@ -115,8 +111,8 @@ struct ActivityHeatmap: View {
         .aspectRatio(GraphLayout.aspectRatio, contentMode: .fit)
     }
 
-    /// Month labels along the top, then one rounded square per day. Shared
-    /// with the share card, which draws the same grid at its own size.
+    /// Shared with the share card, which draws the same grid at its own
+    /// size.
     static func draw(
         _ grid: ActivityGrid,
         style: GraphStyle,
@@ -147,9 +143,8 @@ struct ActivityHeatmap: View {
     }
 }
 
-/// Thirty days of dollars as a line, the way CodexBar's cost history
-/// reads. The line breaks over days before coverage started rather than
-/// drawing them as zero.
+/// Thirty days of dollars as a line, broken over days before coverage
+/// rather than drawn as zero.
 struct SpendChart: View {
     let series: SpendSeries
     let days: [DayKey: UsageLedger.DayUsage]
@@ -203,8 +198,7 @@ struct SpendChart: View {
         .aspectRatio(GraphLayout.aspectRatio, contentMode: .fit)
     }
 
-    /// The area, the line, the baseline, the peak at the top right and the
-    /// first and last day under the plot. Shared with the share card.
+    /// Shared with the share card.
     static func draw(
         _ series: SpendSeries,
         style: GraphStyle,
@@ -285,7 +279,7 @@ struct SpendChart: View {
     }
 }
 
-/// What a day held: the total, then its models. Shared by both graphs.
+/// The day's total, then its models.
 struct DayTooltip: View {
     let day: DayKey
     let usage: UsageLedger.DayUsage?

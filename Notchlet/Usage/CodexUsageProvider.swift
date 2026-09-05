@@ -1,15 +1,11 @@
 import Foundation
 
-/// Usage for OpenAI Codex.
-///
-/// Reads the OAuth tokens the Codex CLI stores in `~/.codex/auth.json` and
-/// calls the exact endpoint behind its `/status` screen. Which windows exist
-/// is decided server-side per plan (observed: 5h+weekly on Plus, weekly only
-/// on Pro tiers, monthly on an unused Go account), so durations and labels
-/// come from the response, never from a plan table — the CLI itself has
-/// none. Tokens are never refreshed here: they last ten days and the CLI
-/// renews them on use, and OpenAI rejects a reused refresh token, so a
-/// refresh behind the CLI's back could sign it out.
+/// Reads the tokens in `~/.codex/auth.json` and calls the endpoint behind
+/// the CLI's `/status` screen. Which windows exist is decided server-side
+/// per plan (5h+weekly on Plus, weekly only on Pro, monthly on Go), so
+/// durations and labels come from the response. Tokens are never refreshed:
+/// OpenAI rejects a reused refresh token, so a refresh behind the CLI's
+/// back could sign it out.
 struct CodexUsageProvider: HTTPUsageProvider {
     let id = "codex"
     let name = "Codex"
@@ -41,13 +37,13 @@ struct CodexUsageProvider: HTTPUsageProvider {
             var tokens: Tokens
         }
 
-        // An API-key login has no tokens object, which reads as signed out:
-        // the usage endpoint only answers ChatGPT logins.
+        // An API-key login has no tokens object; the endpoint only answers
+        // ChatGPT logins.
         guard let auth: Auth = CredentialSupport.homeJSON(".codex/auth.json") else {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
         guard let expiry = CredentialSupport.jwtExpiry(of: auth.tokens.accessToken), expiry > .now else {
-            throw UsageProviderError.notAvailable(.expired)
+            throw ProviderError.notAvailable(.expired)
         }
         var headers = ["Authorization": "Bearer \(auth.tokens.accessToken)"]
         if let accountId = auth.tokens.accountId {
@@ -56,8 +52,6 @@ struct CodexUsageProvider: HTTPUsageProvider {
         return headers
     }
 
-    /// The response carries the ChatGPT plan ("plus", "pro", "go", ...) at
-    /// the top level.
     func parsePlanTier(from data: Data) -> String? {
         struct Response: Decodable {
             var planType: String?
@@ -68,8 +62,8 @@ struct CodexUsageProvider: HTTPUsageProvider {
         return (try? decoder.decode(Response.self, from: data))?.planType
     }
 
-    /// Maps `rate_limit.primary_window` / `secondary_window`, each
-    /// `{used_percent, limit_window_seconds, reset_at}`. Either can be null.
+    /// `rate_limit.primary_window` and `secondary_window`, either of which
+    /// can be null.
     func parseWindows(from data: Data) throws -> [UsageWindow] {
         struct Response: Decodable {
             struct RateLimit: Decodable {

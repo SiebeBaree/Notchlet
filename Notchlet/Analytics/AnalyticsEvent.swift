@@ -1,50 +1,41 @@
 import Foundation
 
-/// Every analytics event Notchlet can send, with its properties typed at the
-/// call site. Event names and property keys exist only here, so this file is
-/// the complete catalog of what leaves the machine. Adding an event is adding
-/// a case.
+/// The complete catalog of what leaves the machine; event names and
+/// property keys exist only here.
 enum AnalyticsEvent {
     case appInstalled
     case appLaunched
     case appUpdated(fromVersion: String, toVersion: String)
-    /// Fired once per calendar day while running. This is the load-bearing
-    /// event: a login-item agent rarely relaunches, so DAU and retention come
-    /// from heartbeats, not launches. `usagePressure` maps provider id to a
-    /// usage bucket ("0-25"..."75-100"), never real numbers.
+    /// Once per calendar day. A login-item agent rarely relaunches, so DAU
+    /// and retention come from this, not launches. `usagePressure` maps
+    /// provider id to a bucket ("0-25"..."75-100"), never real numbers.
     case appHeartbeat(uptimeHours: Double, usagePressure: [String: String])
     case notchOpened
     case notchClosed(openSeconds: TimeInterval)
-    /// Only fired on transitions between states, never per refresh.
     case providerStateChanged(provider: String, state: UsageStore.ProviderState)
     case settingsOpened
-    /// `scope` is "all" or a provider id.
     case historyOpened(scope: String)
     /// Booleans and enum values only, never free text.
     case settingChanged(key: String, value: String)
-    /// `scope` is "all" or a provider id.
     case shareOpened(scope: String)
-    /// What left the app and how it was configured, never the numbers on it.
+    /// How the card was configured, never the numbers on it.
     case shareExported(method: String, theme: String, period: String, graph: String, cost: Bool, models: Bool)
     case updateAvailable(fromVersion: String, toVersion: String)
     case updateInstallClicked(toVersion: String)
     case updateFailed(errorCode: Int)
-    /// Counts only: raw matches in the scan and distinct secrets not seen
-    /// before. `kind` is "full" or "hourly".
+    /// Counts only. `kind` is "full" or "hourly".
     case secretScanCompleted(provider: String, kind: String, findings: Int, new: Int, seconds: TimeInterval)
     /// The one place a fragment of chat content leaves the machine, on an
-    /// explicit click: the first six and last two characters of a match the
-    /// user says is not a secret, so a noisy rule can be turned off.
+    /// explicit click: the preview of a match the user says is not a secret.
     case secretFalsePositive(provider: String, rule: String, preview: String, length: Int)
     case secretIgnored(provider: String, rule: String)
     case secretHelpOpened(provider: String, rule: String)
     /// Thresholds only, never the usage number that crossed them.
     case usageAlertRuleChanged(provider: String, window: String, percent: Int, enabled: Bool)
     case usageAlertFired(provider: String, window: String, percent: Int)
-    /// The provider and whether it finished or needs input; never the
-    /// session, the directory or the app it runs in.
+    /// Never the session, the directory or the app it runs in.
     case agentWaitShown(provider: String, kind: String)
-    /// What made the line go: "hover", "focus" or "prompt".
+    /// "hover", "focus" or "prompt".
     case agentWaitCleared(by: String)
 
     var name: String {
@@ -88,7 +79,7 @@ enum AnalyticsEvent {
         case let .notchClosed(openSeconds):
             ["open_seconds": (openSeconds * 10).rounded() / 10]
         case let .providerStateChanged(provider, state):
-            ["provider": provider, "state": state.rawValue]
+            ["provider": provider, "state": state.analyticsName]
         case let .settingChanged(key, value):
             ["key": key, "value": value]
         case let .historyOpened(scope), let .shareOpened(scope):

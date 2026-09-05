@@ -1,11 +1,10 @@
 import Foundation
 
-/// User-facing strings for reset times and pace verdicts. Pure so the date
-/// edge cases stay testable.
+/// The usage card's strings.
 enum UsageCopy {
-    /// "Resets in 51m" within a day, "Resets Fri 11:00" within a week, and
-    /// "Resets Sep 28" beyond that — a bare weekday a month out reads as
-    /// "this coming Monday".
+    /// "Resets in 51m" within a day, "Resets Fri 11:00" within a week,
+    /// "Resets Sep 28" beyond that: a bare weekday a month out reads as this
+    /// coming Monday.
     static func resetText(for resetsAt: Date?, now: Date = .now) -> String? {
         guard let resetsAt else { return nil }
         let interval = resetsAt.timeIntervalSince(now)
@@ -23,9 +22,7 @@ enum UsageCopy {
         return "Resets \(resetsAt.formatted(.dateTime.month(.abbreviated).day()))"
     }
 
-    /// The pace verdict, nil when there is none to show (missing or stale
-    /// reset data). The early case says how far ahead of the reset the window
-    /// runs out.
+    /// "Plenty", "On pace" or "Empty 3h 10m early"; nil without a projection.
     static func paceText(projection: BurnProjection?, resetsAt: Date?, now: Date = .now) -> String? {
         guard let projection else { return nil }
         switch projection.verdict {
@@ -39,14 +36,12 @@ enum UsageCopy {
         }
     }
 
-    /// Headline of a usage alert: the window's own label, then how far it
-    /// is. "5h limit past 80%", or "Weekly limit used up" at 100.
+    /// "5h limit past 80%", or "Weekly limit used up" at 100.
     static func alertHeadline(windowLabel: String, percent: Int) -> String {
         percent >= 100 ? "\(windowLabel) limit used up" : "\(windowLabel) limit past \(percent)%"
     }
 
-    /// Footer line for data old enough to mention; under 2 minutes counts as
-    /// fresh and shows nothing.
+    /// "Updated 5m ago"; nil under 2 minutes.
     static func freshnessText(fetchedAt: Date?, now: Date = .now) -> String? {
         guard let fetchedAt else { return nil }
         let age = now.timeIntervalSince(fetchedAt)
@@ -54,8 +49,7 @@ enum UsageCopy {
         return "Updated \(shortDuration(age)) ago"
     }
 
-    /// Footer line while a provider is rate limited: names the provider and
-    /// when the next attempt happens.
+    /// "Codex rate limited, retrying in 4m".
     static func rateLimitText(providerName: String, retryAt: Date, now: Date = .now) -> String {
         let wait = retryAt.timeIntervalSince(now)
         guard wait > 0 else {
@@ -64,11 +58,10 @@ enum UsageCopy {
         return "\(providerName) rate limited, retrying in \(shortDuration(wait))"
     }
 
-    /// The status line on a provider's settings page: what it signed in
-    /// with, or why it could not, followed by what to do about it.
+    /// The settings status line: what it signed in with, or why it could
+    /// not and what to do about it.
     static func providerStatusText(
         state: UsageStore.ProviderState?,
-        problem: AuthProblem?,
         option: AuthOption?,
         signInHint: String,
         retryAt: Date?,
@@ -80,11 +73,11 @@ enum UsageCopy {
         case .ok:
             guard let option else { return "Signed in" }
             return option.secretName.map { "Using the pasted \($0)" } ?? "Using \(option.label)"
-        case .notAvailable:
+        case let .notAvailable(problem):
             let reason = switch problem {
             case .rejected: "Login rejected."
             case .expired: "Login expired."
-            case .signedOut, nil: "Not signed in."
+            case .signedOut: "Not signed in."
             }
             return "\(reason) \(signInHint)."
         case .rateLimited:

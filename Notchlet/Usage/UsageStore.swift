@@ -1,40 +1,41 @@
 import Foundation
 import Observation
 
-/// Holds the latest snapshot for every configured provider and schedules
-/// refreshes: a slow heartbeat while the panel is closed, a fast one while it
-/// is open (which also refetches stale data the moment the user looks), and
-/// per-provider backoff when an endpoint rate limits us. A failing provider
-/// keeps its previous snapshot; the panel labels its age instead.
+/// The latest snapshot per provider and the refresh loop: slow while the
+/// panel is closed, every 60s while open, per-provider backoff on a rate
+/// limit. A failing provider keeps its previous snapshot.
 @Observable
 final class UsageStore {
-    /// Whether a provider's last refresh worked, found no usable login,
-    /// hit a rate limit, or failed outright.
-    enum ProviderState: String {
+    enum ProviderState: Equatable {
         case ok
-        case notAvailable = "not_available"
-        case rateLimited = "rate_limited"
+        case notAvailable(AuthProblem)
+        case rateLimited
         case error
+
+        var analyticsName: String {
+            switch self {
+            case .ok: "ok"
+            case .notAvailable: "not_available"
+            case .rateLimited: "rate_limited"
+            case .error: "error"
+            }
+        }
     }
 
     struct Entry: Identifiable {
         let provider: any UsageProvider
         var snapshot: UsageSnapshot?
         var state: ProviderState?
-        /// Why the last refresh found no usable login, while `state` is
-        /// `notAvailable`. Drives the status line in the provider's settings.
-        var authProblem: AuthProblem?
         var schedule = RefreshSchedule()
 
         var id: String { provider.id }
     }
 
-    /// How many providers can be on at once. The expanded panel has room
-    /// for three summary gauges side by side; more would crowd the notch.
+    /// Three summary gauges fit side by side in the expanded panel.
     static let maxActiveProviders = 3
 
     /// Closed-panel poll interval in minutes; the settings picker writes the
-    /// same key. Unset or out-of-catalog values fall back to 10.
+    /// same key. Unknown values fall back to 10.
     static let intervalDefaultsKey = "refreshIntervalMinutes"
     static let intervalChoicesMinutes = [3, 5, 10, 15, 30]
 
@@ -42,27 +43,26 @@ final class UsageStore {
     /// it triggers an immediate refetch.
     private static let openInterval: TimeInterval = 60
 
+    private let defaults: UserDefaults
     private(set) var entries: [Entry]
-    /// Per-provider visibility from settings. Unset means "on when the CLI
-    /// is installed", capped at `maxActiveProviders`, so a fresh launch
-    /// shows the agents present on this machine; a stored user choice always
-    /// wins. Disabled providers keep their entry (and last snapshot) but are
+    /// Unset means on when the CLI is installed, up to the cap; a stored
+    /// choice always wins. Disabled providers keep their entry but are
     /// neither polled nor shown.
     private var providerEnabled: [String: Bool]
     private var isPanelOpen = false
     private var refreshTask: Task<Void, Never>?
-    /// Told about every successful fetch, with the snapshot it replaced.
-    /// The usage alerts hang off this so they cost nothing beyond the poll.
+    /// Every successful fetch with the snapshot it replaced; the alerts
+    /// hang off this.
     var snapshotObserver: ((_ providerID: String, _ previous: UsageSnapshot?, _ current: UsageSnapshot) -> Void)?
 
-    init(providers: [any UsageProvider]) {
+    init(providers: [any UsageProvider], defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         entries = providers.map { Entry(provider: $0, snapshot: nil) }
         // Stored choices first, then installed CLIs fill the remaining slots
-        // in registration order. A fresh install with four CLIs shows the
-        // first three and leaves the fourth one toggle away.
+        // in registration order.
         var enabled: [String: Bool] = [:]
         for provider in providers {
-            enabled[provider.id] = UserDefaults.standard.object(forKey: Self.enabledDefaultsKey(provider.id)) as? Bool
+            enabled[provider.id] = defaults.object(forKey: Self.enabledDefaultsKey(provider.id)) as? Bool
         }
         var openSlots = Self.maxActiveProviders - enabled.values.filter { $0 == true }.count
         for provider in providers where enabled[provider.id] == nil {
@@ -83,34 +83,24 @@ final class UsageStore {
         providerEnabled[providerID] ?? true
     }
 
-    /// Whether another provider can be switched on without passing the cap.
     var canEnableMore: Bool {
         entries.filter { isEnabled($0.id) }.count < Self.maxActiveProviders
     }
 
-    /// Ignores a request that would pass the cap; the settings toggle is
-    /// disabled in that state, so this only guards against races.
+    /// Ignores a request past the cap; the toggle is disabled then, so this
+    /// only guards a race.
     func setEnabled(_ providerID: String, _ enabled: Bool) {
         if enabled, !isEnabled(providerID), !canEnableMore {
             return
         }
         providerEnabled[providerID] = enabled
-        UserDefaults.standard.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
-        // Re-enabling fetches right away if the data is due; disabling just
-        // drops the provider from the loop.
+        defaults.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
         reschedule()
     }
 
-    /// Fetches now and keeps the scheduling loop alive for the lifetime of
-    /// the store.
-    func startRefreshing() {
-        reschedule()
-    }
-
-    /// Fetches one provider right away, cooldowns included: the user just
-    /// changed how it signs in, so whatever it last knew is moot. A provider
-    /// that is switched off is fetched once anyway, so its settings page can
-    /// still say whether the new login works.
+    /// Cooldowns included: the user just changed how the provider signs in.
+    /// A provider that is off is fetched once anyway, so its settings page
+    /// can say whether the login works.
     func refreshNow(_ providerID: String) {
         guard let index = entries.firstIndex(where: { $0.id == providerID }) else { return }
         entries[index].schedule = RefreshSchedule()
@@ -123,19 +113,16 @@ final class UsageStore {
         }
     }
 
-    /// Panel visibility drives the cadence. Opening shrinks the interval to
-    /// `openInterval`, which makes any provider older than that due
-    /// immediately, so the user sees fresh numbers at the moment they look.
-    /// Backoff cooldowns still hold: a rate-limited provider is not poked.
+    /// Opening shrinks the interval to `openInterval`, which makes anything
+    /// older than that due now. Backoff still holds.
     func setPanelOpen(_ open: Bool) {
         guard open != isPanelOpen else { return }
         isPanelOpen = open
         reschedule()
     }
 
-    /// Restarts the scheduling loop so a changed input (interval setting,
-    /// wake from sleep) takes effect now: anything overdue fetches right
-    /// away, everything else just gets its next due time recomputed.
+    /// Restarts the loop so a changed input (interval setting, wake from
+    /// sleep) takes effect now.
     func reschedule() {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
@@ -152,7 +139,7 @@ final class UsageStore {
         if isPanelOpen {
             return Self.openInterval
         }
-        let minutes = UserDefaults.standard.integer(forKey: Self.intervalDefaultsKey)
+        let minutes = defaults.integer(forKey: Self.intervalDefaultsKey)
         return TimeInterval(Self.intervalChoicesMinutes.contains(minutes) ? minutes : 10) * 60
     }
 
@@ -163,7 +150,6 @@ final class UsageStore {
         return nextDue.map { max($0.timeIntervalSinceNow, 1) }
     }
 
-    /// Fetches every enabled provider that has come due.
     private func refreshDueProviders() async {
         let interval = pollInterval
         let now = Date.now
@@ -174,8 +160,6 @@ final class UsageStore {
         await fetch(due, now: now)
     }
 
-    /// Fetches the given providers concurrently, so one slow endpoint
-    /// doesn't hold up the others, and applies each outcome as it lands.
     private func fetch(_ indices: [Int], now: Date) async {
         for index in indices {
             entries[index].schedule.recordAttempt(now: now)
@@ -186,9 +170,9 @@ final class UsageStore {
                 group.addTask {
                     do {
                         return try await (index, .success(provider.fetchUsage()))
-                    } catch let UsageProviderError.notAvailable(problem) {
+                    } catch let ProviderError.notAvailable(problem) {
                         return (index, .notAvailable(problem))
-                    } catch let UsageProviderError.rateLimited(retryAfter) {
+                    } catch let ProviderError.rateLimited(retryAfter) {
                         return (index, .rateLimited(retryAfter: retryAfter))
                     } catch is CancellationError {
                         return (index, .cancelled)
@@ -218,7 +202,7 @@ final class UsageStore {
         case notAvailable(AuthProblem)
         case rateLimited(retryAfter: TimeInterval?)
         case failed
-        /// The refresh loop was restarted mid-flight, not a provider fault.
+        /// Our own reschedule, not a provider fault.
         case cancelled
     }
 
@@ -228,15 +212,12 @@ final class UsageStore {
             let previous = entries[index].snapshot
             entries[index].snapshot = snapshot
             snapshotObserver?(entries[index].id, previous, snapshot)
-            entries[index].authProblem = nil
             entries[index].schedule.recordSuccess()
             transition(at: index, to: .ok)
         case let .notAvailable(problem):
-            // A local credentials check or a plain rejection, so nothing to
-            // back off from.
-            entries[index].authProblem = problem
+            // Nothing to back off from.
             entries[index].schedule.recordSuccess()
-            transition(at: index, to: .notAvailable)
+            transition(at: index, to: .notAvailable(problem))
         case let .rateLimited(retryAfter):
             entries[index].schedule.recordRateLimit(retryAfter: retryAfter)
             transition(at: index, to: .rateLimited)
@@ -244,9 +225,8 @@ final class UsageStore {
             entries[index].schedule.recordError()
             transition(at: index, to: .error)
         case .cancelled:
-            // We cancelled this fetch ourselves by rescheduling, so the
-            // provider learns nothing: no state change and no backoff. The
-            // attempt recorded before the fetch still holds the 30s spacing.
+            // No state change and no backoff; the recorded attempt still
+            // holds the 30s spacing.
             break
         }
     }
@@ -271,12 +251,11 @@ final class UsageStore {
         }
     }
 
-    /// Records the new state and reports the change. Only transitions are
-    /// analytics events, never the steady state of every refresh.
+    /// Only transitions are analytics events, never every refresh.
     private func transition(at index: Int, to newState: ProviderState) {
         let oldState = entries[index].state
         entries[index].state = newState
-        if let oldState, oldState != newState {
+        if let oldState, oldState.analyticsName != newState.analyticsName {
             Analytics.capture(.providerStateChanged(provider: entries[index].id, state: newState))
         }
     }

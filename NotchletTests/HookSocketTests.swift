@@ -38,7 +38,7 @@ struct HookSocketTests {
         let data = try #require(await Self.first(of: received.stream, within: .seconds(5)))
         let receivedAt = Date.now
         let message = try #require(AgentWaitRules.parse(data))
-        #expect(message.provider == "claude-code")
+        #expect(message.provider == .claudeCode)
         #expect(message.sessionID == "s1")
         #expect(message.bundleID == "com.t3tools.t3code")
         #expect(message.pid > 0)

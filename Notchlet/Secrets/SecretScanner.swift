@@ -1,10 +1,8 @@
 import AppKit
 import Observation
 
-/// Scans the enabled providers' chats for leaked keys and keeps what it
-/// found: a first full pass when the Mac is idle, then hourly over what
-/// changed, one provider at a time. New findings open the notch through
-/// `alertGeneration`, once someone is at the Mac to see it.
+/// The scan loop and what it found, one provider at a time. New findings
+/// open the notch through `alertGeneration`, once someone is at the Mac.
 @Observable
 final class SecretScanner {
     static let enabledDefaultsKey = "secretScanEnabled"
@@ -12,40 +10,36 @@ final class SecretScanner {
 
     private let store: UsageStore
     private let stateStore: SecretStateStore
+    private let defaults: UserDefaults
     private(set) var state: SecretScanState
-    /// True while betterleaks is running, not while the loop merely looks.
+    /// While betterleaks runs, not while the loop merely looks.
     private(set) var isScanning = false
-    /// Providers whose last scan threw; the next tick tries again.
     private(set) var failedProviderIDs: Set<String> = []
-    /// Bumped when new findings should open the notch.
     private(set) var alertGeneration = 0
     private var loop: Task<Void, Never>?
     private var isTicking = false
-    /// Holds an alert from a scan that finished while the user was away
-    /// until they are back.
     private let presence = UserPresence()
 
-    init(store: UsageStore, stateStore: SecretStateStore = .default) {
+    init(store: UsageStore, stateStore: SecretStateStore = .default, defaults: UserDefaults = .standard) {
         self.store = store
         self.stateStore = stateStore
+        self.defaults = defaults
         state = stateStore.load() ?? SecretScanState()
     }
 
-    /// False on Intel and in a build without the helper.
     var isAvailable: Bool { Betterleaks.isAvailable }
 
-    /// On by default; the settings toggle flips it.
     var isEnabled: Bool {
-        UserDefaults.standard.object(forKey: Self.enabledDefaultsKey) as? Bool ?? true
+        defaults.object(forKey: Self.enabledDefaultsKey) as? Bool ?? true
     }
 
     func setEnabled(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: Self.enabledDefaultsKey)
+        defaults.set(enabled, forKey: Self.enabledDefaultsKey)
         Analytics.capture(.settingChanged(key: "secret_scan", value: String(enabled)))
         reschedule()
     }
 
-    /// Findings waiting for the user, newest first.
+    /// Newest first.
     var pending: [SecretFinding] {
         state.findings.filter { $0.status == .pending }.sorted { $0.firstSeenAt > $1.firstSeenAt }
     }
@@ -54,12 +48,9 @@ final class SecretScanner {
         store.entries.first { $0.id == id }?.provider.name
     }
 
-    /// What the scanner is up to, for the pane and the settings line.
     enum Status: Equatable {
         case off
         case unavailable
-        /// Some provider has never been scanned; the first pass waits for
-        /// an idle moment.
         case waitingForIdle
         case scanning
         case failed
@@ -84,7 +75,6 @@ final class SecretScanner {
         return .scanned(latest)
     }
 
-    /// Providers that are on and have chats on disk to read.
     private var providers: [(id: String, source: any SecretScanSource)] {
         store.entries.map(\.provider).compactMap { provider in
             guard store.isEnabled(provider.id), let source = provider.secrets else { return nil }
@@ -96,12 +86,7 @@ final class SecretScanner {
         reschedule(after: SecretScanSchedule.launchDelay)
     }
 
-    /// Restarts the loop: what a wake from sleep or the toggle calls.
-    func reschedule() {
-        reschedule(after: 0)
-    }
-
-    private func reschedule(after delay: TimeInterval) {
+    func reschedule(after delay: TimeInterval = 0) {
         loop?.cancel()
         loop = nil
         guard isEnabled, isAvailable else { return }
@@ -150,7 +135,6 @@ final class SecretScanner {
             } catch is CancellationError {
                 return
             } catch {
-                // Left undated, so the next tick tries again.
                 failedProviderIDs.insert(provider.id)
             }
         }
@@ -160,8 +144,6 @@ final class SecretScanner {
             }
         }
     }
-
-    // MARK: Actions
 
     func ignore(_ id: String) {
         guard let finding = setStatus(.ignored, of: id) else { return }
@@ -176,7 +158,7 @@ final class SecretScanner {
 
     /// The one place a fragment of chat content leaves the machine, on an
     /// explicit click: the preview and the rule, so noisy rules can be
-    /// turned off in a later release.
+    /// turned off.
     func reportFalsePositive(_ id: String) {
         guard let finding = setStatus(.falsePositive, of: id) else { return }
         Analytics.capture(.secretFalsePositive(
@@ -187,8 +169,7 @@ final class SecretScanner {
         ))
     }
 
-    /// Opens the website's page for this kind of key. The finding stays
-    /// pending until the user ignores it.
+    /// The finding stays pending until the user ignores it.
     func openHelp(_ id: String) {
         guard let finding = state.findings.first(where: { $0.id == id }) else { return }
         var components = URLComponents(url: Self.helpURL, resolvingAgainstBaseURL: false)!

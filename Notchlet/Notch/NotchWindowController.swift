@@ -1,14 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// Creates the notch panel, pins it over the notch and repositions it when
-/// display configuration changes.
-///
-/// The window is sized to the bare notch while collapsed and grows to
-/// `NotchGeometry.panelSize` only while expanded. Every cursor move inside
-/// the window runs SwiftUI hover hit-testing, so a window that is only ever
-/// as large as what it draws keeps the app idle whenever the mouse is
-/// anywhere else.
+/// Pins the panel over the notch. The window is sized to the bare notch
+/// while collapsed and grows to `panelSize` only while expanded: every
+/// cursor move inside the window runs SwiftUI hover hit-testing, so the
+/// window is never larger than what it draws.
 final class NotchWindowController: NSWindowController {
     private let store: UsageStore
     private let history: UsageHistory
@@ -45,8 +41,8 @@ final class NotchWindowController: NSWindowController {
         self.notchSize = notchSize
 
         super.init(window: panel)
-        // The window frame is ours to set, so the hosting view has no reason
-        // to publish an intrinsic size for AppKit to fit the window to.
+        // The controller owns the frame, so the hosting view must not
+        // publish an intrinsic size for AppKit to fit the window to.
         hostingView.sizingOptions = []
         panel.contentView = hostingView
 
@@ -64,13 +60,11 @@ final class NotchWindowController: NSWindowController {
         fatalError("init(coder:) is not supported")
     }
 
-    /// Prefers the built-in display (the one with a notch), falls back to the
-    /// main screen with a virtual notch.
+    /// The display with a notch, else the main screen with a virtual one.
     private static var targetScreen: NSScreen? {
         NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main
     }
 
-    /// Size of the physical notch, or the virtual fallback.
     private static func notchSize(of screen: NSScreen) -> CGSize {
         let topInset = screen.safeAreaInsets.top
         guard topInset > 0,
@@ -96,8 +90,8 @@ final class NotchWindowController: NSWindowController {
         )
     }
 
-    /// The view grows the window before it expands or outlines and shrinks
-    /// it after the animation back ends, so the drawing always has room.
+    /// The view calls this before it grows and after it has shrunk, so the
+    /// drawing always has room.
     private func setPanelState(expanded: Bool, waiting: Bool) {
         guard expanded != isExpanded || waiting != isWaiting else { return }
         isExpanded = expanded
@@ -111,10 +105,8 @@ final class NotchWindowController: NSWindowController {
             : NotchGeometry.collapsedPanelSize(notchSize: notchSize, waiting: isWaiting)
     }
 
-    /// Moves the panel onto the current target screen at the size the
-    /// current state needs. The notch size is recomputed here too:
-    /// unplugging a display can switch us between a physical notch and the
-    /// virtual fallback, and the content has to follow.
+    /// Unplugging a display can switch between a physical notch and the
+    /// virtual fallback, so the notch size is recomputed here too.
     @objc private func reposition() {
         guard let screen = Self.targetScreen, let window else { return }
         let currentNotchSize = Self.notchSize(of: screen)

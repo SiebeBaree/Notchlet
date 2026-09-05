@@ -1,8 +1,7 @@
 import AppKit
 
-/// Hardware, display and app context registered as PostHog super properties,
-/// so any single event can be sliced by machine, version or provider setup.
-/// Nothing here identifies the machine: no serial, no hostname, no username.
+/// PostHog super properties. Nothing here identifies the machine: no
+/// serial, no hostname, no username.
 enum DeviceInfo {
     static var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"

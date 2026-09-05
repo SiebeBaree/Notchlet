@@ -1,8 +1,7 @@
 import Foundation
 
-/// What the scanner remembers between launches: every finding with its
-/// status, and when each provider was last scanned. Previews and hashes
-/// only, never a secret.
+/// What the scanner remembers between launches. Previews and hashes only,
+/// never a secret.
 nonisolated struct SecretScanState: Codable, Equatable, Sendable {
     static let currentVersion = 1
 
@@ -22,8 +21,8 @@ nonisolated struct SecretStateStore: Sendable {
 
     let url: URL
 
-    /// Nil when there is no file yet or it is not the current version: a
-    /// corrupt or foreign file starts over rather than crashing every launch.
+    /// A corrupt or foreign file starts over rather than crashing every
+    /// launch.
     func load() -> SecretScanState? {
         guard let data = try? Data(contentsOf: url),
               let state = try? JSONDecoder().decode(SecretScanState.self, from: data),

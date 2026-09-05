@@ -1,10 +1,8 @@
 import Foundation
 
-/// Decides which rules fire on a fresh snapshot. Pure, so the once-per-cycle
-/// logic is testable without a store.
+/// Which rules fire on a fresh snapshot.
 nonisolated enum UsageAlertEvaluator {
-    /// Two reset times this close apart are the same cycle: endpoints round
-    /// or jitter the timestamp between fetches.
+    /// Endpoints round or jitter the reset time between fetches.
     static let cycleTolerance: TimeInterval = 60
 
     /// A rule fires when its window is at or past the threshold and it has

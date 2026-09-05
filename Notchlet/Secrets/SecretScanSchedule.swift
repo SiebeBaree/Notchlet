@@ -1,12 +1,10 @@
 import Foundation
 
-/// When a provider's chats get scanned. The first pass reads everything
-/// the CLI has ever logged, so it waits until the Mac has been idle for two
-/// minutes and is not hot; after that, once an hour over what changed,
-/// which is small enough to run whatever the user is doing.
+/// The first pass reads everything the CLI has ever logged, so it waits
+/// for two idle minutes and a cool Mac; after that, hourly over what
+/// changed.
 nonisolated enum SecretScanSchedule {
     static let launchDelay: TimeInterval = 5
-    /// How often the loop looks at whether anything is due.
     static let tickInterval: TimeInterval = 300
     static let interval: TimeInterval = 3600
     static let idleRequirement: TimeInterval = 120
