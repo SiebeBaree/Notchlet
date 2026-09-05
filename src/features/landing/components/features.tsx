@@ -1,6 +1,6 @@
 import { githubUrl } from "../links";
 
-type Feature = {
+export type Feature = {
     title: string;
     description: string;
     badges: { label: string; href?: string }[];

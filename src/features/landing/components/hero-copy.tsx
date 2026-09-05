@@ -9,6 +9,8 @@ import { DownloadLink } from "./download-link";
 const providers = [
     { name: "Claude Code", icon: "/claude-ai-icon.svg" },
     { name: "Codex", icon: "/openai_dark.svg" },
+    { name: "Cursor", icon: "/cursor_dark.svg" },
+    { name: "OpenCode", icon: "/opencode-dark.svg" },
 ] as const;
 
 // Fades the copy off the desktop early in the scroll so the shrinking screen reads as a clean Mac.
@@ -27,8 +29,8 @@ export function HeroCopy() {
                     Know before you hit the limit.
                 </h1>
                 <p className="mt-4 max-w-xl text-sm leading-relaxed text-balance text-white/85 [text-shadow:0_1px_10px_rgba(5,15,45,0.5)] sm:mt-5 sm:text-base">
-                    Notchlet keeps your Claude Code and Codex usage in the notch, so the five hour window never runs out
-                    on you mid task.
+                    Notchlet keeps your Claude Code, Codex, Cursor and OpenCode usage in the notch, so the five hour
+                    window never runs out on you mid task.
                 </p>
 
                 <p className="mt-6 text-xs font-semibold tracking-[0.16em] text-white/90 uppercase [text-shadow:0_1px_12px_rgba(5,15,45,0.5)] sm:mt-8">

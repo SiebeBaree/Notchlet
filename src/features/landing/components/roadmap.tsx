@@ -1,15 +1,10 @@
-import Image from "next/image";
-
 import { githubIssuesUrl } from "../links";
 
 // "Local" and "Opt in" answer the question the privacy block raises: anything that reads your chats does it on your
 // Mac, and anything that leaves the device is a choice you make.
 const roadmap = [
-    { title: "Cursor and OpenCode support", icons: ["/cursor_dark.svg", "/opencode-dark.svg"] },
-    { title: "History of your token spend" },
-    { title: "Share your token spend with others", sub: "a PNG of your numbers" },
+    { title: "Leaked keys in your chats", sub: "a scan of your transcripts for API keys", tag: "Local" },
     { title: "Alerts when an agent is waiting on you" },
-    { title: "Secrets counter", sub: "how often you paste secrets into chats", tag: "Local" },
     { title: "Angry counter", sub: "how often you lose it at the model", tag: "Local" },
     { title: "Global leaderboard", sub: "anonymous unless you make a profile", tag: "Opt in" },
     { title: "Your AI personality", sub: "when you work, your most used phrases, who you are in chats", tag: "Opt in" },
@@ -25,7 +20,7 @@ export function Roadmap() {
                 <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-3">
                     Nothing below is locked in. Tell me which one you actually want.
                 </p>
-                <ul className="mt-14 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+                <ul className="mt-14 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                     {roadmap.map((item, index) => (
                         <li key={item.title} className="flex flex-col bg-white p-6">
                             <span className="flex items-center justify-between">
@@ -38,20 +33,7 @@ export function Roadmap() {
                                     </span>
                                 )}
                             </span>
-                            <span className="mt-3 flex items-center gap-2.5 text-[15px] font-semibold tracking-tight text-ink">
-                                {item.title}
-                                {"icons" in item &&
-                                    item.icons.map((icon) => (
-                                        <Image
-                                            key={icon}
-                                            src={icon}
-                                            alt=""
-                                            width={14}
-                                            height={14}
-                                            className="h-3.5 w-auto opacity-50 invert"
-                                        />
-                                    ))}
-                            </span>
+                            <span className="mt-3 text-[15px] font-semibold tracking-tight text-ink">{item.title}</span>
                             {"sub" in item && (
                                 <span className="mt-1.5 block text-[13px] leading-relaxed text-ink-3">{item.sub}</span>
                             )}

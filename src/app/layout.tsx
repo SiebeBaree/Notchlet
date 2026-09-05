@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Crimson_Pro, Geist, Geist_Mono } from "next/font/google";
-import { headers } from "next/headers";
 
 import "./globals.css";
 
+import { JsonLd } from "@/components/json-ld";
 import { Toaster } from "@/components/ui/sonner";
 import { siteDescription, siteName, siteTitle, siteUrl } from "@/lib/site";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ const crimsonPro = Crimson_Pro({ subsets: ["latin"], variable: "--font-display" 
 
 export const metadata: Metadata = {
     metadataBase: siteUrl,
-    title: { default: siteName, template: `%s · ${siteName}` },
+    title: { default: siteTitle, template: `%s · ${siteName}` },
     description: siteDescription,
     alternates: { canonical: "./" },
     openGraph: {
@@ -40,22 +40,15 @@ export const viewport: Viewport = {
     themeColor: "#ffffff",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-    const nonce = (await headers()).get("x-nonce") ?? undefined;
-    const jsonLd = JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        name: siteName,
-        description: siteDescription,
-        url: siteUrl.href,
-    }).replaceAll("<", "\\u003c");
-
+export default function RootLayout({ children }: LayoutProps<"/">) {
     return (
         <html lang="en" className={cn("font-sans", geist.variable, geistMono.variable, crimsonPro.variable)}>
             <body className="min-h-dvh antialiased">
                 <Providers>{children}</Providers>
                 <Toaster />
-                <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: jsonLd }} />
+                <JsonLd
+                    data={{ "@type": "WebSite", name: siteName, description: siteDescription, url: siteUrl.href }}
+                />
             </body>
         </html>
     );
