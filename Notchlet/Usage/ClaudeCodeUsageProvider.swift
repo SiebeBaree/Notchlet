@@ -60,7 +60,7 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         guard let stored = await store.read(backend),
               let credentials = ClaudeTokenRefresh.Credentials(json: stored.json)
         else {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
         let current = if credentials.isExpired() {
             try await refresh(backend, expired: credentials)
@@ -79,7 +79,7 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         expired: ClaudeTokenRefresh.Credentials
     ) async throws -> ClaudeTokenRefresh.Credentials {
         if let dead = deadRefreshToken.withLock({ $0 }), dead == expired.refreshToken {
-            throw UsageProviderError.notAvailable(.expired)
+            throw ProviderError.notAvailable(.expired)
         }
         let store = store
         let outcome = await Task.detached { await store.refreshIfExpired(backend) }.value
@@ -87,12 +87,12 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         case let .current(credentials):
             return credentials
         case .noCredentials:
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         case let .cannotRefresh(deadToken):
             deadRefreshToken.withLock { $0 = deadToken }
-            throw UsageProviderError.notAvailable(.expired)
+            throw ProviderError.notAvailable(.expired)
         case .lockBusy, .failed:
-            throw UsageProviderError.requestFailed
+            throw ProviderError.requestFailed
         }
     }
 

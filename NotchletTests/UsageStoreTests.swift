@@ -16,7 +16,7 @@ struct UsageStoreTests {
         var signInHint: String { "" }
 
         func fetchUsage() async throws -> UsageSnapshot {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
     }
 

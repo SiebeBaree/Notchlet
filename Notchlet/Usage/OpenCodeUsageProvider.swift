@@ -37,12 +37,12 @@ struct OpenCodeUsageProvider: HTTPUsageProvider {
 
     func authHeaders(for option: AuthOption) async throws -> [String: String] {
         let key: String? = if option.id == Self.keyOption.id {
-            await SecretStore.read(providerID: id, optionID: option.id)
+            await PastedSecrets.read(providerID: id, optionID: option.id)
         } else {
             Self.cliKey()
         }
         guard let key, !key.isEmpty else {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
         return ["Authorization": "Bearer \(key)"]
     }

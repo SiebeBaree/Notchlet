@@ -24,7 +24,7 @@ struct ProviderSettingsPage: View {
         let options = store.entries.first { $0.id == providerID }?.provider.authOptions ?? []
         _selection = State(initialValue: ProviderAuthSettings.selection(for: providerID, options: options))
         _storedSecrets = State(initialValue: Set(options.filter {
-            SecretStore.hasSecret(providerID: providerID, optionID: $0.id)
+            PastedSecrets.hasSecret(providerID: providerID, optionID: $0.id)
         }.map(\.id)))
     }
 
@@ -63,14 +63,14 @@ struct ProviderSettingsPage: View {
                             store.refreshNow(providerID)
                             Analytics.capture(.settingChanged(
                                 key: "provider_\(providerID)_auth",
-                                value: selection.storedValue
+                                value: selection.rawValue
                             ))
                         }
                     }
                 }
                 Text(statusText(for: entry))
                     .font(.system(size: 10))
-                    .foregroundStyle(entry.state == .notAvailable ? NotchPalette.amber : .white.opacity(0.5))
+                    .foregroundStyle(isProblem(entry.state) ? NotchPalette.amber : .white.opacity(0.5))
                 ForEach(provider.authOptions.filter { $0.secretName != nil }) { option in
                     secretRow(option)
                 }
@@ -83,10 +83,16 @@ struct ProviderSettingsPage: View {
         }
     }
 
+    private func isProblem(_ state: UsageStore.ProviderState?) -> Bool {
+        if case .notAvailable = state {
+            return true
+        }
+        return false
+    }
+
     private func statusText(for entry: UsageStore.Entry) -> String {
         UsageCopy.providerStatusText(
             state: entry.state,
-            problem: entry.authProblem,
             option: entry.provider.authOptions.first { $0.id == entry.snapshot?.authOptionID },
             signInHint: entry.provider.signInHint,
             retryAt: entry.schedule.retryAt
@@ -103,7 +109,7 @@ struct ProviderSettingsPage: View {
                 Spacer()
                 HoverTextButton("Remove") {
                     Task {
-                        guard await SecretStore.remove(providerID: providerID, optionID: option.id) else {
+                        guard await PastedSecrets.remove(providerID: providerID, optionID: option.id) else {
                             notice = "Could not remove the \(secretName) from the keychain"
                             return
                         }
@@ -136,7 +142,7 @@ struct ProviderSettingsPage: View {
             return
         }
         Task {
-            if await SecretStore.save(text, providerID: providerID, optionID: option.id) {
+            if await PastedSecrets.save(text, providerID: providerID, optionID: option.id) {
                 storedSecrets.insert(option.id)
                 notice = nil
                 store.refreshNow(providerID)

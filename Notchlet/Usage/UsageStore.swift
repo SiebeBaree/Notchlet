@@ -8,22 +8,27 @@ import Observation
 /// keeps its previous snapshot; the panel labels its age instead.
 @Observable
 final class UsageStore {
-    /// Whether a provider's last refresh worked, found no usable login,
-    /// hit a rate limit, or failed outright.
-    enum ProviderState: String {
+    /// How a provider's last refresh went.
+    enum ProviderState: Equatable {
         case ok
-        case notAvailable = "not_available"
-        case rateLimited = "rate_limited"
+        case notAvailable(AuthProblem)
+        case rateLimited
         case error
+
+        var analyticsName: String {
+            switch self {
+            case .ok: "ok"
+            case .notAvailable: "not_available"
+            case .rateLimited: "rate_limited"
+            case .error: "error"
+            }
+        }
     }
 
     struct Entry: Identifiable {
         let provider: any UsageProvider
         var snapshot: UsageSnapshot?
         var state: ProviderState?
-        /// Why the last refresh found no usable login, while `state` is
-        /// `notAvailable`. Drives the status line in the provider's settings.
-        var authProblem: AuthProblem?
         var schedule = RefreshSchedule()
 
         var id: String { provider.id }
@@ -180,9 +185,9 @@ final class UsageStore {
                 group.addTask {
                     do {
                         return try await (index, .success(provider.fetchUsage()))
-                    } catch let UsageProviderError.notAvailable(problem) {
+                    } catch let ProviderError.notAvailable(problem) {
                         return (index, .notAvailable(problem))
-                    } catch let UsageProviderError.rateLimited(retryAfter) {
+                    } catch let ProviderError.rateLimited(retryAfter) {
                         return (index, .rateLimited(retryAfter: retryAfter))
                     } catch is CancellationError {
                         return (index, .cancelled)
@@ -222,15 +227,13 @@ final class UsageStore {
             let previous = entries[index].snapshot
             entries[index].snapshot = snapshot
             snapshotObserver?(entries[index].id, previous, snapshot)
-            entries[index].authProblem = nil
             entries[index].schedule.recordSuccess()
             transition(at: index, to: .ok)
         case let .notAvailable(problem):
             // A local credentials check or a plain rejection, so nothing to
             // back off from.
-            entries[index].authProblem = problem
             entries[index].schedule.recordSuccess()
-            transition(at: index, to: .notAvailable)
+            transition(at: index, to: .notAvailable(problem))
         case let .rateLimited(retryAfter):
             entries[index].schedule.recordRateLimit(retryAfter: retryAfter)
             transition(at: index, to: .rateLimited)
@@ -270,7 +273,7 @@ final class UsageStore {
     private func transition(at index: Int, to newState: ProviderState) {
         let oldState = entries[index].state
         entries[index].state = newState
-        if let oldState, oldState != newState {
+        if let oldState, oldState.analyticsName != newState.analyticsName {
             Analytics.capture(.providerStateChanged(provider: entries[index].id, state: newState))
         }
     }

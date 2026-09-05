@@ -25,7 +25,7 @@ nonisolated struct OpenCodeHistorySource: UsageHistorySource {
         var events: [UsageEvent] = []
         for database in Self.databases(in: dataDirectory) {
             guard let rows = await CredentialSupport.sqliteRows(path: database, sql: Self.sql(since: since)) else {
-                throw UsageProviderError.requestFailed
+                throw ProviderError.requestFailed
             }
             events += try Self.events(fromRows: rows)
         }

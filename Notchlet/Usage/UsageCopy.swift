@@ -68,7 +68,6 @@ enum UsageCopy {
     /// with, or why it could not, followed by what to do about it.
     static func providerStatusText(
         state: UsageStore.ProviderState?,
-        problem: AuthProblem?,
         option: AuthOption?,
         signInHint: String,
         retryAt: Date?,
@@ -80,11 +79,11 @@ enum UsageCopy {
         case .ok:
             guard let option else { return "Signed in" }
             return option.secretName.map { "Using the pasted \($0)" } ?? "Using \(option.label)"
-        case .notAvailable:
+        case let .notAvailable(problem):
             let reason = switch problem {
             case .rejected: "Login rejected."
             case .expired: "Login expired."
-            case .signedOut, nil: "Not signed in."
+            case .signedOut: "Not signed in."
             }
             return "\(reason) \(signInHint)."
         case .rateLimited:

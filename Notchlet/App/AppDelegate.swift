@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchController = NotchWindowController(
             store: store, history: history, updater: updater, scanner: scanner, alerts: alerts, waits: waits
         ) { scope in
-            Analytics.capture(.shareOpened(scope: scope.storedValue))
+            Analytics.capture(.shareOpened(scope: scope.rawValue))
             shareController.show(scope: scope)
         }
         notchController?.showWindow(nil)

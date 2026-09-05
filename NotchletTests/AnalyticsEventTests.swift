@@ -16,7 +16,7 @@ struct AnalyticsEventTests {
     }
 
     @Test func providerStateUsesSnakeCaseValues() {
-        let event = AnalyticsEvent.providerStateChanged(provider: "codex", state: .notAvailable)
+        let event = AnalyticsEvent.providerStateChanged(provider: "codex", state: .notAvailable(.expired))
 
         #expect(event.properties["state"] as? String == "not_available")
         #expect(event.properties["provider"] as? String == "codex")

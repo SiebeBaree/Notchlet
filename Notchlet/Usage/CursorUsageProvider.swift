@@ -17,9 +17,7 @@ import Foundation
 /// is left out. The token is never refreshed: Cursor.app rotates it itself
 /// and rewrites the row, which the next poll picks up.
 struct CursorUsageProvider: HTTPUsageProvider {
-    static let providerID = "cursor"
-
-    let id = Self.providerID
+    let id = "cursor"
     let name = "Cursor"
     let logoAssetName = "CursorLogo"
     let usageURL = URL(string: "https://cursor.com/api/usage-summary")!
@@ -27,8 +25,7 @@ struct CursorUsageProvider: HTTPUsageProvider {
 
     static let appOption = AuthOption(id: "app", label: "Cursor app")
     static let tokenOption = AuthOption(id: "token", label: "Pasted token", secretName: "session token")
-    static let allAuthOptions = [appOption, tokenOption]
-    let authOptions = Self.allAuthOptions
+    let authOptions = [Self.appOption, Self.tokenOption]
     let history: (any UsageHistorySource)? = CursorHistorySource()
 
     private static let stateDatabase = "Library/Application Support/Cursor/User/globalStorage/state.vscdb"
@@ -46,7 +43,7 @@ struct CursorUsageProvider: HTTPUsageProvider {
     /// sends the same one to the usage export.
     static func sessionHeaders(for option: AuthOption) async throws -> [String: String] {
         let token: String? = if option.id == tokenOption.id {
-            await SecretStore.read(providerID: providerID, optionID: option.id)
+            await PastedSecrets.read(providerID: "cursor", optionID: option.id)
         } else {
             await CredentialSupport.sqliteValue(
                 homePath: stateDatabase,
@@ -55,10 +52,10 @@ struct CursorUsageProvider: HTTPUsageProvider {
             )
         }
         guard let token else {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
         guard let cookie = sessionCookie(token: token) else {
-            throw UsageProviderError.notAvailable(.expired)
+            throw ProviderError.notAvailable(.expired)
         }
         return ["Accept": "application/json", "Cookie": cookie]
     }

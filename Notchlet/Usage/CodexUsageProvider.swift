@@ -44,10 +44,10 @@ struct CodexUsageProvider: HTTPUsageProvider {
         // An API-key login has no tokens object, which reads as signed out:
         // the usage endpoint only answers ChatGPT logins.
         guard let auth: Auth = CredentialSupport.homeJSON(".codex/auth.json") else {
-            throw UsageProviderError.notAvailable(.signedOut)
+            throw ProviderError.notAvailable(.signedOut)
         }
         guard let expiry = CredentialSupport.jwtExpiry(of: auth.tokens.accessToken), expiry > .now else {
-            throw UsageProviderError.notAvailable(.expired)
+            throw ProviderError.notAvailable(.expired)
         }
         var headers = ["Authorization": "Bearer \(auth.tokens.accessToken)"]
         if let accountId = auth.tokens.accountId {

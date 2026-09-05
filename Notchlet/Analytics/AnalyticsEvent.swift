@@ -88,7 +88,7 @@ enum AnalyticsEvent {
         case let .notchClosed(openSeconds):
             ["open_seconds": (openSeconds * 10).rounded() / 10]
         case let .providerStateChanged(provider, state):
-            ["provider": provider, "state": state.rawValue]
+            ["provider": provider, "state": state.analyticsName]
         case let .settingChanged(key, value):
             ["key": key, "value": value]
         case let .historyOpened(scope), let .shareOpened(scope):

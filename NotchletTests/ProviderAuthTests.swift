@@ -16,15 +16,53 @@ struct ProviderAuthTests {
         #expect(AuthSelection.option("key").resolve(options).map(\.id) == ["key"])
     }
 
-    @Test func storedValueRoundTrips() {
-        #expect(AuthSelection(storedValue: "key", options: options) == .option("key"))
-        #expect(AuthSelection(storedValue: "auto", options: options) == .auto)
-        #expect(AuthSelection(storedValue: nil, options: options) == .auto)
-        #expect(AuthSelection.option("key").storedValue == "key")
+    @Test func rawValueRoundTrips() {
+        #expect(AuthSelection(rawValue: "key") == .option("key"))
+        #expect(AuthSelection(rawValue: "auto") == .auto)
+        #expect(AuthSelection.option("key").rawValue == "key")
     }
 
-    @Test func unknownStoredOptionFallsBackToAuto() {
-        #expect(AuthSelection(storedValue: "browser", options: options) == .auto)
+    @Test func unknownOptionValidatesToAuto() {
+        #expect(AuthSelection.option("browser").validated(against: options) == .auto)
+        #expect(AuthSelection.option("key").validated(against: options) == .option("key"))
+    }
+
+    @Test func firstUsableAnswersFromTheFirstOptionThatWorks() async throws {
+        let answer = try await AuthSelection.auto.firstUsable(options) { option in
+            if option.id == "cli" {
+                throw ProviderError.notAvailable(.signedOut)
+            }
+            return option.id
+        }
+        #expect(answer == "key")
+    }
+
+    @Test func firstUsableReportsTheMostSpecificProblem() async {
+        await #expect(throws: ProviderError.self) {
+            try await AuthSelection.auto.firstUsable(options) { option in
+                throw ProviderError.notAvailable(option.id == "cli" ? .expired : .signedOut)
+            }
+        }
+        do {
+            _ = try await AuthSelection.auto.firstUsable(options) { option in
+                throw ProviderError.notAvailable(option.id == "cli" ? .expired : .signedOut)
+            }
+        } catch let ProviderError.notAvailable(problem) {
+            #expect(problem == .expired)
+        } catch {
+            Issue.record("Expected notAvailable, got \(error)")
+        }
+    }
+
+    @Test func firstUsableStopsOnAnyOtherError() async {
+        var tried: [String] = []
+        await #expect(throws: ProviderError.self) {
+            try await AuthSelection.auto.firstUsable(options) { option in
+                tried.append(option.id)
+                throw ProviderError.requestFailed
+            }
+        }
+        #expect(tried == ["cli"])
     }
 
     @Test func moreSpecificProblemWins() {

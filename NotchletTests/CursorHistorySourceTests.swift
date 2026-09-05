@@ -23,7 +23,7 @@ struct CursorHistorySourceTests {
     }
 
     @Test func anExportWithoutTheTokenColumnsIsRefused() throws {
-        #expect(throws: UsageProviderError.self) {
+        #expect(throws: ProviderError.self) {
             try CursorHistorySource.events(fromCSV: "Date,Model,Cost\n2026-09-03T06:21:46Z,auto,1\n")
         }
         #expect(try CursorHistorySource.events(fromCSV: "").isEmpty)

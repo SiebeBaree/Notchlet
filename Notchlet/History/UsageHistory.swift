@@ -119,20 +119,20 @@ nonisolated struct UsageLedger: Sendable {
 /// logs is heavy enough without two of them racing.
 @Observable
 final class UsageHistory {
-    enum Scope: Hashable, Sendable {
+    /// The raw value ("all" or the provider id) is what UserDefaults keeps.
+    nonisolated enum Scope: Hashable, Sendable, RawRepresentable {
         case all
         case provider(String)
 
-        /// "all" or the provider id, as UserDefaults keeps it.
-        var storedValue: String {
+        init(rawValue: String) {
+            self = rawValue == "all" ? .all : .provider(rawValue)
+        }
+
+        var rawValue: String {
             switch self {
             case .all: "all"
             case let .provider(id): id
             }
-        }
-
-        init(storedValue: String) {
-            self = storedValue == "all" ? .all : .provider(storedValue)
         }
     }
 

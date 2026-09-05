@@ -30,29 +30,19 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
         }
         request.setValue("text/csv", forHTTPHeaderField: "Accept")
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw UsageProviderError.requestFailed }
+        guard let http = response as? HTTPURLResponse else { throw ProviderError.requestFailed }
         if http.statusCode == 401 || http.statusCode == 403 {
-            throw UsageProviderError.notAvailable(.rejected)
+            throw ProviderError.notAvailable(.rejected)
         }
-        guard http.statusCode == 200 else { throw UsageProviderError.requestFailed }
+        guard http.statusCode == 200 else { throw ProviderError.requestFailed }
         return try Self.events(fromCSV: String(decoding: data, as: UTF8.self))
     }
 
-    /// The first sign-in option the user's selection allows that has a
-    /// usable session, as `HTTPUsageProvider.fetchUsage` walks them.
+    /// The same sign-in walk the live provider does.
     private static func sessionHeaders() async throws -> [String: String] {
-        let options = await ProviderAuthSettings
-            .selection(for: CursorUsageProvider.providerID, options: CursorUsageProvider.allAuthOptions)
-            .resolve(CursorUsageProvider.allAuthOptions)
-        var problem = AuthProblem.signedOut
-        for option in options {
-            do {
-                return try await CursorUsageProvider.sessionHeaders(for: option)
-            } catch let UsageProviderError.notAvailable(found) {
-                problem = max(problem, found)
-            }
-        }
-        throw UsageProviderError.notAvailable(problem)
+        let provider = await CursorUsageProvider()
+        return try await ProviderAuthSettings.selection(for: provider.id, options: provider.authOptions)
+            .firstUsable(provider.authOptions, CursorUsageProvider.sessionHeaders)
     }
 
     private enum Column {
@@ -78,7 +68,7 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
             columns[name.trimmingCharacters(in: .whitespaces)] = index
         }
         guard Column.required.allSatisfy({ columns[$0] != nil }) else {
-            throw UsageProviderError.requestFailed
+            throw ProviderError.requestFailed
         }
         func field(_ row: [String], _ name: String) -> String? {
             guard let index = columns[name], index < row.count else { return nil }

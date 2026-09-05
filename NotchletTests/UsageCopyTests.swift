@@ -90,21 +90,18 @@ struct UsageCopyTests {
     @Test func providerStatusNamesTheOptionOrTheProblem() {
         let cli = AuthOption(id: "cli", label: "Codex CLI")
         let pasted = AuthOption(id: "key", label: "Pasted key", secretName: "API key")
-        func status(_ state: UsageStore.ProviderState?, _ problem: AuthProblem? = nil, option: AuthOption? = nil,
-                    retryAt: Date? = nil) -> String
-        {
+        func status(_ state: UsageStore.ProviderState?, option: AuthOption? = nil, retryAt: Date? = nil) -> String {
             UsageCopy.providerStatusText(
-                state: state, problem: problem, option: option, signInHint: "Run codex login",
-                retryAt: retryAt, now: now
+                state: state, option: option, signInHint: "Run codex login", retryAt: retryAt, now: now
             )
         }
 
         #expect(status(nil) == "Waiting for the first refresh")
         #expect(status(.ok, option: cli) == "Using Codex CLI")
         #expect(status(.ok, option: pasted) == "Using the pasted API key")
-        #expect(status(.notAvailable, .signedOut) == "Not signed in. Run codex login.")
-        #expect(status(.notAvailable, .expired) == "Login expired. Run codex login.")
-        #expect(status(.notAvailable, .rejected) == "Login rejected. Run codex login.")
+        #expect(status(.notAvailable(.signedOut)) == "Not signed in. Run codex login.")
+        #expect(status(.notAvailable(.expired)) == "Login expired. Run codex login.")
+        #expect(status(.notAvailable(.rejected)) == "Login rejected. Run codex login.")
         #expect(status(.rateLimited, retryAt: now.addingTimeInterval(240)) == "Rate limited, retrying in 4m")
         #expect(status(.error, retryAt: now.addingTimeInterval(120)) == "Request failed, retrying in 2m")
         #expect(status(.error) == "Request failed, retrying soon")

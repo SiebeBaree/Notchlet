@@ -40,7 +40,7 @@ struct NotchView: View {
     @State private var focusedProviderID: String?
     @State private var pane: Pane = .usage
     /// The history pane's scope, remembered across opens.
-    @AppStorage("historyScope") private var historyScope = "all"
+    @AppStorage("historyScope") private var historyScope: UsageHistory.Scope = .all
     @State private var openedAt: Date?
     @State private var openDebounce: Task<Void, Never>?
     @State private var isHovering = false
@@ -213,10 +213,7 @@ struct NotchView: View {
             case .alerts:
                 AlertsPane(alerts: alerts, store: store)
             case .history:
-                HistoryPane(history: history, scope: Binding(
-                    get: { resolvedScope },
-                    set: { historyScope = $0.storedValue }
-                ))
+                HistoryPane(history: history, scope: Binding(get: { resolvedScope }, set: { historyScope = $0 }))
             case .usage:
                 UsagePane(store: store, focusedProviderID: $focusedProviderID, showHistory: showHistory)
             }
@@ -276,11 +273,10 @@ struct NotchView: View {
     /// history (switched off, say): a scope with no data and no chips to
     /// leave it would be a dead end.
     private var resolvedScope: UsageHistory.Scope {
-        let scope = UsageHistory.Scope(storedValue: historyScope)
-        if case let .provider(id) = scope, !history.providersWithHistory.contains(where: { $0.id == id }) {
+        if case let .provider(id) = historyScope, !history.providersWithHistory.contains(where: { $0.id == id }) {
             return .all
         }
-        return scope
+        return historyScope
     }
 
     /// A corner icon opens its pane, or closes it back to usage.
@@ -290,7 +286,7 @@ struct NotchView: View {
 
     /// A gauge opens history already scoped to its provider.
     private func showHistory(for providerID: String) {
-        historyScope = UsageHistory.Scope.provider(providerID).storedValue
+        historyScope = .provider(providerID)
         show(.history)
     }
 
@@ -303,7 +299,7 @@ struct NotchView: View {
             Analytics.capture(.settingsOpened)
         case .history:
             history.ingestIfStale()
-            Analytics.capture(.historyOpened(scope: resolvedScope.storedValue))
+            Analytics.capture(.historyOpened(scope: resolvedScope.rawValue))
         case .usage, .secrets, .alerts:
             break
         }
