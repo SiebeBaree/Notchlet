@@ -38,6 +38,14 @@ enum AnalyticsEvent {
     case secretFalsePositive(provider: String, rule: String, preview: String, length: Int)
     case secretIgnored(provider: String, rule: String)
     case secretHelpOpened(provider: String, rule: String)
+    /// Thresholds only, never the usage number that crossed them.
+    case usageAlertRuleChanged(provider: String, window: String, percent: Int, enabled: Bool)
+    case usageAlertFired(provider: String, window: String, percent: Int)
+    /// The provider and whether it finished or needs input; never the
+    /// session, the directory or the app it runs in.
+    case agentWaitShown(provider: String, kind: String)
+    /// What made the line go: "hover", "focus" or "prompt".
+    case agentWaitCleared(by: String)
 
     var name: String {
         switch self {
@@ -60,6 +68,10 @@ enum AnalyticsEvent {
         case .secretFalsePositive: "secret_false_positive"
         case .secretIgnored: "secret_ignored"
         case .secretHelpOpened: "secret_help_opened"
+        case .usageAlertRuleChanged: "usage_alert_rule_changed"
+        case .usageAlertFired: "usage_alert_fired"
+        case .agentWaitShown: "agent_wait_shown"
+        case .agentWaitCleared: "agent_wait_cleared"
         }
     }
 
@@ -101,6 +113,14 @@ enum AnalyticsEvent {
             ["provider": provider, "rule": rule, "preview": preview, "length": length]
         case let .secretIgnored(provider, rule), let .secretHelpOpened(provider, rule):
             ["provider": provider, "rule": rule]
+        case let .usageAlertRuleChanged(provider, window, percent, enabled):
+            ["provider": provider, "window": window, "percent": percent, "enabled": enabled]
+        case let .usageAlertFired(provider, window, percent):
+            ["provider": provider, "window": window, "percent": percent]
+        case let .agentWaitShown(provider, kind):
+            ["provider": provider, "kind": kind]
+        case let .agentWaitCleared(by):
+            ["by": by]
         }
     }
 }

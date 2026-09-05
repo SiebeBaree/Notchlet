@@ -1,5 +1,4 @@
 import AppKit
-import CoreGraphics
 import Observation
 
 /// Scans the enabled providers' chats for leaked keys and keeps what it
@@ -22,9 +21,9 @@ final class SecretScanner {
     private(set) var alertGeneration = 0
     private var loop: Task<Void, Never>?
     private var isTicking = false
-    /// Waits for the first input after a scan that finished while the user
-    /// was away, so the alert lands when they are back.
-    private var activityMonitor: Any?
+    /// Holds an alert from a scan that finished while the user was away
+    /// until they are back.
+    private let presence = UserPresence()
 
     init(store: UsageStore, stateStore: SecretStateStore = .default) {
         self.store = store
@@ -116,19 +115,12 @@ final class SecretScanner {
         }
     }
 
-    /// Seconds since the last mouse or key event anywhere on the system.
-    private static var idleSeconds: TimeInterval {
-        [CGEventType.mouseMoved, .keyDown, .leftMouseDown, .scrollWheel]
-            .map { CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: $0) }
-            .min() ?? 0
-    }
-
     private func scanDue() async {
         guard !isTicking else { return }
         isTicking = true
         defer { isTicking = false }
         let conditions = SecretScanSchedule.Conditions(
-            idleSeconds: Self.idleSeconds,
+            idleSeconds: UserPresence.idleSeconds,
             thermalState: ProcessInfo.processInfo.thermalState
         )
         var new = 0
@@ -163,33 +155,10 @@ final class SecretScanner {
             }
         }
         if new > 0 {
-            alertWhenActive()
-        }
-    }
-
-    /// Opens the notch now if someone is at the Mac, otherwise on their
-    /// first mouse event. The monitor needs no permission (key events
-    /// would) and removes itself after firing once.
-    private func alertWhenActive() {
-        if Self.idleSeconds < SecretScanSchedule.activeWithin {
-            alertGeneration += 1
-            return
-        }
-        guard activityMonitor == nil else { return }
-        activityMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .scrollWheel]) {
-            [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.activityResumed()
+            presence.whenActive { [weak self] in
+                self?.alertGeneration += 1
             }
         }
-    }
-
-    private func activityResumed() {
-        if let activityMonitor {
-            NSEvent.removeMonitor(activityMonitor)
-            self.activityMonitor = nil
-        }
-        alertGeneration += 1
     }
 
     // MARK: Actions

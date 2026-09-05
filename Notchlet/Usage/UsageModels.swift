@@ -1,7 +1,7 @@
 import Foundation
 
 /// One rate-limit window, e.g. a rolling 5-hour session or a weekly cap.
-struct UsageWindow: Equatable, Identifiable {
+nonisolated struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
     /// Stable identifier within one provider, e.g. "session" or "weekly".
     let id: String
     /// Short display label, e.g. "5h", "Weekly", "Fable".

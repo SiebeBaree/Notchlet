@@ -12,12 +12,13 @@ import SwiftUI
 /// background, so clicks in the transparent area go to the window below.
 struct NotchView: View {
     /// What the expanded panel shows: usage, past usage behind the history
-    /// icon, leaked secrets behind the key, or in-notch settings behind the
-    /// gear.
+    /// icon, leaked secrets behind the key, a usage alert that opened the
+    /// notch on its own, or in-notch settings behind the gear.
     private enum Pane {
         case usage
         case history
         case secrets
+        case alerts
         case settings
     }
 
@@ -25,10 +26,13 @@ struct NotchView: View {
     let history: UsageHistory
     let updater: UpdateController
     let scanner: SecretScanner
+    let alerts: UsageAlerts
+    let waits: AgentWaits
     let notchSize: CGSize
     /// Tells the window controller to grow the window before the card
-    /// expands and to shrink it once the collapse animation has ended.
-    let resizePanel: (_ expanded: Bool) -> Void
+    /// expands or the wait line appears, and to shrink it once the collapse
+    /// animation has ended.
+    let resizePanel: (_ expanded: Bool, _ waiting: Bool) -> Void
     /// Opens the share editor for a scope.
     let share: (UsageHistory.Scope) -> Void
 
@@ -42,6 +46,10 @@ struct NotchView: View {
     @State private var isHovering = false
     /// Folds an alert the user never hovered back into the notch.
     @State private var autoCollapse: Task<Void, Never>?
+    /// The notch is grown and outlined for a waiting agent. Mirrors
+    /// `waits.isWaiting` while collapsed so the change can animate and the
+    /// window can shrink after it.
+    @State private var isOutlined = false
 
     /// Providers with something to draw. A snapshot without windows (an
     /// unlimited plan, say) would be a brand row over nothing, so it counts
@@ -61,6 +69,13 @@ struct NotchView: View {
                     isHovering = hovering
                     if hovering {
                         autoCollapse?.cancel()
+                        // Opening the notch is looking; the wait line is done.
+                        waits.clearAll(by: "hover")
+                        // An alert nobody acknowledged is the first thing
+                        // a hover shows, until it is.
+                        if !isExpanded, alerts.current != nil {
+                            pane = .alerts
+                        }
                     }
                     setExpanded(hovering)
                     store.setPanelOpen(hovering)
@@ -69,17 +84,30 @@ struct NotchView: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .onChange(of: scanner.alertGeneration) { _, _ in showAlert() }
+        .onChange(of: waits.isWaiting, initial: true) { _, waiting in
+            if !isExpanded {
+                setOutlined(waiting)
+            }
+        }
+        .onChange(of: scanner.alertGeneration) { _, _ in showAlert(.secrets) }
+        .onChange(of: alerts.alertGeneration) { _, _ in showAlert(.alerts) }
+        .onChange(of: alerts.current == nil) { _, none in
+            // Got it on the last notice hands the panel back to usage.
+            if none, pane == .alerts {
+                show(.usage)
+            }
+        }
     }
 
-    /// A new leaked key opens the notch on its own for twelve seconds, or
-    /// for as long as the mouse is in it. Not through `setPanelOpen`: an
-    /// alert is not the user looking at usage, so it never speeds up the
-    /// polling. A panel already open on another pane keeps it, with the
-    /// key icon lit in the corner.
-    private func showAlert() {
+    /// A new leaked key or a usage alert opens the notch on its own for
+    /// twelve seconds, or for as long as the mouse is in it. Not through
+    /// `setPanelOpen`: an alert is not the user looking at usage, so it
+    /// never speeds up the polling. A panel already open on another pane
+    /// keeps it: the key icon lights up in the corner, and a usage alert
+    /// comes first on the next hover.
+    private func showAlert(_ target: Pane) {
         guard !isExpanded else { return }
-        pane = .secrets
+        pane = target
         setExpanded(true)
         autoCollapse = Task {
             try? await Task.sleep(for: .seconds(12))
@@ -89,21 +117,52 @@ struct NotchView: View {
     }
 
     private var shape: some View {
-        ZStack(alignment: .top) {
+        let growth = isOutlined ? NotchGeometry.waitInset : 0
+        let bottomRadius: CGFloat = isExpanded ? 20 : 10 + growth
+        return ZStack(alignment: .top) {
             if isExpanded {
                 expandedContent
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .frame(width: (isExpanded ? expandedWidth : notchSize.width) + 2 * NotchGeometry.notchTopCornerRadius)
-        .frame(height: isExpanded ? nil : notchSize.height, alignment: .top)
+        .frame(width: (isExpanded ? expandedWidth : notchSize.width) + 2 * NotchGeometry
+            .notchTopCornerRadius + 2 * growth)
+        .frame(height: isExpanded ? nil : notchSize.height + growth, alignment: .top)
         .background(
             .black,
             in: NotchShape(
                 topRadius: NotchGeometry.notchTopCornerRadius,
-                bottomRadius: isExpanded ? 20 : 10
+                bottomRadius: bottomRadius
             )
         )
+        .overlay {
+            if isOutlined {
+                WaitOutline(
+                    color: waits.needsInput ? NSColor(SecretsPane.amber) : .systemBlue,
+                    topRadius: NotchGeometry.notchTopCornerRadius,
+                    bottomRadius: bottomRadius,
+                    inset: NotchGeometry.waitLineInset,
+                    lineWidth: NotchGeometry.waitLineWidth
+                )
+                .transition(.opacity)
+            }
+        }
+    }
+
+    /// Grows the notch for the wait line and shrinks it back, with the
+    /// window resized around the animation the way `setExpanded` does.
+    private func setOutlined(_ outlined: Bool) {
+        guard outlined != isOutlined else { return }
+        if outlined {
+            resizePanel(false, true)
+        }
+        withAnimation(.spring(duration: 0.35, bounce: 0.15), completionCriteria: .removed) {
+            isOutlined = outlined
+        } completion: {
+            if !isOutlined, !isExpanded {
+                resizePanel(false, false)
+            }
+        }
     }
 
     /// Animates between the notch and the card. The window grows before the
@@ -111,17 +170,20 @@ struct NotchView: View {
     /// a hover that returns mid-collapse keeps the window as it is.
     private func setExpanded(_ expanded: Bool) {
         if expanded {
-            resizePanel(true)
+            resizePanel(true, false)
         }
         withAnimation(.spring(duration: 0.35, bounce: 0.15), completionCriteria: .removed) {
             isExpanded = expanded
+            // A wait that arrived while the card was open shows on the
+            // way back down.
+            isOutlined = !expanded && waits.isWaiting
             if !expanded {
                 focusedProviderID = nil
                 pane = .usage
             }
         } completion: {
             if !isExpanded {
-                resizePanel(false)
+                resizePanel(false, isOutlined)
             }
         }
     }
@@ -152,9 +214,11 @@ struct NotchView: View {
 
             switch pane {
             case .settings:
-                NotchSettingsView(store: store, updater: updater, scanner: scanner)
+                NotchSettingsView(store: store, updater: updater, scanner: scanner, alerts: alerts, waits: waits)
             case .secrets:
                 SecretsPane(scanner: scanner)
+            case .alerts:
+                AlertsPane(alerts: alerts, store: store)
             case .history:
                 HistoryPane(history: history, scope: Binding(
                     get: { resolvedScope },
@@ -248,7 +312,7 @@ struct NotchView: View {
         case .history:
             history.ingestIfStale()
             Analytics.capture(.historyOpened(scope: resolvedScope.storedValue))
-        case .usage, .secrets:
+        case .usage, .secrets, .alerts:
             break
         }
     }
@@ -343,7 +407,7 @@ private struct NotchIconButton: View {
     }
 }
 
-private func paceColor(_ verdict: BurnProjection.Verdict?) -> Color {
+func paceColor(_ verdict: BurnProjection.Verdict?) -> Color {
     switch verdict {
     case .early: Color(red: 1.0, green: 0.42, blue: 0.34)
     case .onPace: Color(red: 1.0, green: 0.84, blue: 0.04)
@@ -353,7 +417,7 @@ private func paceColor(_ verdict: BurnProjection.Verdict?) -> Color {
 }
 
 /// Provider logo and name.
-private struct BrandRow: View {
+struct BrandRow: View {
     let provider: any UsageProvider
 
     var body: some View {
@@ -461,7 +525,7 @@ private struct WindowColumn: View {
 /// inside. The small tick across the track marks where the remaining arc
 /// should end right now at an even burn: halfway through the window puts it
 /// at the bottom of the ring.
-private struct UsageRing: View {
+struct UsageRing: View {
     let remainingFraction: Double
     var expectedRemainingFraction: Double?
     let color: Color
