@@ -210,6 +210,8 @@ private struct ThemeSwatch: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(theme.name)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .help(theme.name)
     }
 }
