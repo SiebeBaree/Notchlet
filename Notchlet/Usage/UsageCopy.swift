@@ -69,24 +69,56 @@ enum UsageCopy {
     ) -> String {
         switch state {
         case nil:
-            return "Waiting for the first refresh"
+            return "Fetching usage"
         case .ok:
             guard let option else { return "Signed in" }
             return option.secretName.map { "Using the pasted \($0)" } ?? "Using \(option.label)"
-        case let .notAvailable(problem):
-            let reason = switch problem {
-            case .rejected: "Login rejected."
-            case .expired: "Login expired."
-            case .signedOut: "Not signed in."
-            }
-            return "\(reason) \(signInHint)."
-        case .rateLimited:
-            guard let retryAt, retryAt > now else { return "Rate limited, retrying soon" }
-            return "Rate limited, retrying in \(shortDuration(retryAt.timeIntervalSince(now)))"
-        case .error:
-            guard let retryAt, retryAt > now else { return "Request failed, retrying soon" }
-            return "Request failed, retrying in \(shortDuration(retryAt.timeIntervalSince(now)))"
+        case .notAvailable, .rateLimited, .error:
+            return pendingStatus(state: state, signInHint: signInHint, retryAt: retryAt, now: now).detail
         }
+    }
+
+    /// What the usage card says about a provider that has no windows to
+    /// draw: a short title for its column and the full line for the
+    /// drill-in and the single-provider card.
+    static func pendingStatus(
+        state: UsageStore.ProviderState?,
+        signInHint: String,
+        retryAt: Date?,
+        now: Date = .now
+    ) -> (title: String, detail: String) {
+        switch state {
+        case nil:
+            return ("Fetching", "Fetching usage")
+        case .ok:
+            return ("No limits", "This plan reports no rate limits")
+        case let .notAvailable(problem):
+            let title = switch problem {
+            case .rejected: "Login rejected"
+            case .expired: "Login expired"
+            case .signedOut: "Not signed in"
+            }
+            return (title, "\(title). \(signInHint).")
+        case .rateLimited:
+            return ("Rate limited", "Rate limited, retrying \(retryText(retryAt, now: now))")
+        case .error:
+            return ("Request failed", "Request failed, retrying \(retryText(retryAt, now: now))")
+        }
+    }
+
+    /// "Claude Code, Codex, Cursor or OpenCode" for the card with no
+    /// provider on.
+    static func noProviderText(names: [String]) -> String {
+        let list = names.count > 1
+            ? names.dropLast().joined(separator: ", ") + " or " + names[names.count - 1]
+            : names.first ?? "an agent CLI"
+        return "No coding agent found. Install \(list), or turn one on under Providers in settings."
+    }
+
+    /// "in 4m", or "soon" once the retry time has passed.
+    private static func retryText(_ retryAt: Date?, now: Date) -> String {
+        guard let retryAt, retryAt > now else { return "soon" }
+        return "in \(shortDuration(retryAt.timeIntervalSince(now)))"
     }
 
     /// "51m", "3h 10m" or "4d 16h", never "0m" for a positive interval.

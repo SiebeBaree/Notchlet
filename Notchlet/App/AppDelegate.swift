@@ -1,5 +1,4 @@
 import AppKit
-import notify
 
 /// Builds every service at launch and keeps them alive for the life of the
 /// app.
@@ -37,7 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Analytics.bootstrap()
         Analytics.startDailyHeartbeat { services.store.usagePressure }
         #if DEBUG
-            Self.registerDebugAlert(services)
+            DebugTrigger.listen(.init(
+                store: services.store, scanner: services.scanner, alerts: services.alerts, waits: services.waits
+            ))
         #endif
     }
 
@@ -75,22 +76,4 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         services?.history.reschedule()
         services?.scanner.reschedule()
     }
-
-    #if DEBUG
-        /// `notifyutil -p com.notchlet.debug.alert` while running from Xcode
-        /// shows an alert on the first window with data, to check the card
-        /// without waiting for real usage to cross a mark.
-        private static func registerDebugAlert(_ services: Services) {
-            var token: Int32 = 0
-            notify_register_dispatch("com.notchlet.debug.alert", &token, .main) { _ in
-                MainActor.assumeIsolated {
-                    let store = services.store
-                    guard let entry = store.entries.first(where: { store.isEnabled($0.id) && $0.snapshot != nil }),
-                          let window = entry.snapshot?.primaryWindow
-                    else { return }
-                    services.alerts.showTestNotice(providerID: entry.id, window: window)
-                }
-            }
-        }
-    #endif
 }

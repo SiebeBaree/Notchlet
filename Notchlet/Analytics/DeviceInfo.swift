@@ -7,6 +7,16 @@ enum DeviceInfo {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
 
+    /// Running from Xcode: the pbxproj's placeholder version means nothing
+    /// and there is no feed to check against.
+    static var isDevelopment: Bool {
+        #if DEBUG
+            true
+        #else
+            false
+        #endif
+    }
+
     static var build: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
     }
