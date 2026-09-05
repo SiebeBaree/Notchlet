@@ -7,7 +7,7 @@ enum ClaudeTokenRefresh {
     static let tokenURL = URL(string: "https://platform.claude.com/v1/oauth/token")!
     /// Claude Code's OAuth client; a refresh has to name the client the
     /// token was issued to.
-    static let clientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+    nonisolated static let clientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 
     /// The fields Notchlet reads from the `claudeAiOauth` object; `merge`
     /// carries everything else through untouched.
