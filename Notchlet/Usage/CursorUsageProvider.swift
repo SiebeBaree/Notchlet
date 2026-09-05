@@ -68,14 +68,6 @@ struct CursorUsageProvider: HTTPUsageProvider {
         return "WorkosCursorSessionToken=\(userID)%3A%3A\(jwt)"
     }
 
-    func parsePlanTier(from data: Data) -> String? {
-        struct Response: Decodable {
-            var membershipType: String?
-        }
-
-        return (try? JSONDecoder().decode(Response.self, from: data))?.membershipType
-    }
-
     /// The three percent fields of `individualUsage.plan` are the headline
     /// and the two pools. Accounts without percentages (team, enterprise)
     /// fall back to the first spend meter with a cap. Percent fields are

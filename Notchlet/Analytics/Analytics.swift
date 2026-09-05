@@ -69,42 +69,35 @@ enum Analytics {
         PostHogSDK.shared.capture(event.name, properties: event.properties)
     }
 
-    /// Super properties so any event can be sliced by provider mix and
-    /// plan tier; re-registered only when something changed.
-    static func updateProviderContext(activeProviders: [String], planTiers: [String: String]) {
-        var context: [String: Any] = [
+    /// Super properties so any event can be sliced by provider mix;
+    /// re-registered only when something changed.
+    static func updateProviderContext(activeProviders: [String]) {
+        let context: [String: Any] = [
             "provider_count_active": activeProviders.count,
             "providers_active": activeProviders.sorted(),
         ]
-        for (provider, tier) in planTiers {
-            context["plan_\(provider)"] = tier
-        }
         guard isBootstrapped, !(context as NSDictionary).isEqual(providerContext) else { return }
         providerContext = context as NSDictionary
         PostHogSDK.shared.register(context)
     }
 
-    /// Once per calendar day while the app runs; `usagePressure` is sampled
-    /// at beat time.
-    static func startDailyHeartbeat(usagePressure: @escaping @MainActor () -> [String: String]) {
-        beatIfNewDay(usagePressure: usagePressure)
+    /// Once per calendar day while the app runs.
+    static func startDailyHeartbeat() {
+        beatIfNewDay()
         heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { _ in
             MainActor.assumeIsolated {
-                beatIfNewDay(usagePressure: usagePressure)
+                beatIfNewDay()
             }
         }
         heartbeatTimer?.tolerance = 5 * 60
     }
 
-    private static func beatIfNewDay(usagePressure: @MainActor () -> [String: String]) {
+    private static func beatIfNewDay() {
         guard isBootstrapped else { return }
         let today = Date.now.formatted(.iso8601.year().month().day())
         guard UserDefaults.standard.string(forKey: lastHeartbeatDayKey) != today else { return }
         UserDefaults.standard.set(today, forKey: lastHeartbeatDayKey)
-        capture(.appHeartbeat(
-            uptimeHours: Date.now.timeIntervalSince(launchedAt) / 3600,
-            usagePressure: usagePressure()
-        ))
+        capture(.appHeartbeat(uptimeHours: Date.now.timeIntervalSince(launchedAt) / 3600))
     }
 
     private static func captureLaunchEvents() {

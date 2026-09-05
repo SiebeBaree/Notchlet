@@ -44,8 +44,6 @@ nonisolated struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
 struct UsageSnapshot: Equatable {
     var windows: [UsageWindow]
     var fetchedAt: Date
-    /// Anonymous analytics only, never shown.
-    var planTier: String?
     /// Which auth option produced this snapshot, for the settings status
     /// line.
     var authOptionID: String?
