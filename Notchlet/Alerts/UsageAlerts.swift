@@ -77,7 +77,7 @@ final class UsageAlerts {
     }
 
     #if DEBUG
-        /// 80% on the given window, for checking the card. Not saved.
+        /// 80% on the given window, for `DebugTrigger`. Not saved.
         func showTestNotice(providerID: String, window: UsageWindow) {
             let rule = UsageAlertRule(providerID: providerID, windowID: window.id, percent: 80)
             state.pending.removeAll { $0.rule == rule }

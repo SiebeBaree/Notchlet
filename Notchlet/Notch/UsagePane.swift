@@ -1,15 +1,23 @@
 import SwiftUI
 
 /// One provider's full breakdown, or a summary gauge per provider with the
-/// hovered one unfolded below.
+/// hovered one unfolded below. A provider that is on but has no window to
+/// draw keeps its place and says why: still fetching, signed out, rate
+/// limited, a plan without limits.
 struct UsagePane: View {
     let store: UsageStore
     @Binding var focusedProviderID: String?
     let showHistory: (String) -> Void
 
-    /// A snapshot without windows (an unlimited plan) counts as no data.
-    private var activeEntries: [UsageStore.Entry] {
-        store.entries.filter { store.isEnabled($0.id) && $0.snapshot?.windows.isEmpty == false }
+    /// The provider shown when exactly one is on. `NotchView` puts its name
+    /// beside the notch cutout, so the pane itself leaves the name out.
+    static func soloEntry(in store: UsageStore) -> UsageStore.Entry? {
+        let shown = shownEntries(in: store)
+        return shown.count == 1 ? shown.first : nil
+    }
+
+    static func shownEntries(in store: UsageStore) -> [UsageStore.Entry] {
+        store.entries.filter { store.isEnabled($0.id) }
     }
 
     var body: some View {
@@ -19,21 +27,18 @@ struct UsagePane: View {
 
     @ViewBuilder
     private var content: some View {
-        let active = activeEntries
-        if active.isEmpty {
-            Text("No usage data yet")
+        let shown = Self.shownEntries(in: store)
+        if shown.isEmpty {
+            Text(UsageCopy.noProviderText(names: store.entries.map(\.provider.name)))
                 .font(.system(size: 11))
                 .foregroundStyle(.white.opacity(0.5))
-        } else if active.count == 1, let entry = active.first, let snapshot = entry.snapshot {
-            VStack(alignment: .leading, spacing: 12) {
-                BrandRow(provider: entry.provider)
-                WindowRow(windows: snapshot.windows, ringDiameter: 62)
-            }
-            .contentShape(.rect)
-            .onTapGesture { showHistory(entry.id) }
+        } else if shown.count == 1, let entry = shown.first {
+            detail(for: entry, ringDiameter: 62)
+                .contentShape(.rect)
+                .onTapGesture { showHistory(entry.id) }
         } else {
             HStack(alignment: .top, spacing: 0) {
-                ForEach(active) { entry in
+                ForEach(shown) { entry in
                     ProviderSummary(
                         entry: entry,
                         isFocused: focusedProviderID == entry.id,
@@ -50,27 +55,43 @@ struct UsagePane: View {
                     }
                 }
             }
-            if let focused = active.first(where: { $0.id == focusedProviderID }),
-               let snapshot = focused.snapshot
-            {
+            if let focused = shown.first(where: { $0.id == focusedProviderID }) {
                 NotchRule()
-                WindowRow(windows: snapshot.windows, ringDiameter: 48)
+                detail(for: focused, ringDiameter: 48)
+            }
+        }
+    }
+
+    /// The windows, or the full reason there are none.
+    @ViewBuilder
+    private func detail(for entry: UsageStore.Entry, ringDiameter: CGFloat) -> some View {
+        if let windows = entry.snapshot?.windows, !windows.isEmpty {
+            WindowRow(windows: windows, ringDiameter: ringDiameter)
+        } else {
+            HStack(spacing: 14) {
+                PendingRing(state: entry.state, diameter: ringDiameter)
+                Text(entry.pendingStatus.detail)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(entry.hasProblem ? NotchPalette.amber : .white.opacity(0.85))
+                Spacer(minLength: 0)
             }
         }
     }
 
     /// Nothing while the data is fresh, so stale numbers never pass as live.
+    /// A provider without numbers says so in its own column.
     @ViewBuilder
     private var footer: some View {
-        let limited = store.entries
-            .filter { store.isEnabled($0.id) && $0.state == .rateLimited }
+        let shown = Self.shownEntries(in: store).filter { $0.snapshot != nil }
+        let limited = shown
+            .filter { $0.state == .rateLimited }
             .compactMap { entry in entry.schedule.retryAt.map { (name: entry.provider.name, retryAt: $0) } }
             .min { $0.retryAt < $1.retryAt }
         if let limited {
             Text(UsageCopy.rateLimitText(providerName: limited.name, retryAt: limited.retryAt))
                 .font(.system(size: 10))
                 .foregroundStyle(NotchPalette.amber)
-        } else if let oldest = activeEntries.compactMap(\.snapshot?.fetchedAt).min(),
+        } else if let oldest = shown.compactMap(\.snapshot?.fetchedAt).min(),
                   let text = UsageCopy.freshnessText(fetchedAt: oldest)
         {
             Text(text)
@@ -80,7 +101,19 @@ struct UsagePane: View {
     }
 }
 
-/// The primary window's gauge, label and pace.
+private extension UsageStore.Entry {
+    var pendingStatus: (title: String, detail: String) {
+        UsageCopy.pendingStatus(state: state, signInHint: provider.signInHint, retryAt: schedule.retryAt)
+    }
+
+    /// Fetching and a plan without limits are not problems.
+    var hasProblem: Bool {
+        state != nil && state != .ok
+    }
+}
+
+/// The primary window's gauge, label and pace, or the pending ring with
+/// the short reason.
 private struct ProviderSummary: View {
     let entry: UsageStore.Entry
     let isFocused: Bool
@@ -106,6 +139,11 @@ private struct ProviderSummary: View {
                     }
                 }
                 .font(.system(size: 10.5))
+            } else {
+                PendingRing(state: entry.state, diameter: 62)
+                Text(entry.pendingStatus.title)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(entry.hasProblem ? NotchPalette.amber : .white.opacity(0.55))
             }
         }
         .padding(.vertical, 8)
@@ -115,6 +153,33 @@ private struct ProviderSummary: View {
             in: .rect(cornerRadius: 12)
         )
         .opacity(isDimmed ? 0.55 : 1)
+    }
+}
+
+/// The gauge's track with a glyph where the number would be, so a column
+/// without data lines up with the ones that have it.
+private struct PendingRing: View {
+    let state: UsageStore.ProviderState?
+    let diameter: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(.white.opacity(0.17), lineWidth: diameter / 12)
+            Image(systemName: glyph)
+                .font(.system(size: diameter * 0.26, weight: .semibold))
+                .foregroundStyle(state == nil || state == .ok ? .white.opacity(0.55) : NotchPalette.amber)
+        }
+        .frame(width: diameter, height: diameter)
+    }
+
+    private var glyph: String {
+        switch state {
+        case nil: "ellipsis"
+        case .ok: "infinity"
+        case .rateLimited: "clock"
+        case .notAvailable, .error: "exclamationmark"
+        }
     }
 }
 
