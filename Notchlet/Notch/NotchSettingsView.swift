@@ -66,15 +66,7 @@ struct NotchSettingsView: View {
             ForEach(store.entries) { entry in
                 HStack(spacing: 7) {
                     HStack(spacing: 7) {
-                        Image(entry.provider.logoAssetName)
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 12, height: 12)
-                            .foregroundStyle(.white.opacity(0.85))
-                        Text(entry.provider.name)
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.white.opacity(0.85))
+                        BrandRow(provider: entry.provider, muted: true)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 8, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.45))
@@ -162,9 +154,7 @@ struct NotchSettingsView: View {
                 }
             }
 
-            Rectangle()
-                .fill(.white.opacity(0.15))
-                .frame(height: 1)
+            NotchRule()
 
             // The only way out of the app: no dock icon, no menu bar item,
             // and the panel never activates, so Cmd+Q never reaches us.
@@ -263,8 +253,6 @@ private struct ProviderPage: View {
     @State private var storedSecrets: Set<String>
     @State private var notice: String?
 
-    private static let problemColor = Color(red: 0.85, green: 0.64, blue: 0.26)
-
     init(store: UsageStore, providerID: String, back: @escaping () -> Void) {
         self.store = store
         self.providerID = providerID
@@ -286,15 +274,7 @@ private struct ProviderPage: View {
             VStack(alignment: .leading, spacing: 10) {
                 HoverTextButton("Back", action: back)
                 HStack(spacing: 7) {
-                    Image(provider.logoAssetName)
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 13, height: 13)
-                        .foregroundStyle(.white)
-                    Text(provider.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
+                    BrandRow(provider: provider)
                     Spacer()
                     ProviderToggle(store: store, entry: entry)
                 }
@@ -326,7 +306,7 @@ private struct ProviderPage: View {
                 }
                 Text(statusText(for: entry))
                     .font(.system(size: 10))
-                    .foregroundStyle(entry.state == .notAvailable ? Self.problemColor : .white.opacity(0.5))
+                    .foregroundStyle(entry.state == .notAvailable ? NotchPalette.amber : .white.opacity(0.5))
                 ForEach(provider.authOptions.filter { $0.secretName != nil }) { option in
                     secretRow(option)
                 }
@@ -475,7 +455,7 @@ private struct ThresholdChip: View {
                 .frame(width: 34)
                 .padding(.vertical, 2)
                 .background(
-                    isOn ? SecretsPane.amber : .white.opacity(isHovering ? 0.12 : 0.06),
+                    isOn ? NotchPalette.amber : .white.opacity(isHovering ? 0.12 : 0.06),
                     in: .capsule
                 )
                 .contentShape(.capsule)

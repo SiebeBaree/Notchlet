@@ -325,7 +325,7 @@ struct ShareEditorView: View {
                         ScopeChips(providers: model.providers, scope: Binding(
                             get: { model.effectiveScope },
                             set: { model.scope = $0 }
-                        ))
+                        ), size: 11.5)
                     }
                     Picker("Period", selection: $model.options.period) {
                         Text("Today").tag(UsageHistory.Range.today)
@@ -453,37 +453,6 @@ struct ShareEditorView: View {
                 .padding(.top, 10)
             content()
         }
-    }
-}
-
-/// All, or one provider, like the pane's chips.
-private struct ScopeChips: View {
-    let providers: [any UsageProvider]
-    @Binding var scope: UsageHistory.Scope
-
-    var body: some View {
-        HStack(spacing: 6) {
-            chip("All", scope: .all)
-            ForEach(providers, id: \.id) { provider in
-                chip(provider.name, scope: .provider(provider.id))
-            }
-        }
-    }
-
-    private func chip(_ title: String, scope: UsageHistory.Scope) -> some View {
-        let isOn = self.scope == scope
-        return Button {
-            self.scope = scope
-        } label: {
-            Text(title)
-                .font(.system(size: 11.5))
-                .foregroundStyle(isOn ? .white : .white.opacity(0.65))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(.white.opacity(isOn ? 0.16 : 0.07), in: .capsule)
-                .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
     }
 }
 

@@ -138,7 +138,7 @@ struct NotchView: View {
         .overlay {
             if isOutlined {
                 WaitOutline(
-                    color: waits.needsInput ? NSColor(SecretsPane.amber) : .systemBlue,
+                    color: waits.needsInput ? NSColor(NotchPalette.amber) : .systemBlue,
                     topRadius: NotchGeometry.notchTopCornerRadius,
                     bottomRadius: bottomRadius,
                     inset: NotchGeometry.waitLineInset,
@@ -255,7 +255,7 @@ struct NotchView: View {
                 .buttonStyle(.plain)
                 .help(SecretsPane.statusText(.scanning) ?? "")
             } else if !scanner.pending.isEmpty {
-                NotchIconButton(systemName: "key.fill", isActive: pane == .secrets, tint: SecretsPane.amber) {
+                NotchIconButton(systemName: "key.fill", isActive: pane == .secrets, tint: NotchPalette.amber) {
                     toggle(.secrets)
                 }
             }
@@ -329,7 +329,7 @@ struct NotchView: View {
         if let limited {
             Text(UsageCopy.rateLimitText(providerName: limited.name, retryAt: limited.retryAt))
                 .font(.system(size: 10))
-                .foregroundStyle(Color(red: 0.85, green: 0.64, blue: 0.26))
+                .foregroundStyle(NotchPalette.amber)
         } else if let oldest = activeEntries.compactMap(\.snapshot?.fetchedAt).min(),
                   let text = UsageCopy.freshnessText(fetchedAt: oldest)
         {
@@ -375,62 +375,9 @@ struct NotchView: View {
             if let focused = active.first(where: { $0.id == focusedProviderID }),
                let snapshot = focused.snapshot
             {
-                Rectangle()
-                    .fill(.white.opacity(0.15))
-                    .frame(height: 1)
+                NotchRule()
                 WindowRow(windows: snapshot.windows, ringDiameter: 48)
             }
-        }
-    }
-}
-
-/// Small corner icon, grayish until hovered or active. A tint keeps its
-/// colour at every opacity, for the one icon that has to be noticed.
-private struct NotchIconButton: View {
-    let systemName: String
-    var isActive = false
-    var tint: Color = .white
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(tint.opacity(isActive || isHovering ? 0.85 : tint == .white ? 0.35 : 0.7))
-                .frame(width: 18, height: 18)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-    }
-}
-
-func paceColor(_ verdict: BurnProjection.Verdict?) -> Color {
-    switch verdict {
-    case .early: Color(red: 1.0, green: 0.42, blue: 0.34)
-    case .onPace: Color(red: 1.0, green: 0.84, blue: 0.04)
-    case .plenty: Color(red: 0.2, green: 0.84, blue: 0.29)
-    case nil: .white
-    }
-}
-
-/// Provider logo and name.
-struct BrandRow: View {
-    let provider: any UsageProvider
-
-    var body: some View {
-        HStack(spacing: 7) {
-            Image(provider.logoAssetName)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 13, height: 13)
-                .foregroundStyle(.white)
-            Text(provider.name)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
         }
     }
 }
@@ -450,7 +397,7 @@ private struct ProviderSummary: View {
                 UsageRing(
                     remainingFraction: window.remainingFraction,
                     expectedRemainingFraction: window.expectedRemainingFraction(),
-                    color: paceColor(projection?.verdict),
+                    color: NotchPalette.pace(projection?.verdict),
                     diameter: 62
                 )
                 VStack(spacing: 1) {
@@ -458,7 +405,7 @@ private struct ProviderSummary: View {
                         .foregroundStyle(.white.opacity(0.55))
                     if let pace = UsageCopy.paceText(projection: projection, resetsAt: window.resetsAt) {
                         Text(pace)
-                            .foregroundStyle(paceColor(projection?.verdict))
+                            .foregroundStyle(NotchPalette.pace(projection?.verdict))
                     }
                 }
                 .font(.system(size: 10.5))
@@ -503,7 +450,7 @@ private struct WindowColumn: View {
             UsageRing(
                 remainingFraction: window.remainingFraction,
                 expectedRemainingFraction: window.expectedRemainingFraction(),
-                color: paceColor(projection?.verdict),
+                color: NotchPalette.pace(projection?.verdict),
                 diameter: ringDiameter
             )
             VStack(spacing: 1) {
@@ -513,48 +460,10 @@ private struct WindowColumn: View {
                 }
                 if let pace = UsageCopy.paceText(projection: projection, resetsAt: window.resetsAt) {
                     Text(pace)
-                        .foregroundStyle(paceColor(projection?.verdict))
+                        .foregroundStyle(NotchPalette.pace(projection?.verdict))
                 }
             }
             .font(.system(size: 10.5))
         }
-    }
-}
-
-/// Circular gauge of what's left, with the percentage and a tiny "left"
-/// inside. The small tick across the track marks where the remaining arc
-/// should end right now at an even burn: halfway through the window puts it
-/// at the bottom of the ring.
-struct UsageRing: View {
-    let remainingFraction: Double
-    var expectedRemainingFraction: Double?
-    let color: Color
-    let diameter: CGFloat
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(.white.opacity(0.17), lineWidth: diameter / 12)
-            Circle()
-                .trim(from: 0, to: remainingFraction)
-                .stroke(color, style: StrokeStyle(lineWidth: diameter / 12, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            if let expectedRemainingFraction {
-                Capsule()
-                    .fill(.white.opacity(0.55))
-                    .frame(width: 1.5, height: diameter / 12 + 4)
-                    .offset(y: -diameter / 2)
-                    .rotationEffect(.degrees(expectedRemainingFraction * 360))
-            }
-            VStack(spacing: -2) {
-                Text("\(Int((remainingFraction * 100).rounded()))%")
-                    .font(.system(size: diameter * 0.23, weight: .semibold))
-                    .foregroundStyle(.white)
-                Text("left")
-                    .font(.system(size: diameter * 0.11))
-                    .foregroundStyle(.white.opacity(0.55))
-            }
-        }
-        .frame(width: diameter, height: diameter)
     }
 }

@@ -48,9 +48,9 @@ struct HistoryPane: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            rule
+            NotchRule()
             graphSection(ledger: ledger, grid: grid, today: today, calendar: calendar, coverageStart: coverageStart)
-            rule
+            NotchRule()
             ModelTable(
                 models: ledger.models(range.span(endingOn: today, calendar: calendar)),
                 showsProvider: scope == .all && providers.count > 1,
@@ -64,12 +64,6 @@ struct HistoryPane: View {
                 providers: providers
             )
         }
-    }
-
-    private var rule: some View {
-        Rectangle()
-            .fill(.white.opacity(0.15))
-            .frame(height: 1)
     }
 
     @ViewBuilder
@@ -137,41 +131,8 @@ struct HistoryPane: View {
         }
         return Text(text)
             .font(.system(size: 10))
-            .foregroundStyle(failed.isEmpty ? .white.opacity(0.4) : Color(red: 0.85, green: 0.64, blue: 0.26))
+            .foregroundStyle(failed.isEmpty ? .white.opacity(0.4) : NotchPalette.amber)
             .lineLimit(1)
-    }
-}
-
-/// All, or one provider. A single choice, remembered across opens.
-private struct ScopeChips: View {
-    let providers: [any UsageProvider]
-    @Binding var scope: UsageHistory.Scope
-
-    var body: some View {
-        HStack(spacing: 4) {
-            chip("All", scope: .all)
-            ForEach(providers, id: \.id) { provider in
-                chip(provider.name, scope: .provider(provider.id))
-            }
-        }
-    }
-
-    private func chip(_ title: String, scope: UsageHistory.Scope) -> some View {
-        let isOn = self.scope == scope
-        return Button {
-            withAnimation(.spring(duration: 0.25, bounce: 0.1)) {
-                self.scope = scope
-            }
-        } label: {
-            Text(title)
-                .font(.system(size: 10.5))
-                .foregroundStyle(isOn ? .white : .white.opacity(0.55))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(isOn ? .white.opacity(0.12) : .clear, in: .capsule)
-                .contentShape(.capsule)
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -289,31 +250,5 @@ private struct ModelTable: View {
             output
                 .frame(width: Self.numberWidth, alignment: .trailing)
         }
-    }
-}
-
-/// Quiet text button that brightens on hover, or stays bright while it is
-/// the active choice.
-struct HoverTextButton: View {
-    let title: String
-    var isActive = false
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    init(_ title: String, isActive: Bool = false, action: @escaping () -> Void) {
-        self.title = title
-        self.isActive = isActive
-        self.action = action
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(isActive || isHovering ? 0.85 : 0.45))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
     }
 }

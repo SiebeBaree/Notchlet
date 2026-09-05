@@ -4,8 +4,6 @@ import SwiftUI
 /// key betterleaks thinks it is, its masked preview, and the three things
 /// to do about it. A pager in the header walks the rest.
 struct SecretsPane: View {
-    static let amber = Color(red: 0.85, green: 0.64, blue: 0.26)
-
     let scanner: SecretScanner
 
     @State private var index = 0
@@ -55,7 +53,7 @@ struct SecretsPane: View {
     private func previewLine(_ finding: SecretFinding) -> some View {
         Text(finding.preview)
             .font(.system(size: 11, design: .monospaced))
-            .foregroundStyle(Self.amber)
+            .foregroundStyle(NotchPalette.amber)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
