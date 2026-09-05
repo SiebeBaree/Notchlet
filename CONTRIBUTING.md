@@ -38,7 +38,7 @@ Implement `UsageProvider` in a new file under `Notchlet/Usage/` and register it 
 
 - Swift 6 language mode with main-actor default isolation. Follow what the compiler tells you.
 - Format with [SwiftFormat](https://github.com/nicklockwood/SwiftFormat): `swiftformat .` before committing. CI runs `swiftformat --lint`.
-- Comments explain intent and constraints, not what the next line does.
+- Comments say why, never what. A type gets a doc comment only when its name and members do not say what it is, one or two sentences. An inline comment only for a reason the code cannot express: a platform quirk, another program's protocol, a number that was measured. No comment restates a name, narrates a past change or repeats `CLAUDE.md`.
 
 ## Tests
 

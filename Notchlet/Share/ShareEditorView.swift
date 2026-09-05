@@ -214,7 +214,6 @@ private struct ThemeSwatch: View {
     }
 }
 
-/// A dotted dark field behind the preview.
 private struct DottedField: View {
     var body: some View {
         Canvas { context, size in
@@ -236,7 +235,7 @@ private struct DottedField: View {
     }
 }
 
-/// An empty view the share picker can anchor to, behind the Share button.
+/// What the share picker anchors to, behind the Share button.
 private struct PickerAnchor: NSViewRepresentable {
     let model: ShareEditorModel
 
