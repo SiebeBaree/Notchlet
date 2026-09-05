@@ -1,10 +1,9 @@
 import Foundation
 
-/// The five token buckets every vendor bills. Reasoning and thinking tokens
-/// are output. `input` is always the uncached part of the prompt: Codex
-/// reports cached tokens inside its input count and its parser subtracts
-/// them, Claude reports them apart. Anthropic bills the two cache-write
-/// tiers differently, so they stay apart too.
+/// The five buckets every vendor bills. `input` is the uncached part of the
+/// prompt (Codex counts cached tokens inside its input and its parser
+/// subtracts them); reasoning tokens are output; Anthropic bills the two
+/// cache-write tiers differently, so they stay apart.
 nonisolated struct TokenCount: Hashable, Codable, Sendable {
     var input = 0
     var cacheRead = 0
@@ -14,7 +13,7 @@ nonisolated struct TokenCount: Hashable, Codable, Sendable {
 
     static let zero = TokenCount()
 
-    /// Everything that went in, cached or not: what the pane calls input.
+    /// What the pane calls input.
     var promptTokens: Int { input + cacheRead + cacheWrite5m + cacheWrite1h }
     var total: Int { promptTokens + output }
 
@@ -33,26 +32,21 @@ nonisolated struct TokenCount: Hashable, Codable, Sendable {
     }
 }
 
-/// One request as a source recorded it. Provider-neutral so the rollup, the
-/// pricing and the pane never branch on where it came from.
+/// One request as a source recorded it.
 nonisolated struct UsageEvent: Hashable, Sendable {
-    /// Identity for sources that can record one request more than once
-    /// (Claude writes a line per content block, each with the full usage).
-    /// Nil for sources that never repeat.
+    /// For sources that record one request more than once (Claude writes a
+    /// line per content block, each with the full usage). Nil otherwise.
     var id: String?
-    /// Nil when the source did not say. Shown as unknown, never priced.
     var model: String?
     var timestamp: Date
     var tokens: TokenCount
-    /// A cost the CLI computed itself (OpenCode, older Claude Code logs).
-    /// Wins over the price table, in dollars.
+    /// In dollars, as the CLI computed it. Wins over the price table.
     var reportedCost: Double?
 }
 
-/// A Gregorian calendar day in the user's own time zone, "2026-09-03". The
-/// only place a `Date` becomes a day, so every rollup buckets the same way.
-/// Always Gregorian, whatever calendar the Mac is set to: the archive
-/// stores these and parses them back with Gregorian month lengths.
+/// A Gregorian calendar day in the user's time zone, "2026-09-03". The only
+/// place a `Date` becomes a day. Always Gregorian, whatever calendar the
+/// Mac is set to: the archive stores these and parses them back.
 nonisolated struct DayKey: Hashable, Comparable, Sendable {
     let year: Int
     let month: Int
@@ -69,9 +63,8 @@ nonisolated struct DayKey: Hashable, Comparable, Sendable {
         self.init(year: parts.year ?? 1970, month: parts.month ?? 1, day: parts.day ?? 1)
     }
 
-    /// Parses "yyyy-MM-dd", the form the archive stores. A day the month
-    /// does not have is refused: `Calendar` would roll it into the next
-    /// month and the key would no longer name its own day.
+    /// "yyyy-MM-dd". A day the month does not have is refused; `Calendar`
+    /// would roll it into the next month.
     init?(_ string: String) {
         let parts = string.split(separator: "-", omittingEmptySubsequences: false)
         guard parts.count == 3, let year = Int(parts[0]), let month = Int(parts[1]), let day = Int(parts[2]),
@@ -80,7 +73,6 @@ nonisolated struct DayKey: Hashable, Comparable, Sendable {
         self.init(year: year, month: month, day: day)
     }
 
-    /// Gregorian month lengths, leap years included.
     static func days(inMonth month: Int, year: Int) -> Int {
         switch month {
         case 2: (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 ? 29 : 28
@@ -93,7 +85,6 @@ nonisolated struct DayKey: Hashable, Comparable, Sendable {
         String(format: "%04d-%02d-%02d", year, month, day)
     }
 
-    /// Midnight at the start of the day.
     func start(in calendar: Calendar) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
     }
@@ -103,7 +94,7 @@ nonisolated struct DayKey: Hashable, Comparable, Sendable {
         return DayKey(date, calendar: calendar)
     }
 
-    /// Days from this day up to and including `other`, in order.
+    /// Up to and including `other`.
     func days(through other: DayKey, calendar: Calendar) -> [DayKey] {
         var days: [DayKey] = []
         var current = self
@@ -120,9 +111,8 @@ nonisolated struct DayKey: Hashable, Comparable, Sendable {
 }
 
 nonisolated extension Calendar {
-    /// Gregorian in the current time zone and locale, the calendar every
-    /// `DayKey` is made with. A Mac set to another calendar would otherwise
-    /// produce keys the archive cannot read back.
+    /// The calendar every `DayKey` is made with; a Mac set to another
+    /// calendar would produce keys the archive cannot read back.
     static var localGregorian: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = Calendar.current.timeZone
@@ -149,23 +139,20 @@ extension DayKey: Codable {
     }
 }
 
-/// One provider's use of one model on one day, priced by the CLI or not.
-/// The unit the archive keeps and the pane sums, so a per-day, per-model
-/// breakdown is always there.
+/// One provider's use of one model on one day: what the archive keeps and
+/// the pane sums.
 nonisolated struct DailyUsage: Hashable, Codable, Sendable {
     var day: DayKey
     var providerID: String
     var model: String?
     var requests: Int
     var tokens: TokenCount
-    /// Sum of the costs the CLI reported, when it reports any.
     var reportedCost: Double?
 }
 
-/// Turns events into daily rows.
 nonisolated enum UsageRollup {
-    /// Drops repeated recordings of one request, keeping the fullest. Events
-    /// without an id are kept as they are.
+    /// Keeps the fullest recording of each id; events without one are kept
+    /// as they are.
     static func deduplicated(_ events: [UsageEvent]) -> [UsageEvent] {
         var keyed: [String: UsageEvent] = [:]
         var unkeyed: [UsageEvent] = []
@@ -182,10 +169,9 @@ nonisolated enum UsageRollup {
         return unkeyed + keyed.values
     }
 
-    /// Buckets by local day and model. Events the CLI priced itself and
-    /// events it did not stay in separate rows, so a reported cost never
-    /// stands in for tokens it did not cover and the price table gets the
-    /// rest. Sorted by day then model so the archive on disk stays stable.
+    /// Events the CLI priced and events it did not stay in separate rows,
+    /// so a reported cost never stands in for tokens it did not cover.
+    /// Sorted so the archive on disk stays stable.
     static func daily(_ events: [UsageEvent], providerID: String, calendar: Calendar) -> [DailyUsage] {
         struct Key: Hashable {
             let day: DayKey

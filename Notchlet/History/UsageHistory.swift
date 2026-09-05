@@ -1,12 +1,11 @@
 import Foundation
 import Observation
 
-/// The rows of one or more providers and the sums the pane asks for. Pure
-/// so the arithmetic stays testable with hand-written rows.
+/// The rows of one or more providers and the sums the pane asks for.
 nonisolated struct UsageLedger: Sendable {
-    /// Cost and tokens over a span of days. `cost` is nil when nothing in
-    /// the span could be priced; `unpricedModels` names what was left out
-    /// of it, so a low number never passes for a complete one.
+    /// `cost` is nil when nothing could be priced; `unpricedModels` names
+    /// what was left out of it, so a low number never passes for a complete
+    /// one.
     struct Summary: Equatable, Sendable {
         var requests = 0
         var tokens = 0
@@ -14,7 +13,6 @@ nonisolated struct UsageLedger: Sendable {
         var unpricedModels: [String] = []
     }
 
-    /// One model's share, across providers or within one.
     struct ModelUsage: Identifiable, Equatable, Sendable {
         let providerID: String
         let model: String?
@@ -25,7 +23,6 @@ nonisolated struct UsageLedger: Sendable {
         var id: String { "\(providerID)/\(model ?? "")" }
     }
 
-    /// One day, with its models for the graph's hover detail.
     struct DayUsage: Equatable, Sendable {
         let day: DayKey
         var summary: Summary
@@ -38,17 +35,15 @@ nonisolated struct UsageLedger: Sendable {
         Self.summarize(rows.filter { days.contains($0.day) })
     }
 
-    /// Models by total tokens, largest first.
+    /// Largest first.
     func models(_ days: ClosedRange<DayKey>) -> [ModelUsage] {
         Self.models(of: rows.filter { days.contains($0.day) })
     }
 
-    /// Days in the span with any tokens.
     func activeDays(_ days: ClosedRange<DayKey>) -> Int {
         Set(rows.filter { days.contains($0.day) && $0.tokens.total > 0 }.map(\.day)).count
     }
 
-    /// The most consecutive active days inside the span.
     func longestStreak(_ days: ClosedRange<DayKey>, calendar: Calendar) -> Int {
         let active = Set(rows.filter { days.contains($0.day) && $0.tokens.total > 0 }.map(\.day))
         var longest = 0
@@ -62,7 +57,6 @@ nonisolated struct UsageLedger: Sendable {
         return longest
     }
 
-    /// Every day in the span that has rows.
     func byDay(_ days: ClosedRange<DayKey>) -> [DayKey: DayUsage] {
         let grouped = Dictionary(grouping: rows.filter { days.contains($0.day) }, by: \.day)
         return grouped.mapValues { rows in
@@ -112,11 +106,9 @@ nonisolated struct UsageLedger: Sendable {
     }
 }
 
-/// Past usage for the providers that have a source, and the ingest cadence
-/// that keeps it current: once shortly after launch, once an hour after
-/// that so days seal on time, and whenever the pane opens onto data older
-/// than a minute. Sources are read one at a time; a first read of a year of
-/// logs is heavy enough without two of them racing.
+/// Past usage per provider and the ingest cadence: shortly after launch,
+/// hourly so days seal on time, and when the pane opens onto data older
+/// than a minute. One source at a time.
 @Observable
 final class UsageHistory {
     /// The raw value ("all" or the provider id) is what UserDefaults keeps.
@@ -136,8 +128,7 @@ final class UsageHistory {
         }
     }
 
-    /// The spans the pane's tiles and the share card sum over. The pane
-    /// shows the first three; the year exists for the card.
+    /// The pane shows the first three; the year exists for the share card.
     nonisolated enum Range: String, CaseIterable, Sendable {
         case today
         case week
@@ -159,9 +150,7 @@ final class UsageHistory {
     }
 
     static let ingestInterval: TimeInterval = 3600
-    /// Data older than this is refreshed when the pane opens onto it.
     static let staleAge: TimeInterval = 60
-    /// Live providers fetch first at launch; the logs can wait this long.
     static let launchDelay: TimeInterval = 5
 
     let calendar: Calendar
@@ -170,7 +159,6 @@ final class UsageHistory {
     private(set) var histories: [String: ProviderHistory] = [:]
     private(set) var lastIngestAt: Date?
     private(set) var isIngesting = false
-    /// Providers whose last ingest threw, so the pane can say so.
     private(set) var failedProviderIDs: Set<String> = []
     private var loop: Task<Void, Never>?
 
@@ -180,12 +168,11 @@ final class UsageHistory {
         ingestor = HistoryIngestor(archives: archives, calendar: calendar)
     }
 
-    /// Providers that are on and have somewhere to read history from.
     var providersWithHistory: [any UsageProvider] {
         store.entries.map(\.provider).filter { store.isEnabled($0.id) && $0.history != nil }
     }
 
-    /// Shows the archives right away and starts the ingest loop.
+    /// The archives show right away; the first read of the logs follows.
     func start() {
         Task { [weak self] in
             guard let self else { return }
@@ -198,8 +185,7 @@ final class UsageHistory {
         reschedule(after: Self.launchDelay)
     }
 
-    /// What the pane calls on open: fresh data does nothing, stale data
-    /// fetches now without disturbing the hourly cadence.
+    /// What the pane calls on open; the hourly cadence is not disturbed.
     func ingestIfStale(now: Date = .now) {
         guard let lastIngestAt else {
             return
@@ -209,8 +195,8 @@ final class UsageHistory {
         }
     }
 
-    /// Restarts the loop, fetching right away when the data is old enough:
-    /// what a wake from sleep or a change of providers calls.
+    /// What a wake from sleep calls: fetches right away when the data is
+    /// old enough.
     func reschedule(after delay: TimeInterval = 0) {
         loop?.cancel()
         loop = Task { [weak self] in
@@ -243,8 +229,6 @@ final class UsageHistory {
         lastIngestAt = .now
     }
 
-    // MARK: Queries
-
     var today: DayKey { DayKey(.now, calendar: calendar) }
 
     private func providerIDs(in scope: Scope) -> [String] {
@@ -270,10 +254,9 @@ final class UsageHistory {
         ledger(scope).byDay(span)
     }
 
-    /// The first day every provider in the scope can vouch for, so the
-    /// latest of their coverage starts: before it the sum is missing a
-    /// provider, and a partial day would read as a quiet one. Nil until
-    /// every provider has an archive.
+    /// The latest of the providers' coverage starts: before it the sum is
+    /// missing a provider, and a partial day would read as a quiet one. Nil
+    /// until every provider has an archive.
     func coverageStart(_ scope: Scope) -> DayKey? {
         let ids = providerIDs(in: scope)
         let starts = ids.compactMap { histories[$0]?.archive.coverageStart }

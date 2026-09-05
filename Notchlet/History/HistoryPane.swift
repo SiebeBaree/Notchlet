@@ -1,10 +1,8 @@
 import SwiftUI
 
-/// The history pane: how much was used rather than how much is left. Scope
-/// chips when more than one provider has history, cost and tokens for
-/// today, the week and the month, the activity or spend graph, then the
-/// models of the selected range. Same card width as the other panes; the
-/// graph fills it.
+/// How much was used rather than how much is left: scope chips, a tile per
+/// range, the activity or spend graph, then the models of the selected
+/// range.
 struct HistoryPane: View {
     enum Graph: String {
         case activity
@@ -108,8 +106,7 @@ struct HistoryPane: View {
         Analytics.capture(.settingChanged(key: "history_graph", value: graph.rawValue))
     }
 
-    /// The pricing caveat, unpriced models and the archive's age, or what
-    /// is standing in the way of any numbers at all.
+    /// The caveats, or what is standing in the way of any numbers at all.
     private func footer(
         unpricedModels: [String],
         coverageStart: DayKey?,
@@ -136,8 +133,7 @@ struct HistoryPane: View {
     }
 }
 
-/// Cost over tokens for one range. The selected range feeds the model
-/// table below. A range with nothing in it says so rather than $0.00.
+/// Cost over tokens for one range; the selected one feeds the model table.
 private struct RangeTile: View {
     let range: UsageHistory.Range
     let summary: UsageLedger.Summary
@@ -187,8 +183,7 @@ private struct RangeTile: View {
     }
 }
 
-/// Models of the selected range, input and output apart. The first few
-/// show; the rest unfold in place.
+/// The first few models show; the rest unfold in place.
 private struct ModelTable: View {
     let models: [UsageLedger.ModelUsage]
     let showsProvider: Bool

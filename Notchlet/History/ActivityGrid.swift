@@ -1,13 +1,9 @@
 import Foundation
 
-/// The 53-week grid behind the activity graph: one cell per day, the last
-/// column being the current week, laid out the way GitHub does it. Pure so
-/// the day-to-cell mapping and the levels stay testable.
-///
+/// The 53-week grid behind the activity graph, the way GitHub lays it out.
 /// Levels are quartiles of the days that had any usage, so one heavy month
-/// does not flatten the rest of the year into the darkest shade. Days
-/// before the archive's coverage are unknown, not quiet, and get their own
-/// fill.
+/// does not flatten the rest of the year. Days before coverage are unknown,
+/// not quiet.
 nonisolated struct ActivityGrid: Equatable, Sendable {
     static let weeks = 53
     static let rows = 7
@@ -15,7 +11,7 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
     enum Fill: Equatable, Sendable {
         case unknown
         case empty
-        /// 1 (lightest use) through 4 (heaviest).
+        /// 1 through 4.
         case level(Int)
     }
 
@@ -38,19 +34,16 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
     let monthLabels: [MonthLabel]
 
     init(today: DayKey, calendar: Calendar, tokens: [DayKey: Int], coverageStart: DayKey?) {
-        // Back to the first day of the week 52 weeks before this one.
         let weekday = calendar.component(.weekday, from: today.start(in: calendar))
         let daysIntoWeek = (weekday - calendar.firstWeekday + 7) % 7
         let start = today.advanced(by: -(daysIntoWeek + (Self.weeks - 1) * 7), calendar: calendar)
         self.start = start
         end = today
 
-        // Only days the grid draws set its levels.
         let thresholds = Self.quartiles(of: tokens.compactMap { day, count in
             day >= start && day <= today && count > 0 && (coverageStart.map { day >= $0 } ?? true) ? count : nil
         })
-        // Month names in English like the rest of the pane, whatever the
-        // calendar's locale.
+        // English like the rest of the pane, whatever the calendar's locale.
         var labelCalendar = calendar
         labelCalendar.locale = Locale(identifier: "en_US")
         var cells: [Cell] = []
@@ -69,8 +62,8 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
                 .level(1 + thresholds.filter { count >= $0 }.count)
             }
             cells.append(Cell(day: day, column: column, row: row, tokens: count, fill: fill))
-            // A month is labeled over the first week that starts in it, if
-            // the previous label left it three columns of room.
+            // Labeled over the first week that starts in the month, given
+            // three columns of room.
             if row == 0, day.month != previousMonth {
                 previousMonth = day.month
                 if column - lastLabelColumn >= 3, column <= Self.weeks - 3 {
@@ -89,7 +82,6 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
         return index < cells.count ? cells[index] : nil
     }
 
-    /// The three cut points between the four levels.
     static func quartiles(of values: [Int]) -> [Int] {
         guard !values.isEmpty else { return [] }
         let sorted = values.sorted()

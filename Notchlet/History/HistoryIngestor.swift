@@ -1,7 +1,6 @@
 import Foundation
 
-/// One provider's history as the pane reads it: the sealed archive plus the
-/// live days, recomputed from the logs on every ingest.
+/// The sealed archive plus the live days, recomputed on every ingest.
 nonisolated struct ProviderHistory: Equatable, Sendable {
     var archive: ProviderArchive
     var live: [DailyUsage]
@@ -9,13 +8,11 @@ nonisolated struct ProviderHistory: Equatable, Sendable {
     var rows: [DailyUsage] { archive.rows + live }
 }
 
-/// Runs ingests off the main actor: asks a source for events, rolls them
-/// into days, seals the days that are old enough into the archive on disk
-/// and hands back the rest as live rows. Owns the archives so the store
-/// never touches a file. One ingest per provider runs at a time; a call
-/// that arrives while one is running gets that one's result, since the
-/// actor is reentrant across the wait on the source and two ingests
-/// racing to save could move `sealedThrough` backwards.
+/// Asks a source for events, rolls them into days, seals the days that are
+/// old enough into the archive and hands back the rest as live rows. One
+/// ingest per provider at a time: the actor is reentrant across the wait
+/// on the source, and two ingests racing to save could move
+/// `sealedThrough` backwards.
 actor HistoryIngestor {
     private let archives: HistoryArchiveStore
     private let calendar: Calendar
@@ -27,8 +24,7 @@ actor HistoryIngestor {
         self.calendar = calendar
     }
 
-    /// The archive as last saved, without reading any log. What the pane
-    /// shows at launch while the first ingest runs.
+    /// As last saved, without reading any log.
     func archive(for providerID: String) -> ProviderArchive? {
         if let archive = loaded[providerID] {
             return archive

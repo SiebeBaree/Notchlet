@@ -1,15 +1,10 @@
 import Foundation
 
-/// OpenCode's message store as a history source.
-///
-/// OpenCode keeps every message in SQLite under its data directory, one
-/// database per release channel (`opencode.db`, `opencode-next.db`), as a
-/// JSON `data` column. Assistant messages carry the model, the token
-/// counts and the cost OpenCode computed itself. Only the gateways
-/// OpenCode bills (Go and Zen) count: a message through the user's own
-/// API key is that vendor's bill, not OpenCode usage. Read through
-/// `sqlite3` read-only, like Cursor's token, so the app's database is
-/// never locked or modified.
+/// OpenCode keeps every message in SQLite, one database per release
+/// channel, as a JSON `data` column. Only the gateways OpenCode bills (Go
+/// and Zen) count: a message through the user's own API key is that
+/// vendor's bill. Read through `sqlite3` read-only so the app's database
+/// is never locked.
 nonisolated struct OpenCodeHistorySource: UsageHistorySource {
     static let defaultDataDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appending(path: ".local/share/opencode")
@@ -32,8 +27,7 @@ nonisolated struct OpenCodeHistorySource: UsageHistorySource {
         return events
     }
 
-    /// Every `opencode*.db` in the directory, so a preview channel counts
-    /// too. Nothing at all when OpenCode has never run.
+    /// A preview channel's database counts too.
     static func databases(in directory: URL) -> [URL] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
         return names.filter { $0.hasPrefix("opencode") && $0.hasSuffix(".db") }.sorted()
@@ -60,9 +54,8 @@ nonisolated struct OpenCodeHistorySource: UsageHistorySource {
         """
     }
 
-    /// The rows as `sqlite3 -json` prints them. A cost of zero means
-    /// OpenCode did not price the message (a plan that includes it), so
-    /// the price table gets its turn; a positive cost is authoritative.
+    /// A cost of zero means OpenCode did not price the message, so the
+    /// price table gets its turn.
     static func events(fromRows data: Data) throws -> [UsageEvent] {
         guard !data.isEmpty else { return [] }
         return try JSONDecoder().decode([Row].self, from: data).map { row in

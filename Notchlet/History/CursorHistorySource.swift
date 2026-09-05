@@ -1,13 +1,9 @@
 import Foundation
 
-/// Cursor's usage as a history source.
-///
-/// Cursor keeps no log on the Mac; the dashboard's usage export does the
-/// job, fetched with the same session cookie the live provider builds. It
-/// is a CSV of per-model token aggregates with a date each, account-wide,
-/// so this history covers every machine the account is used on. Without
-/// an archive yet the first read asks for a year, enough for the graph;
-/// after that only the days since the last sealed one.
+/// Cursor keeps no log on the Mac, so this fetches the dashboard's usage
+/// export CSV with the live provider's session cookie. It is account-wide.
+/// The first read asks for a year, enough for the graph; after that only
+/// the days since the last sealed one.
 nonisolated struct CursorHistorySource: UsageHistorySource {
     static let exportURL = URL(string: "https://cursor.com/api/dashboard/export-usage-events-csv")!
     static let firstWindow: TimeInterval = 366 * 24 * 3600
@@ -55,11 +51,10 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
         static let required = [date, model, inputWithCacheWrite, input, cacheRead, output]
     }
 
-    /// One event per row. "Input (w/ Cache Write)" is the prompt tokens
-    /// that were written to the cache, "Input (w/o Cache Write)" the rest;
-    /// both as OpenUsage reads them. A row with a broken date or count is
-    /// skipped rather than counted as zero; a header missing a column is
-    /// an export we do not understand and throws.
+    /// "Input (w/ Cache Write)" is the prompt tokens written to the cache,
+    /// "Input (w/o Cache Write)" the rest, as OpenUsage reads them. A broken
+    /// row is skipped rather than counted as zero; a header missing a
+    /// column throws.
     static func events(fromCSV csv: String) throws -> [UsageEvent] {
         let rows = CSV.rows(csv)
         guard let header = rows.first else { return [] }
@@ -106,10 +101,9 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
     }
 }
 
-/// Cursor names models its own way: `claude-4.5-sonnet-thinking`,
-/// `gpt-5.6-sol-high`, `claude-opus-4-7-max-fast`. This folds the effort
-/// and thinking tags away and puts Anthropic's ids in Anthropic's order,
-/// so the price table finds them. Fast stays, it is priced apart.
+/// Folds Cursor's model labels (`claude-4.5-sonnet-thinking`,
+/// `gpt-5.6-sol-high`) into the vendors' ids so the price table finds
+/// them. Fast stays, it is priced apart.
 nonisolated enum CursorModelNames {
     private static let effortTags = ["none", "low", "medium", "high", "xhigh", "extra-high", "max", "ultra", "thinking"]
 

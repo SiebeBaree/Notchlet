@@ -1,8 +1,7 @@
 import Foundation
 
-/// Number and date formatting for the history pane. Pure, and pinned to
-/// en_US so a token count reads the same on every Mac: the pane is too
-/// small for locale-sized numbers and the dollar sign is the unit.
+/// Pinned to en_US: the pane is too small for locale-sized numbers and the
+/// dollar sign is the unit.
 nonisolated enum HistoryCopy {
     private static let locale = Locale(identifier: "en_US")
 
@@ -32,8 +31,7 @@ nonisolated enum HistoryCopy {
         return text + unit
     }
 
-    /// "$0.04", "$4.21", "$118.40", "$1,204". Cents matter below a
-    /// thousand dollars and are noise above it.
+    /// "$0.04", "$4.21", "$118.40", "$1,204".
     static func cost(_ dollars: Double) -> String {
         if dollars < 0.005, dollars > 0 {
             return "<$0.01"
@@ -47,12 +45,12 @@ nonisolated enum HistoryCopy {
         day.start(in: calendar).formatted(style(calendar).weekday(.abbreviated).day().month(.abbreviated))
     }
 
-    /// "Aug 12" for the axis and the footer.
+    /// "Aug 12".
     static func shortDay(_ day: DayKey, calendar: Calendar) -> String {
         day.start(in: calendar).formatted(style(calendar).day().month(.abbreviated))
     }
 
-    /// "Aug 12, 2026" where the year matters, as on a shared image.
+    /// "Aug 12, 2026".
     static func fullDay(_ day: DayKey, calendar: Calendar) -> String {
         day.start(in: calendar).formatted(style(calendar).day().month(.abbreviated).year())
     }
@@ -62,8 +60,7 @@ nonisolated enum HistoryCopy {
         day.start(in: calendar).formatted(style(calendar).month(.abbreviated).year())
     }
 
-    /// No fields until one is added, in the calendar's own time zone so
-    /// midnight stays on its day.
+    /// In the calendar's own time zone so midnight stays on its day.
     private static func style(_ calendar: Calendar) -> Date.FormatStyle {
         Date.FormatStyle(
             date: .omitted,
@@ -74,9 +71,7 @@ nonisolated enum HistoryCopy {
         )
     }
 
-    /// The pane's footer: the pricing caveat, then what could not be
-    /// priced, then how far back the archive goes when that is less than
-    /// the graph shows.
+    /// "Cost at API list prices · gpt-5.7 not priced · History since Aug 12".
     static func footer(unpricedModels: [String], coverageStart: DayKey?, graphStart: DayKey,
                        calendar: Calendar) -> String
     {
@@ -86,8 +81,7 @@ nonisolated enum HistoryCopy {
     }
 
     /// What could not be priced, then how far back the archive goes when
-    /// that is less than the graph shows. Empty when there is nothing to
-    /// caveat.
+    /// that is less than the graph shows.
     static func caveats(unpricedModels: [String], coverageStart: DayKey?, graphStart: DayKey,
                         calendar: Calendar) -> [String]
     {
