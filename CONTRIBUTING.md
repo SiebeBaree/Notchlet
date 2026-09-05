@@ -2,43 +2,37 @@
 
 ## Setup
 
-You need Xcode 26 or newer. Clone, open `Notchlet.xcodeproj`, run the `Notchlet` scheme. That's it, there are no dependencies.
+You need Xcode 26 or newer and a Mac. Clone, fetch the secret scanner's binary, open the project and run the `Notchlet` scheme:
 
-The app is an `LSUIElement` agent: no dock icon, no main window. After launching, hover over the notch (or the top center of an external display) to see it.
-
-## Project layout
-
-```
-Notchlet/
-  App/        entry point and the delegate that builds every service
-  Notch/      the panel over the notch: window, positioning, root view, settings, shared controls
-  Usage/      provider protocol, models, the store and one provider per agent CLI
-  History/    past usage read from the CLIs' logs, and its pane
-  Secrets/    leaked keys in the CLIs' chats, and their pane
-  Alerts/     threshold alerts, and their pane
-  Agents/     the wait line fed by the CLIs' hooks
-  Share/      the share card and its editor window
-  Analytics/  anonymous PostHog events
-  Updates/    Sparkle
-NotchletTests/
+```sh
+git clone https://github.com/SiebeBaree/Notchlet.git
+cd Notchlet
+./Scripts/fetch-betterleaks.sh
+open Notchlet.xcodeproj
 ```
 
-Each feature folder owns its logic and its pane. `CLAUDE.md` at the repo root is the architecture doc; read it before changing how a feature is put together.
+The script downloads [betterleaks](https://github.com/betterleaks/betterleaks) into the gitignored `Vendor/`, pinned by version and checksum. The build fails until it has run. There are no other dependencies to install; Sparkle comes in through Swift Package Manager.
 
-The Xcode project uses file-system-synced groups. Add a file to the right folder on disk and it is part of the target, no pbxproj edits needed. This keeps merge conflicts out of pull requests, so please don't restructure targets without opening an issue first.
+Analytics need a PostHog key in `Config/Secrets.xcconfig`, which is gitignored. Without it the app builds and sends nothing, which is what you want while developing.
 
-## Adding a usage provider
+The app is an `LSUIElement` agent: no dock icon, no main window. After launching, hover over the notch (or the top center of an external display) to see it. Quit it from the settings behind the gear, there is no menu.
 
-Implement `UsageProvider` in a new file under `Notchlet/Usage/` and register it in `AppDelegate`. Two rules:
+`AGENTS.md` at the repo root describes the project, its vocabulary and its rules. Read it before changing how a feature is put together.
 
-1. Fetching a snapshot must never consume usage or count against a limit.
+## Adding a provider
+
+Implement `UsageProvider` in a new file under `Notchlet/Usage/`, add a logo imageset and register it in `AppDelegate`. Two rules:
+
+1. Fetching usage must never consume usage or count against a limit.
 2. Read only what the CLI itself uses (local files, keychain, its own usage endpoint). No third-party services.
+
+Add a parsing test against a real response from the endpoint, with anything personal removed.
 
 ## Style
 
 - Swift 6 language mode with main-actor default isolation. Follow what the compiler tells you.
 - Format with [SwiftFormat](https://github.com/nicklockwood/SwiftFormat): `swiftformat .` before committing. CI runs `swiftformat --lint`.
-- Comments say why, never what. A type gets a doc comment only when its name and members do not say what it is, one or two sentences. An inline comment only for a reason the code cannot express: a platform quirk, another program's protocol, a number that was measured. No comment restates a name, narrates a past change or repeats `CLAUDE.md`.
+- Comments say why, never what. A type gets a doc comment only when its name and members do not say what it is, one or two sentences. An inline comment only for a reason the code cannot express: a platform quirk, another program's protocol, a number that was measured. No comment restates a name or narrates a past change.
 
 ## Tests
 
@@ -56,3 +50,7 @@ Tests use Swift Testing. Keep them focused: pure logic like geometry and parsing
 - One change per PR. Small PRs get reviewed fast.
 
 For anything beyond a bug fix, open an issue first so we agree on direction before you write code.
+
+## AI-written code
+
+PRs written with an AI agent are welcome, this codebase is largely built that way. The bar does not move for them. You are responsible for every line: read the diff, run the tests, and know why each change is there. A PR with dead code, comments that narrate the diff, tests that assert nothing, or changes outside its title gets closed rather than reviewed.

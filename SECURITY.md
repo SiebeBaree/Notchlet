@@ -1,6 +1,6 @@
 # Security policy
 
-Notchlet reads credentials for Claude Code and Codex from your machine to query their usage endpoints. Anything that could leak those credentials, send them anywhere unexpected or widen what the app reads is a security issue.
+Notchlet reads the credentials the agent CLIs keep on your Mac to query their usage endpoints, and reads their chat logs to find leaked keys. Anything that could leak those credentials or findings, send them anywhere unexpected, or widen what the app reads is a security issue.
 
 ## Reporting
 

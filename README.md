@@ -1,66 +1,31 @@
 <div align="center">
 
-<img src="docs/hero.svg" alt="Notchlet expanded out of the notch, showing Claude and Codex usage" width="100%">
+<img src="docs/banner.png" alt="Notchlet expanded out of the notch, showing Claude, Codex and Cursor usage" width="100%">
 
 <h1>Notchlet</h1>
 
 <p><b>Your agent limits, in the notch.</b><br>
-Hover the top of your Mac and see how much Claude Code, Codex, Cursor and OpenCode usage you have left.</p>
-
-<p>
-<a href="https://github.com/SiebeBaree/Notchlet/releases/latest"><img src="https://img.shields.io/badge/Download%20for%20macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
-</p>
+Hover the notch to see how much of your Claude Code, Codex, Cursor and OpenCode limits is left, and what you used and spent over the past year. It also tells you when a limit passes a mark you set, when an agent is waiting on you, and when a key leaked into a chat.</p>
 
 <p>
 <a href="https://github.com/SiebeBaree/Notchlet/actions/workflows/ci.yml"><img src="https://github.com/SiebeBaree/Notchlet/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 <img src="https://img.shields.io/badge/macOS-14%2B-lightgrey" alt="macOS 14+">
-<img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white" alt="Swift 6">
 <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
 </p>
 
 </div>
 
-## What it is
-
-If you run coding agents all day, you hit a wall you cannot see. Claude Code and Codex both cap you per rate-limit window, and both bury the number inside the CLI. Claude Code puts it behind `/usage`, Codex behind `/status`. You have to open a terminal session and ask.
-
-Notchlet moves that number to the one place you already look. It lives in the notch, shows nothing until you hover, then slides open with what is left and whether you are burning it too fast.
-
-No dock icon. No menu bar clutter. No window to manage.
-
-## What the numbers mean
-
-<div align="center">
-<img src="docs/breakdown.svg" alt="Claude usage broken down by rate-limit window" width="620">
-</div>
-
-Every rate-limit window gets a ring.
-
-- **The percentage** is how much of that window you have left, not how much you burned.
-- **The small tick** on the track marks where you would be at an even burn. Ring ahead of the tick means you are under pace. Behind it means you are ahead of schedule in the bad way.
-- **The verdict** turns that into a sentence. `Plenty`, `On pace`, or `Empty 1h 20m early` so you know how much runway you actually lose.
-
-Run two or three agents and each gets a summary gauge. Hover one to unfold its full breakdown.
-
-## What you have used
-
-Click the bars icon in the corner, or any gauge, and the card turns into history: cost and tokens for today, the last 7 days and the last 30 days, a 12-month graph of tokens per day (hover a day for its models, or switch to cost per day over the last month), and every model with its input and output tokens.
-
-The share icon next to it turns those numbers into a picture: your cost or tokens for the period, the activity grid or the spend line, the models you used, on black glass with the notch cut out of the top. Switch off what you do not want to show, copy, paste it into a post.
-
-It comes from what each agent already keeps: Claude Code's transcripts, Codex's session rollouts and OpenCode's message database on your Mac, and Cursor's usage export from its dashboard, which covers the whole account. Claude Code deletes its transcripts after 30 days, so Notchlet seals each finished day into its own archive and the graph keeps growing from the day you installed it. Cost is what the same tokens would cost at API list prices. A subscription does not bill per token, so read it as a value, not a bill.
-
 ## Install
 
+<a href="https://github.com/SiebeBaree/Notchlet/releases/latest"><img src="https://img.shields.io/badge/Download%20for%20macOS-000000?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS"></a>
+
+Or with Homebrew:
+
 ```sh
-brew install --cask notchlet
+brew install --cask SiebeBaree/tap/notchlet
 ```
 
-Or [download the latest release](https://github.com/SiebeBaree/Notchlet/releases/latest), drag it to Applications and open it. Then look at the top of your screen and hover.
-
-Notchlet needs macOS 14 or newer. A notch is optional. On a Mac or external display without one, it draws a virtual notch at the top center of the screen.
-
-### Build from source
+Or build it yourself:
 
 ```sh
 git clone https://github.com/SiebeBaree/Notchlet.git
@@ -69,40 +34,94 @@ cd Notchlet
 open Notchlet.xcodeproj
 ```
 
-Run the `Notchlet` scheme in Xcode 26 or newer. The script downloads the
-[betterleaks](https://github.com/betterleaks/betterleaks) binary the secret
-scanner runs, pinned by version and checksum; the build fails until it has.
+macOS 14 or newer. A Mac without a notch gets a virtual one at the top of the screen. Updates arrive through Sparkle: an icon shows up in the notch, nothing pops up.
 
 ## Supported agents
 
-| Agent | Reads | Windows |
+<div align="center">
+<img src="docs/agents.png" alt="Claude Code, Codex, Cursor and OpenCode" width="560">
+</div>
+
+Notchlet reads the limits from the same endpoints the CLIs read them from, with the login the CLI already has on your Mac. Fetching a limit never spends any of it. Up to three providers show at once; installed ones are on by default.
+
+| Provider | Signs in with | Limits |
 | --- | --- | --- |
-| Claude Code | The endpoint behind `/usage` | 5h session, weekly, per-model weekly |
-| Codex | The endpoint behind `/status` | Whatever your ChatGPT plan gets |
-| Cursor | The endpoint behind the dashboard's usage page | Monthly total, plus the Cursor models and other models pools |
-| OpenCode | The OpenCode Go usage endpoint | 5h, weekly, monthly |
+| Claude Code | Its keychain item, or its credentials file | 5h, weekly, per-model weekly |
+| Codex | Its `auth.json` | Whatever your ChatGPT plan gets |
+| Cursor | Cursor.app's own state, or a session token you paste | Monthly, plus the Cursor models and other models pools |
+| OpenCode | The key `/connect` saved, or a key you paste | OpenCode Go: 5h, weekly, monthly |
 
-Each agent has one or more ways to sign in, and Auto picks the first that works. Claude Code's login comes from its keychain item, with its credentials file as fallback. Codex's comes from the CLI's `auth.json`. Cursor's comes from Cursor.app's own state database, or a session token you paste. OpenCode's comes from the key `/connect` saved, or a key you paste. Pick a method per agent in its settings page; pasted secrets live in Notchlet's own keychain item. OpenCode Zen credits are not shown: they only exist on the web dashboard, and Notchlet does not borrow browser cookies.
+Pick the login per provider in its settings page. Anything you paste goes into Notchlet's own keychain item.
 
-Agents found on your Mac are on by default, up to three at once. Toggle them in the settings behind the gear.
+Adding a provider is one file. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Adding an agent is one file. See [CONTRIBUTING.md](CONTRIBUTING.md).
+## Features
 
-## Privacy
+### Usage view
 
-Notchlet reads the credentials the CLIs already wrote to your machine and calls the same usage endpoints the CLIs call. Nothing else.
+<img src="docs/usage.png" alt="Claude usage per limit" width="442">
 
-- It never spends usage to measure usage.
-- It refreshes one token, Claude Code's, and only once it has expired while Claude Code is idle. It does that the way a second Claude Code process would: same locks, same compare-and-swap write to the same keychain item, so Claude Code picks the new token up instead of being signed out by it. Every other agent's token is left alone; the CLIs renew those themselves on use.
-- It never asks for your keychain password. Every keychain read and write goes through the same `security` tool the CLIs use.
-- Your usage numbers, credentials and account never leave your Mac.
-- The secret scanner reads the same chat logs, with a copy of
-  [betterleaks](https://github.com/betterleaks/betterleaks) inside the app,
-  once when your Mac is idle and then hourly. It never checks a key against
-  anyone's API, and it stores and shows the first six and last two
-  characters of a find, never the key. Off with one toggle in settings.
+One gauge per limit, showing what is left. The tick on the track is where you would be at an even burn. The verdict under it says whether you run out before the reset, and by how much. With two or three providers active each gets one gauge, hover one to unfold its limits.
 
-Notchlet does send anonymous product analytics, a random UUID plus events like "the notch was opened". The full list of what leaves the machine is one file, [`AnalyticsEvent.swift`](Notchlet/Analytics/AnalyticsEvent.swift). Turn it off with one toggle in settings. Builds from source send nothing at all.
+### Historic view
+
+<img src="docs/history.png" alt="Cost and tokens for today, 7 days and 30 days, with a 12-month activity graph" width="442">
+
+Cost and tokens for today, the last 7 days and the last 30 days. A year of activity with each day's models on hover, or the last 30 days of cost per day. Every model with its input and output tokens. Filter by provider with the chips, or click a gauge in the usage view to jump straight to that provider.
+
+### Share view
+
+<img src="docs/share.png" alt="The share window with a usage image and its options" width="640">
+
+The share icon turns the historic view into a PNG. Pick the period, whether it leads with cost or tokens, the activity grid or the spend line, the models, and one of three looks. Copy it or save it.
+
+### Settings
+
+<img src="docs/settings.png" alt="Settings inside the notch" width="442">
+
+Everything lives in the notch, there is no settings window. Providers and their logins, notifications, analytics, updates, the secret scanner, the agent line and how often to refresh.
+
+### Secret scanning
+
+<img src="docs/secrets.png" alt="A leaked OpenAI API key found in a Claude chat" width="442">
+
+Agents see a lot of keys. Notchlet scans your Claude Code and Codex chats for them on your Mac and opens the notch when it finds one, with the kind of key and enough characters to recognise it. Ignore it, report a false positive, or follow the link to rotate it.
+
+### Notifications
+
+<img src="docs/alert.png" alt="Claude's 5h limit passed 80%" width="442">
+
+Pick 50, 75, 80, 90 or 100 percent on any limit. When a refresh finds the limit past that mark the notch opens by itself. Once per cycle, and it waits until you are back at the Mac.
+
+<img src="docs/alert-settings.png" alt="A chip per percentage on every limit" width="442">
+
+The other notification is a line around the notch. Blue means an agent finished, amber means it is asking you something.
+
+<img src="docs/wait-input.png" alt="An amber line around the notch while an agent waits for input" width="100%">
+
+It goes away when you hover the notch, when you switch back to the terminal or editor that runs the agent, or when the agent gets its next prompt. It never shows when that app is already in front.
+
+## How it works
+
+**The notch.** Notchlet is an AppKit agent app with one borderless panel over the notch and no dock icon. Collapsed, that panel is sized to the notch itself, so moving the mouse anywhere else never reaches the app and costs nothing. Hovering grows the window and the SwiftUI card animates out of the notch shape.
+
+**Limits.** Every provider is one file that names its endpoint, its login options and how to map the response into limits. Claude Code's limits come from the endpoint behind `/usage`, Codex's from the one behind `/status`, Cursor's from the endpoint its dashboard uses, OpenCode's from the OpenCode Go usage endpoint. The store polls every 10 minutes while the notch is closed (3 to 30 in settings) and every 60 seconds while it is open, with 30 seconds between attempts and exponential backoff on a 429.
+
+**Logins.** Keychain items are read by spawning `/usr/bin/security`, the same tool the CLIs wrote them with, so macOS never asks for your keychain password. Cursor's token is read from its `state.vscdb` with `sqlite3` in read-only mode. The one token Notchlet ever refreshes is Claude Code's, and only after it expired: it takes Claude Code's own lock files, re-reads, refreshes and writes back exactly as Claude Code does, so a running Claude Code is never signed out.
+
+**Pace.** The verdict is the average burn since the limit's window started, the same model CodexBar uses. No verdict is given until 8% of the window has passed, so a burst right after a reset does not read as "empty in minutes". Nothing is stored between refreshes.
+
+**History.** Each CLI already logs every request: Claude Code's transcripts, Codex's session rollouts, OpenCode's message database and Cursor's usage export. Notchlet rolls those into one row per day and model. JSONL logs are read in 256 KiB chunks and remembered by size and modification date, so a re-read only touches the appended bytes. Claude Code deletes transcripts after 30 days, so every finished day is sealed into Notchlet's own archive under Application Support and only today and yesterday are recomputed. Cost is what the same tokens would cost at API list prices, from a bundled table; a model the table does not know is named, never priced at zero. Logs are read five seconds after launch, then hourly, on wake, and when the view opens onto data older than a minute.
+
+**Share.** The PNG is the same SwiftUI view as the preview, rendered at 2x to 2400 by 1350 pixels. Nothing in it uses a blur or a material because there is no window behind an offscreen render, so the glass is painted from gradients.
+
+**Secrets.** [betterleaks](https://github.com/betterleaks/betterleaks) ships inside the app, pinned by version and checksum. It runs at background priority with high confidence only, the first time after the Mac has been idle for two minutes and is cool, then hourly over the files that changed. A finding is stored as a hash of the secret plus its first six and last two characters, so a key pasted in forty chats is one finding and the secret itself is never written down. Placeholders, bare variable names and expired JWTs are dropped. The scanner never checks a key against anyone's API. Apple silicon only, since the binary is arm64.
+
+**Notifications.** A rule is a provider, a limit and a percentage. Rules are checked on every successful refresh the store already does, and each fires once per cycle, keyed by the limit's reset time. Rules and unacknowledged notifications persist, so a relaunch neither loses nor repeats one. The notch opens for twelve seconds, deferred until your next mouse move if you were away.
+
+**The line.** Notchlet writes a two-line shell script to `~/.notchlet/hook` and registers it in each CLI's own hook config: `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.cursor/hooks.json` and an OpenCode plugin file. The script pipes the hook payload into a Unix socket with `nc`. Notchlet works out which terminal or editor launched the agent from the bundle id macOS puts in every GUI-launched process's environment, and clears the line when that app comes to the front. Turning the setting off removes exactly those hook entries. The line is a stroked `CAShapeLayer` with a Core Animation fade, so the collapsed notch keeps its zero CPU.
+
+**Analytics and updates.** Anonymous PostHog events, a random id and things like "the notch was opened". The complete list of what leaves the machine is one file, [`AnalyticsEvent.swift`](Notchlet/Analytics/AnalyticsEvent.swift). Usage numbers, credentials and findings are never in it. One toggle turns it off, and builds from source send nothing. Updates come from Sparkle over a signed appcast on GitHub Pages.
 
 ## License
 
