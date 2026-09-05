@@ -167,13 +167,14 @@ struct AgentHookInstaller {
     }
 
     /// An entry is Notchlet's when its command, or every command in its
-    /// group, is the hook script.
+    /// group, is exactly the hook script with one of the provider tags.
     static func isNotchlet(_ entry: [String: Any], script: String) -> Bool {
+        let commands = Set(Target.allCases.map { "\(script) \($0.rawValue)" })
         if let command = entry["command"] as? String {
-            return command.hasPrefix(script)
+            return commands.contains(command)
         }
         if let group = entry["hooks"] as? [[String: Any]], !group.isEmpty {
-            return group.allSatisfy { ($0["command"] as? String)?.hasPrefix(script) == true }
+            return group.allSatisfy { commands.contains($0["command"] as? String ?? "") }
         }
         return false
     }

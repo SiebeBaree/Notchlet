@@ -34,8 +34,9 @@ struct HookSocketTests {
         stdin.fileHandleForWriting.write(Data(#"{"session_id":"s1","hook_event_name":"Stop","cwd":"/tmp"}"#.utf8))
         try stdin.fileHandleForWriting.close()
 
-        var iterator = received.stream.makeAsyncIterator()
-        let data = try #require(await iterator.next())
+        // Both waits have deadlines, so a broken socket or a stuck script
+        // fails the test instead of hanging the run.
+        let data = try #require(await Self.first(of: received.stream, within: .seconds(5)))
         let message = try #require(AgentWaitRules.parse(data))
         #expect(message.provider == "claude-code")
         #expect(message.sessionID == "s1")
@@ -43,8 +44,30 @@ struct HookSocketTests {
         #expect(message.pid > 0)
         #expect(message.effect == .wait(.finished))
 
+        let deadline = Date.now.addingTimeInterval(5)
+        while process.isRunning, Date.now < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        if process.isRunning {
+            process.terminate()
+            Issue.record("The hook script did not exit")
+        }
         process.waitUntilExit()
         #expect(process.terminationStatus == 0)
         #expect(Date.now.timeIntervalSince(started) < 2)
+    }
+
+    /// The stream's first element, or nil once the deadline passes.
+    private static func first(of stream: AsyncStream<Data>, within timeout: Duration) async -> Data? {
+        await withTaskGroup(of: Data?.self) { group in
+            group.addTask { await stream.first { _ in true } }
+            group.addTask {
+                try? await Task.sleep(for: timeout)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
     }
 }
