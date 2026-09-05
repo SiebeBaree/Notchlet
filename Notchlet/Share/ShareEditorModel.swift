@@ -1,10 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The share editor's state and actions: the options (remembered across
-/// opens), the card they produce from the history store, and what Copy,
-/// Save and Share do with it. Owned by the window controller and shown by
-/// `ShareEditorView`.
+/// The options (remembered across opens), the card they produce, and what
+/// Copy, Save and Share do with it.
 @Observable
 final class ShareEditorModel {
     private static let periodKey = "share.period"
@@ -19,10 +17,9 @@ final class ShareEditorModel {
         didSet { save() }
     }
 
-    /// A line over the preview, cleared after a moment.
     private(set) var toast: String?
     private var toastTask: Task<Void, Never>?
-    /// The view the share picker pops out of.
+    /// What the share picker pops out of.
     weak var shareAnchor: NSView?
 
     init(history: UsageHistory, scope: UsageHistory.Scope) {
@@ -61,10 +58,8 @@ final class ShareEditorModel {
         history.providersWithHistory
     }
 
-    /// The scope the card and the chips use: the chosen one, or all when
-    /// its provider no longer has history (switched off while the window
-    /// was open, say). Labels and data both go through this so they never
-    /// disagree.
+    /// All when the chosen provider no longer has history. Labels and data
+    /// both go through this so they never disagree.
     var effectiveScope: UsageHistory.Scope {
         if case let .provider(id) = scope, !providers.contains(where: { $0.id == id }) {
             return .all
@@ -72,7 +67,6 @@ final class ShareEditorModel {
         return scope
     }
 
-    /// The providers the card names.
     var scopedProviders: [ShareCard.Provider] {
         let all = providers
         let chosen: [any UsageProvider] = if case let .provider(id) = effectiveScope {
@@ -83,8 +77,7 @@ final class ShareEditorModel {
         return chosen.map { ShareCard.Provider(id: $0.id, name: $0.name, logoAssetName: $0.logoAssetName) }
     }
 
-    /// The archives show right away at launch, but today and yesterday
-    /// only arrive with the first read of the logs.
+    /// Today and yesterday only arrive with the first read of the logs.
     var isReadingLogs: Bool {
         history.lastIngestAt == nil
     }
@@ -93,7 +86,6 @@ final class ShareEditorModel {
         ShareTheme.theme(options.theme)
     }
 
-    /// What the period holds, for the editor's disabled states.
     var summary: UsageLedger.Summary {
         history.summary(options.period, scope: effectiveScope)
     }

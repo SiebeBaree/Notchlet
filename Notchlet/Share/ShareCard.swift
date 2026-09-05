@@ -1,7 +1,5 @@
 import Foundation
 
-/// The graph on a shared image: the pane's two graphs are alternatives
-/// here as well, both at once would crowd the card.
 nonisolated enum ShareGraph: String, CaseIterable, Sendable {
     case activity
     case spend
@@ -14,8 +12,7 @@ nonisolated enum ShareThemeID: String, CaseIterable, Sendable {
     case paper
 }
 
-/// What the editor lets the user choose. The headline is always on the
-/// card; `showsCost` decides whether it is dollars or tokens.
+/// `showsCost` decides whether the headline is dollars or tokens.
 nonisolated struct ShareOptions: Equatable, Sendable {
     var period: UsageHistory.Range = .month
     var showsCost = true
@@ -24,9 +21,8 @@ nonisolated struct ShareOptions: Equatable, Sendable {
     var theme: ShareThemeID = .notch
 }
 
-/// Everything drawn on a shared image, already formatted. Built once from
-/// the ledger by `make`, so the view never touches history and the
-/// wording can be tested without rendering anything.
+/// Everything on a shared image, already formatted, so the view never
+/// touches history and the wording is testable without rendering.
 nonisolated struct ShareCard: Equatable, Sendable {
     struct Provider: Equatable, Sendable {
         let id: String
@@ -37,7 +33,7 @@ nonisolated struct ShareCard: Equatable, Sendable {
     enum Headline: Equatable, Sendable {
         case cost(String)
         case tokens(String)
-        /// Nothing in the period. The editor disables export.
+        /// The editor disables export.
         case none
     }
 
@@ -50,14 +46,14 @@ nonisolated struct ShareCard: Equatable, Sendable {
         let id: String
         let name: String
         let tokens: String
-        /// This model's part of the period's tokens, for the bar.
+        /// Of the period's tokens, for the bar.
         let share: Double
     }
 
     static let tagline = "Your agent limits, in the notch."
 
     var providers: [Provider]
-    /// "Last 30 days · Aug 5 to Sep 3, 2026", right of the header.
+    /// "Last 30 days · Aug 5 to Sep 3, 2026".
     var period: String
     var headline: Headline
     var caption: String
@@ -65,13 +61,13 @@ nonisolated struct ShareCard: Equatable, Sendable {
     var activity: ActivityGrid?
     var spend: SpendSeries?
     var models: [ModelRow]
-    /// The caveats the pane's footer would show, or the tagline.
+    /// The pane's caveats, or the tagline.
     var footer: String
 
     var hasUsage: Bool { headline != .none }
     var hasGraph: Bool { activity != nil || spend != nil }
 
-    /// How many model rows fit: three next to a graph, five without one.
+    /// Three next to a graph, five without one.
     static func modelRowCount(graph: ShareGraph) -> Int {
         graph == .none ? 5 : 3
     }
@@ -116,7 +112,6 @@ nonisolated struct ShareCard: Equatable, Sendable {
             stats.append(Stat(value: count(models.count), label: models.count == 1 ? "model" : "models"))
         }
 
-        // A card with nothing in its period shows nothing but that.
         var activity: ActivityGrid?
         var spend: SpendSeries?
         var graphStart: DayKey?
@@ -153,8 +148,8 @@ nonisolated struct ShareCard: Equatable, Sendable {
             }
             : []
 
-        // Coverage inside the period is said in the header; the footer only
-        // repeats it when the graph reaches further back than that.
+        // Coverage inside the period is said in the header; the footer
+        // only repeats it when the graph reaches further back.
         let coverageInPeriod = coverageStart.map { $0 > span.lowerBound } ?? false
         var caveats = HistoryCopy.caveats(
             unpricedModels: headline.isCost ? summary.unpricedModels : [],
@@ -179,9 +174,8 @@ nonisolated struct ShareCard: Equatable, Sendable {
         )
     }
 
-    /// "Today · Sep 3, 2026", "Last 30 days · Aug 5 to Sep 3, 2026",
-    /// "12 months · Sep 2025 to Sep 2026", or "since" the archive's first
-    /// day when that falls inside the period.
+    /// "Today · Sep 3, 2026", "12 months · Sep 2025 to Sep 2026", or "since"
+    /// the archive's first day when that falls inside the period.
     static func periodLabel(
         _ period: UsageHistory.Range,
         span: ClosedRange<DayKey>,
@@ -229,8 +223,8 @@ nonisolated struct ShareCard: Equatable, Sendable {
         }
     }
 
-    /// Days active as "27 of 30" over a fixed span, a plain count over a
-    /// year, then the longest streak.
+    /// "27 of 30" days active over a fixed span, a plain count over a year,
+    /// then the longest streak.
     private static func dayStats(
         ledger: UsageLedger,
         span: ClosedRange<DayKey>,
@@ -245,7 +239,7 @@ nonisolated struct ShareCard: Equatable, Sendable {
         ]
     }
 
-    /// "3,418", pinned to en_US like the rest of the history copy.
+    /// "3,418".
     private static func count(_ value: Int) -> String {
         value.formatted(.number.locale(Locale(identifier: "en_US")))
     }

@@ -1,14 +1,7 @@
 import SwiftUI
 
-/// Settings, rendered inside the expanded notch. There is no settings
-/// window and no menu bar item; the notch is the whole surface, so quitting
-/// lives here too. The providers row opens a list with one visibility
-/// toggle per provider; at the cap the remaining toggles lock until one is
-/// turned off. Each provider row opens its own page: how it signs in, how
-/// that is going, and a place to paste a secret where the provider takes
-/// one. The alerts row opens one line per window the notch shows, with a
-/// chip per threshold. The agent switch hooks Notchlet into the CLIs, or
-/// takes those hooks out again.
+/// Settings inside the expanded notch. There is no settings window and no
+/// menu bar item, so quitting lives here too.
 struct NotchSettingsView: View {
     private enum Page: Equatable {
         case main
@@ -23,11 +16,9 @@ struct NotchSettingsView: View {
     let alerts: UsageAlerts
     let waits: AgentWaits
 
-    /// Same key Analytics uses; @AppStorage keeps the toggle in sync with it.
+    /// The keys Analytics, SecretScanner and UsageStore read.
     @AppStorage("analyticsOptOut") private var analyticsOptOut = false
-    /// Same key SecretScanner reads; it owns the loop, this owns the switch.
     @AppStorage(SecretScanner.enabledDefaultsKey) private var secretScanEnabled = true
-    // Same key UsageStore reads for its closed-panel poll cadence.
     @AppStorage(UsageStore.intervalDefaultsKey) private var refreshMinutes = 10
     @State private var autoChecksForUpdates: Bool
     @State private var page: Page = .main
@@ -156,8 +147,8 @@ struct NotchSettingsView: View {
 
             NotchRule()
 
-            // The only way out of the app: no dock icon, no menu bar item,
-            // and the panel never activates, so Cmd+Q never reaches us.
+            // The only way out: the panel never activates, so Cmd+Q never
+            // reaches us.
             HStack(spacing: 14) {
                 if let version = updater.availableUpdateVersion {
                     Text("Version \(version) available")
@@ -216,7 +207,7 @@ struct NotchSettingsView: View {
     }
 }
 
-/// A provider's visibility switch, locked when the cap is reached.
+/// Locked when the cap is reached.
 struct ProviderToggle: View {
     let store: UsageStore
     let entry: UsageStore.Entry

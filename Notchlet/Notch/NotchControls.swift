@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The colours the panes share.
 enum NotchPalette {
     /// Attention: a leaked key, a lit alert chip, a rate-limited provider.
     static let amber = Color(red: 0.85, green: 0.64, blue: 0.26)
@@ -16,7 +15,6 @@ enum NotchPalette {
     }
 }
 
-/// The 1pt line between sections of a pane.
 struct NotchRule: View {
     var body: some View {
         Rectangle()
@@ -25,7 +23,7 @@ struct NotchRule: View {
     }
 }
 
-/// Provider logo and name. `muted` is the settings list's quieter row.
+/// `muted` is the settings list's quieter row.
 struct BrandRow: View {
     let provider: any UsageProvider
     var muted = false
@@ -44,10 +42,8 @@ struct BrandRow: View {
     }
 }
 
-/// Circular gauge of what's left, with the percentage and a tiny "left"
-/// inside. The small tick across the track marks where the remaining arc
-/// should end right now at an even burn: halfway through the window puts it
-/// at the bottom of the ring.
+/// The tick across the track marks where the remaining arc should end right
+/// now at an even burn.
 struct UsageRing: View {
     let remainingFraction: Double
     var expectedRemainingFraction: Double?
@@ -82,8 +78,7 @@ struct UsageRing: View {
     }
 }
 
-/// Quiet text button that brightens on hover, or stays bright while it is
-/// the active choice.
+/// Brightens on hover, or stays bright while it is the active choice.
 struct HoverTextButton: View {
     let title: String
     var isActive = false
@@ -108,8 +103,7 @@ struct HoverTextButton: View {
     }
 }
 
-/// A capsule that lifts on hover and drops back when clicked: the one
-/// action on an alert.
+/// The one action on an alert.
 struct NotchPillButton: View {
     let title: String
     let action: () -> Void
@@ -141,8 +135,8 @@ struct NotchPillButton: View {
     }
 }
 
-/// Small corner icon, grayish until hovered or active. A tint keeps its
-/// colour at every opacity, for the one icon that has to be noticed.
+/// A tint keeps its colour at every opacity, for the one icon that has to
+/// be noticed.
 struct NotchIconButton: View {
     let systemName: String
     var isActive = false
@@ -164,7 +158,6 @@ struct NotchIconButton: View {
     }
 }
 
-/// All, or one provider. A single choice, remembered across opens.
 struct ScopeChips: View {
     let providers: [any UsageProvider]
     @Binding var scope: UsageHistory.Scope

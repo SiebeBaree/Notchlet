@@ -1,10 +1,7 @@
 import SwiftUI
 
-/// One provider's page: its toggle, the sign-in picker when it has more
-/// than one way in, a status line, and a paste row per option that takes a
-/// secret. Pasting reads the clipboard rather than opening a text field:
-/// typing a token into a notch is no fun, and a button needs no keyboard
-/// focus.
+/// Pasting a secret reads the clipboard rather than opening a text field:
+/// a button needs no keyboard focus.
 struct ProviderSettingsPage: View {
     let store: UsageStore
     let providerID: String

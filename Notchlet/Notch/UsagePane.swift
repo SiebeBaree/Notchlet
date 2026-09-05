@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// The usage card: one provider's full breakdown, or a summary gauge per
-/// provider with the hovered one unfolded below, then the freshness footer.
+/// One provider's full breakdown, or a summary gauge per provider with the
+/// hovered one unfolded below.
 struct UsagePane: View {
     let store: UsageStore
     @Binding var focusedProviderID: String?
     let showHistory: (String) -> Void
 
-    /// Providers with something to draw. A snapshot without windows (an
-    /// unlimited plan, say) would be a brand row over nothing, so it counts
-    /// as no data.
+    /// A snapshot without windows (an unlimited plan) counts as no data.
     private var activeEntries: [UsageStore.Entry] {
         store.entries.filter { store.isEnabled($0.id) && $0.snapshot?.windows.isEmpty == false }
     }
@@ -61,9 +59,7 @@ struct UsagePane: View {
         }
     }
 
-    /// Fresh data shows nothing here. Data older than a couple of minutes
-    /// gets a quiet age line, and a rate-limited provider gets an amber line
-    /// naming it and its next retry, so stale numbers never pass as live.
+    /// Nothing while the data is fresh, so stale numbers never pass as live.
     @ViewBuilder
     private var footer: some View {
         let limited = store.entries
@@ -84,8 +80,7 @@ struct UsagePane: View {
     }
 }
 
-/// One provider's at-a-glance gauge: brand on top, then the primary window
-/// with its label and pace.
+/// The primary window's gauge, label and pace.
 private struct ProviderSummary: View {
     let entry: UsageStore.Entry
     let isFocused: Bool
@@ -123,7 +118,6 @@ private struct ProviderSummary: View {
     }
 }
 
-/// A provider's full breakdown: one column per window.
 private struct WindowRow: View {
     let windows: [UsageWindow]
     let ringDiameter: CGFloat
@@ -138,7 +132,6 @@ private struct WindowRow: View {
     }
 }
 
-/// Name above the gauge, reset time and pace verdict below it.
 private struct WindowColumn: View {
     let window: UsageWindow
     let ringDiameter: CGFloat

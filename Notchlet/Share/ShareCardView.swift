@@ -1,13 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// The shared image, 1200 by 675 points, drawn from a `ShareCard`. The
-/// editor shows this view scaled down and `ShareRenderer` renders it at 2x,
-/// so there is one layout to get right.
-///
-/// The glass is painted, never sampled: `ImageRenderer` has no window
-/// behind the view for a material to blur, so every highlight here is a
-/// gradient. Nothing in this file may use a material or a blur.
+/// The shared image at 1200 by 675 points; the editor shows it scaled down
+/// and `ShareRenderer` renders it at 2x, so there is one layout. The glass
+/// is painted, never sampled: `ImageRenderer` has no window behind the
+/// view for a material to blur, so nothing here may use a material or a
+/// blur.
 struct ShareCardView: View {
     static let size = CGSize(width: 1200, height: 675)
     /// Canvas edge to glass edge.
@@ -52,7 +50,6 @@ struct ShareCardView: View {
         .padding(.bottom, 40)
     }
 
-    /// Providers beside the notch on the left, the period on the right.
     private var header: some View {
         HStack(alignment: .center, spacing: 0) {
             HStack(spacing: 20) {
@@ -76,10 +73,8 @@ struct ShareCardView: View {
         }
     }
 
-    /// The headline, then the graph and the models. With one block after
-    /// the headline it floats in the middle of the room; with two, the
-    /// models sit on the footer rule and the room is split between them.
-    /// With nothing else the number takes the card.
+    /// One block after the headline floats in the middle of the room; two
+    /// split it; none and the number takes the card.
     @ViewBuilder
     private var main: some View {
         let blocks = (card.hasGraph ? 1 : 0) + (card.models.isEmpty ? 0 : 1)
@@ -112,8 +107,7 @@ struct ShareCardView: View {
         }
     }
 
-    /// The number with its caption under it, the stats to the right. The
-    /// caption and the stat labels share a baseline.
+    /// The caption and the stat labels share a baseline.
     private var headline: some View {
         HStack(alignment: .lastTextBaseline, spacing: 40) {
             VStack(alignment: .leading, spacing: 2) {
@@ -147,7 +141,7 @@ struct ShareCardView: View {
         .monospacedDigit()
     }
 
-    /// The headline alone: bigger, centered vertically, stats in a row.
+    /// The headline alone, bigger.
     private var poster: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
@@ -208,8 +202,7 @@ struct ShareCardView: View {
         }
     }
 
-    /// Normalized id, a bar for its share of the period's tokens, the
-    /// tokens. Rows get taller when there is no graph to share the room.
+    /// Rows get taller when there is no graph to share the room.
     private var models: some View {
         let rowHeight: CGFloat = card.hasGraph ? 26 : 34
         return VStack(spacing: 0) {
@@ -261,10 +254,8 @@ struct ShareCardView: View {
     }
 }
 
-/// A rounded rectangle with the notch taken out of its top edge, the way
-/// the panel hangs from the real one. The fillets where the notch meets
-/// the edge curve outward like `NotchShape`'s; its bottom corners are
-/// ordinary rounded corners.
+/// A rounded rectangle with the notch taken out of its top edge, fillets
+/// curving outward like `NotchShape`'s.
 struct ShareCardShape: Shape {
     static let cornerRadius: CGFloat = 34
     static let notchWidth: CGFloat = 210
@@ -324,9 +315,9 @@ struct ShareCardShape: Shape {
     }
 }
 
-/// The glass: a gradient fill under a soft shadow, a wide inner stroke for
-/// the refracted edge, a color bounce at the bottom, a sheen from the top
-/// left, and a thin rim lit from above.
+/// A gradient fill under a soft shadow, a wide inner stroke for the
+/// refracted edge, a colour bounce at the bottom, a sheen from the top left
+/// and a thin rim lit from above.
 private struct ShareGlass: View {
     let theme: ShareTheme
 

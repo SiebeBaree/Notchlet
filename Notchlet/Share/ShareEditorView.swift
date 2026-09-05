@@ -1,8 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The preview on the left, the inspector on the right: what the numbers
-/// cover, what the card includes, how it looks, then the export buttons.
+/// The preview on the left, the inspector on the right.
 struct ShareEditorView: View {
     @Bindable var model: ShareEditorModel
 
@@ -24,8 +23,7 @@ struct ShareEditorView: View {
         .background(Color(white: 0.11))
     }
 
-    /// The card at whatever scale fits, on a dotted field so its edges and
-    /// shadow read.
+    /// On a dotted field so the card's edges and shadow read.
     private var preview: some View {
         GeometryReader { proxy in
             let scale = min(

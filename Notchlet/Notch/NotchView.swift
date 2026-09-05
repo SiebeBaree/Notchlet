@@ -1,19 +1,10 @@
 import SwiftUI
 
-/// Root view of the panel. The collapsed notch shape shows nothing; hovering
-/// expands it into the usage card. With one active provider the card shows
-/// its full breakdown directly. With two or three it shows one summary gauge
-/// per provider (its primary window), and hovering a gauge unfolds that
-/// provider's breakdown below. Clicking a gauge, or the history icon in the
-/// corner, swaps the card for the history pane at the same width.
-///
-/// Only the notch shape is drawn: the panel is non-opaque and nothing else
-/// paints a background, so clicks in the transparent area go to the window
-/// below. The window controller sizes the window to what is drawn.
+/// The collapsed notch shape shows nothing; hovering expands it into the
+/// usage card, and the corner icons swap in the other panes. Only the
+/// notch shape is drawn: the panel is non-opaque, so clicks in the
+/// transparent area go to the window below.
 struct NotchView: View {
-    /// What the expanded panel shows: usage, past usage behind the history
-    /// icon, leaked secrets behind the key, a usage alert that opened the
-    /// notch on its own, or in-notch settings behind the gear.
     private enum Pane {
         case usage
         case history
@@ -29,26 +20,22 @@ struct NotchView: View {
     let alerts: UsageAlerts
     let waits: AgentWaits
     let notchSize: CGSize
-    /// Tells the window controller to grow the window before the card
-    /// expands or the wait line appears, and to shrink it once the collapse
-    /// animation has ended.
+    /// Grows the window before the card expands or the wait line appears,
+    /// and shrinks it once the collapse animation has ended.
     let resizePanel: (_ expanded: Bool, _ waiting: Bool) -> Void
-    /// Opens the share editor for a scope.
     let share: (UsageHistory.Scope) -> Void
 
     @State private var isExpanded = false
     @State private var focusedProviderID: String?
     @State private var pane: Pane = .usage
-    /// The history pane's scope, remembered across opens.
     @AppStorage("historyScope") private var historyScope: UsageHistory.Scope = .all
     @State private var openedAt: Date?
     @State private var openDebounce: Task<Void, Never>?
     @State private var isHovering = false
     /// Folds an alert the user never hovered back into the notch.
     @State private var autoCollapse: Task<Void, Never>?
-    /// The notch is grown and outlined for a waiting agent. Mirrors
-    /// `waits.isWaiting` while collapsed so the change can animate and the
-    /// window can shrink after it.
+    /// Mirrors `waits.isWaiting` while collapsed so the change can animate
+    /// and the window can shrink after it.
     @State private var isOutlined = false
 
     private var expandedWidth: CGFloat {
@@ -62,10 +49,8 @@ struct NotchView: View {
                     isHovering = hovering
                     if hovering {
                         autoCollapse?.cancel()
-                        // Opening the notch is looking; the wait line is done.
                         waits.clearAll(by: "hover")
-                        // An alert nobody acknowledged is the first thing
-                        // a hover shows, until it is.
+                        // An unacknowledged alert comes first on every hover.
                         if !isExpanded, alerts.current != nil {
                             pane = .alerts
                         }
@@ -85,19 +70,16 @@ struct NotchView: View {
         .onChange(of: scanner.alertGeneration) { _, _ in showAlert(.secrets) }
         .onChange(of: alerts.alertGeneration) { _, _ in showAlert(.alerts) }
         .onChange(of: alerts.current == nil) { _, none in
-            // Got it on the last notice hands the panel back to usage.
             if none, pane == .alerts {
                 show(.usage)
             }
         }
     }
 
-    /// A new leaked key or a usage alert opens the notch on its own for
-    /// twelve seconds, or for as long as the mouse is in it. Not through
-    /// `setPanelOpen`: an alert is not the user looking at usage, so it
-    /// never speeds up the polling. A panel already open on another pane
-    /// keeps it: the key icon lights up in the corner, and a usage alert
-    /// comes first on the next hover.
+    /// Opens the notch for twelve seconds, or for as long as the mouse is
+    /// in it. Not through `setPanelOpen`: an alert is not the user looking
+    /// at usage, so it never speeds up the polling. A panel already open on
+    /// another pane keeps it.
     private func showAlert(_ target: Pane) {
         guard !isExpanded else { return }
         pane = target
@@ -142,8 +124,8 @@ struct NotchView: View {
         }
     }
 
-    /// Grows the notch for the wait line and shrinks it back, with the
-    /// window resized around the animation the way `setExpanded` does.
+    /// The window is resized around the animation the way `setExpanded`
+    /// does.
     private func setOutlined(_ outlined: Bool) {
         guard outlined != isOutlined else { return }
         if outlined {
@@ -158,9 +140,8 @@ struct NotchView: View {
         }
     }
 
-    /// Animates between the notch and the card. The window grows before the
-    /// card appears and shrinks only once the collapse has fully settled;
-    /// a hover that returns mid-collapse keeps the window as it is.
+    /// The window grows before the card appears and shrinks only once the
+    /// collapse has settled; a hover that returns mid-collapse keeps it.
     private func setExpanded(_ expanded: Bool) {
         if expanded {
             resizePanel(true, false)
@@ -181,8 +162,7 @@ struct NotchView: View {
         }
     }
 
-    /// Debounced open plus close-with-duration analytics. The 250ms delay
-    /// keeps accidental hover grazes out of the numbers.
+    /// The 250ms debounce keeps accidental hover grazes out of the numbers.
     private func trackOpenClose(hovering: Bool) {
         if hovering {
             openDebounce = Task {
@@ -224,11 +204,9 @@ struct NotchView: View {
         .overlay(alignment: .topTrailing) { cornerIcons }
     }
 
-    /// The share, history and gear icons live in the strip beside the notch
-    /// cutout, quiet until hovered. The key's slot holds a spinner while a
-    /// scan runs and the key only while a leaked secret waits; the update
-    /// icon only exists while an update does. Share is dimmed until some
-    /// history exists.
+    /// The key's slot holds a spinner while a scan runs and the key only
+    /// while a leaked secret waits; the update icon only exists while an
+    /// update does.
     private var cornerIcons: some View {
         HStack(spacing: 6) {
             if scanner.isScanning {
@@ -269,9 +247,8 @@ struct NotchView: View {
         .padding(.trailing, 14)
     }
 
-    /// The remembered scope, or all when its provider no longer has
-    /// history (switched off, say): a scope with no data and no chips to
-    /// leave it would be a dead end.
+    /// All when the remembered provider no longer has history: a scope with
+    /// no data and no chips to leave it would be a dead end.
     private var resolvedScope: UsageHistory.Scope {
         if case let .provider(id) = historyScope, !history.providersWithHistory.contains(where: { $0.id == id }) {
             return .all
@@ -279,12 +256,10 @@ struct NotchView: View {
         return historyScope
     }
 
-    /// A corner icon opens its pane, or closes it back to usage.
     private func toggle(_ target: Pane) {
         show(pane == target ? .usage : target)
     }
 
-    /// A gauge opens history already scoped to its provider.
     private func showHistory(for providerID: String) {
         historyScope = .provider(providerID)
         show(.history)

@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Threshold alerts: every window the notch currently shows, one line
-/// each, with a chip per percentage. A lit chip is a rule; tapping it
-/// again removes it, and several on one window are fine.
+/// One line per window the notch shows, with a chip per percentage. A lit
+/// chip is a rule; tapping it again removes it.
 struct AlertSettingsPage: View {
     let store: UsageStore
     let alerts: UsageAlerts
@@ -50,8 +49,6 @@ struct AlertSettingsPage: View {
     }
 }
 
-/// One percentage on one window. Amber when it is a rule, like the rest of
-/// the notch's attention colour.
 private struct ThresholdChip: View {
     let percent: Int
     let isOn: Bool

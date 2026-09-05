@@ -2,8 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Turns a card into pixels and moves them out of the app. Rendering goes
-/// through `ImageRenderer` at 2x, so a landscape card is 2400 by 1350.
+/// `ImageRenderer` at 2x, so a card is 2400 by 1350 pixels.
 enum ShareRenderer {
     static let scale: CGFloat = 2
 
@@ -34,8 +33,7 @@ enum ShareRenderer {
         "Notchlet usage \(HistoryCopy.shortDay(today, calendar: calendar)).png"
     }
 
-    /// A save panel over the editor, starting in Downloads. Calls back only
-    /// when a file was written.
+    /// Calls back only when a file was written.
     static func save(_ png: Data, fileName: String, from window: NSWindow, completion: @escaping () -> Void) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]

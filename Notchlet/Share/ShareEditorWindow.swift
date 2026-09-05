@@ -1,8 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// One window, reused across opens. The app has no menu bar, so the
-/// window handles its own key equivalents.
+/// One window, reused across opens.
 final class ShareEditorWindowController: NSWindowController {
     static let windowSize = CGSize(width: 980, height: 640)
 
@@ -19,9 +18,7 @@ final class ShareEditorWindowController: NSWindowController {
         fatalError("init(coder:) is not supported")
     }
 
-    /// Opens the editor scoped like the pane it came from, or rescopes the
-    /// open one, and brings it to the front. Activating the app is needed
-    /// because the notch panel never does.
+    /// Activating the app is needed because the notch panel never does.
     func show(scope: UsageHistory.Scope) {
         if let model, let window {
             model.scope = scope
@@ -56,7 +53,7 @@ final class ShareEditorWindowController: NSWindowController {
         window.makeKeyAndOrderFront(nil)
     }
 
-    /// Centered on the notch's screen rather than wherever the cursor is.
+    /// On the notch's screen rather than wherever the cursor is.
     private func center(_ window: NSWindow) {
         guard let screen = NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main
         else { return }
@@ -68,7 +65,7 @@ final class ShareEditorWindowController: NSWindowController {
     }
 }
 
-/// Cmd+C, Cmd+S, Cmd+W and Escape, without a main menu to route them.
+/// The app has no main menu to route key equivalents.
 private final class ShareEditorWindow: NSWindow {
     var onCopy: (() -> Void)?
     var onSave: (() -> Void)?

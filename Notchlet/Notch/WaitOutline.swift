@@ -1,16 +1,15 @@
 import AppKit
 import SwiftUI
 
-/// The line around the notch while an agent waits: a `CAShapeLayer` stroked
-/// along `NotchShape.waitLine`, breathing through a Core Animation opacity
-/// animation. The window server runs that, so the app draws nothing per
-/// frame and the collapsed notch keeps its idle CPU.
+/// A `CAShapeLayer` along `NotchShape.waitLine` with a Core Animation
+/// opacity animation: the window server runs it, so the app draws nothing
+/// per frame.
 struct WaitOutline: NSViewRepresentable {
     var color: NSColor
     var topRadius: CGFloat
-    /// The black shape's bottom radius; the line's own is concentric.
+    /// The black shape's; the line's own is concentric.
     var bottomRadius: CGFloat
-    /// Distance from the shape's edge to the stroke's centre line.
+    /// From the shape's edge to the stroke's centre line.
     var inset: CGFloat
     var lineWidth: CGFloat
 
@@ -60,8 +59,8 @@ struct WaitOutline: NSViewRepresentable {
             ).cgPath
         }
 
-        /// Animations leave with the layer, so the breathing starts every
-        /// time the view lands in a window.
+        /// Animations leave with the layer, so restart it each time the
+        /// view lands in a window.
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             guard window != nil else { return }

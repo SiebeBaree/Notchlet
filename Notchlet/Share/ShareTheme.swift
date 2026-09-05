@@ -1,8 +1,6 @@
 import SwiftUI
 
-/// One look for the card: the background, the glass and the colors the
-/// content and the graphs use. Three exist; the editor shows them as
-/// swatches.
+/// The background, the glass and the colours the content and graphs use.
 struct ShareTheme {
     let id: ShareThemeID
     let name: String
