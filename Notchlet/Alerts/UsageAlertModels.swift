@@ -1,17 +1,14 @@
 import Foundation
 
-/// One threshold on one rate-limit window: "Claude Code, 5h, 80% used".
-/// The set of these is the whole setting; several on one window are fine.
+/// One threshold on one rate-limit window. The set of these is the whole
+/// setting.
 nonisolated struct UsageAlertRule: Codable, Hashable, Sendable {
-    /// The percentages the settings chips offer.
     static let percentChoices = [50, 75, 80, 90, 100]
 
     let providerID: String
     let windowID: String
-    /// Used percentage that fires the alert.
     let percent: Int
 
-    /// Stable key for the fired-cycle map and for analytics.
     var key: String { "\(providerID)/\(windowID)/\(percent)" }
 
     /// Compared in fraction space: `80 / 100` is the same double as a
@@ -21,9 +18,8 @@ nonisolated struct UsageAlertRule: Codable, Hashable, Sendable {
     }
 }
 
-/// A rule that fired, with the window as it was at that moment. One per
-/// rule at most: a rule firing again in a later cycle replaces its
-/// unacknowledged notice rather than queueing behind it.
+/// A rule that fired, with the window as it was. One per rule at most: a
+/// later cycle replaces an unacknowledged notice rather than queueing.
 nonisolated struct UsageAlertNotice: Codable, Equatable, Sendable, Identifiable {
     let rule: UsageAlertRule
     let window: UsageWindow
@@ -32,9 +28,7 @@ nonisolated struct UsageAlertNotice: Codable, Equatable, Sendable, Identifiable 
     var id: String { rule.key }
 }
 
-/// What persists between launches: the rules, the notices nobody has
-/// acknowledged yet, and the reset time of the cycle each rule last fired
-/// in, so a relaunch neither loses an alert nor repeats one.
+/// Persisted so a relaunch neither loses an alert nor repeats one.
 nonisolated struct UsageAlertState: Codable, Equatable, Sendable {
     static let currentVersion = 1
 

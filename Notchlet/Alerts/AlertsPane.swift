@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// A usage alert, one at a time: the provider, the window's gauge as the
-/// usage card draws it, what mark it passed, and Got it. Acknowledging
-/// shows the next notice or hands the panel back to usage.
+/// One usage alert at a time; Got it shows the next or hands the panel
+/// back to usage.
 struct AlertsPane: View {
     let alerts: UsageAlerts
     let store: UsageStore

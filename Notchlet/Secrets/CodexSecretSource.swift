@@ -1,9 +1,7 @@
 import Foundation
 
-/// Codex's session rollouts as a scan source: every thread's JSONL under
-/// `~/.codex/sessions` and `archived_sessions`, live copies first so an
-/// archived thread is not scanned twice. Messages, tool calls and their
-/// outputs all share those lines.
+/// Every thread's JSONL under `~/.codex/sessions` and `archived_sessions`,
+/// live copies first so an archived thread is not scanned twice.
 nonisolated struct CodexSecretSource: SecretScanSource {
     private let roots: [URL]
 

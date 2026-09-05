@@ -1,11 +1,8 @@
 import Foundation
 import Observation
 
-/// Threshold alerts on rate-limit windows. Checked on every refresh the
-/// usage store already does, never on a timer of its own: the store hands
-/// over each successful snapshot with the one before it, and the rules
-/// that fire become notices the notch opens with. Everything persists in
-/// one defaults key.
+/// Threshold alerts, checked on every refresh the usage store already
+/// does, never on a timer of their own.
 @Observable
 final class UsageAlerts {
     static let defaultsKey = "usageAlerts"
@@ -13,7 +10,6 @@ final class UsageAlerts {
     private let defaults: UserDefaults
     private let presence = UserPresence()
     private(set) var state: UsageAlertState
-    /// Bumped when a new notice should open the notch.
     private(set) var alertGeneration = 0
 
     init(defaults: UserDefaults = .standard) {
@@ -23,17 +19,16 @@ final class UsageAlerts {
 
     var rules: Set<UsageAlertRule> { state.rules }
 
-    /// The notice to show: the newest one nobody has acknowledged.
+    /// The newest notice nobody has acknowledged.
     var current: UsageAlertNotice? { state.pending.first }
 
     func isOn(_ rule: UsageAlertRule) -> Bool {
         state.rules.contains(rule)
     }
 
-    /// Adds or removes a rule. A rule added to a window already past its
-    /// mark is seeded with the current cycle, so it reports the next
-    /// crossing rather than the one that already happened; removing a rule
-    /// takes its notice with it.
+    /// A rule added to a window already past its mark is seeded with the
+    /// current cycle, so it reports the next crossing rather than the one
+    /// that already happened. Removing a rule takes its notice with it.
     func setRule(_ rule: UsageAlertRule, on: Bool, window: UsageWindow?) {
         if on {
             state.rules.insert(rule)
@@ -51,14 +46,12 @@ final class UsageAlerts {
         ))
     }
 
-    /// Drops the current notice; the next one, if any, takes its place.
     func acknowledge() {
         guard !state.pending.isEmpty else { return }
         state.pending.removeFirst()
         save()
     }
 
-    /// Called by the usage store after every successful fetch.
     func snapshotDidChange(providerID: String, previous: UsageSnapshot?, current: UsageSnapshot) {
         let fired = UsageAlertEvaluator.firing(
             rules: state.rules,
@@ -84,8 +77,7 @@ final class UsageAlerts {
     }
 
     #if DEBUG
-        /// A notice out of thin air for checking the card: 80% on the given
-        /// window. Not saved; Got it drops it like any other.
+        /// 80% on the given window, for checking the card. Not saved.
         func showTestNotice(providerID: String, window: UsageWindow) {
             let rule = UsageAlertRule(providerID: providerID, windowID: window.id, percent: 80)
             state.pending.removeAll { $0.rule == rule }

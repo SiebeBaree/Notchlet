@@ -1,16 +1,11 @@
 import Foundation
 
-/// The betterleaks binary shipped next to the app binary, run on the
-/// background tier so a scan never competes with the user's own work.
-/// `Scripts/fetch-betterleaks.sh` pins the version.
-///
-/// Validation stays off: the scanner never calls a vendor's API to test a
-/// key. The report arrives as JSON on stdout and is reduced to
-/// `SecretMatch` right away; the secret strings live in memory only until
-/// `SecretFinding.merge` has hashed and previewed them.
+/// The betterleaks binary shipped next to the app binary;
+/// `Scripts/fetch-betterleaks.sh` pins the version. Validation stays off:
+/// the scanner never calls a vendor's API to test a key.
 nonisolated enum Betterleaks {
-    /// Nil in a build without the vendored binary, and always on Intel: the
-    /// helper ships as arm64 only, since no Intel Mac has a notch.
+    /// Nil without the vendored binary, and always on Intel: the helper
+    /// ships as arm64 only.
     static let executable: URL? = {
         #if arch(x86_64)
             return nil
@@ -24,13 +19,12 @@ nonisolated enum Betterleaks {
 
     static var isAvailable: Bool { executable != nil }
 
-    /// Rules whose matches were noise on real transcripts, or public by
-    /// design. Brave's rule is a bare `BSA` prefix over 24 to 40 characters
-    /// and matched dozens of random strings; the curl header rule matches
-    /// placeholders like YOUR_TOKEN; IBM's matched an ordinary word; PostHog
-    /// project keys are meant to be embedded client side; base64-encoded
-    /// JWTs cannot be checked for expiry the way plain ones are. The false
-    /// positive reports say what joins this list next.
+    /// Noise on real transcripts, or public by design: Brave's rule is a
+    /// bare `BSA` prefix and matched random strings, the curl header rule
+    /// matches placeholders like YOUR_TOKEN, IBM's matched an ordinary
+    /// word, PostHog project keys are meant to be embedded client side, and
+    /// base64-encoded JWTs cannot be checked for expiry. The false positive
+    /// reports say what joins this list next.
     static let disabledRules = [
         "brave-search-api-key",
         "curl-auth-header",
@@ -39,8 +33,7 @@ nonisolated enum Betterleaks {
         "jwt-base64",
     ]
 
-    /// Low and medium confidence rules (the generic password and API key
-    /// patterns) matched test fixtures far more than keys.
+    /// Lower confidence rules matched test fixtures far more than keys.
     private static let confidence = "high"
     private static let maxFileMegabytes = 256
     private static let timeoutSeconds = 600
@@ -75,8 +68,7 @@ nonisolated enum Betterleaks {
         return try matches(from: report)
     }
 
-    /// The findings in a betterleaks JSON report. Line numbers are 1-based;
-    /// the file is empty for piped input.
+    /// Line numbers are 1-based; the file is empty for piped input.
     static func matches(from report: Data) throws -> [SecretMatch] {
         try JSONDecoder().decode([Finding].self, from: report).map { finding in
             SecretMatch(

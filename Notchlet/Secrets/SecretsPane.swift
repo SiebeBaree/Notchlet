@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// The secrets pane: one leaked key at a time, newest first. What kind of
-/// key betterleaks thinks it is, its masked preview, and the three things
-/// to do about it. A pager in the header walks the rest.
+/// One leaked key at a time, newest first, with the three things to do
+/// about it.
 struct SecretsPane: View {
     let scanner: SecretScanner
 
@@ -49,7 +48,6 @@ struct SecretsPane: View {
         }
     }
 
-    /// The first and last characters of the key, enough to know which one.
     private func previewLine(_ finding: SecretFinding) -> some View {
         Text(finding.preview)
             .font(.system(size: 11, design: .monospaced))
@@ -61,7 +59,7 @@ struct SecretsPane: View {
     }
 
     /// Reporting needs analytics on to go anywhere, so the button only
-    /// exists while it does; Ignore is always there.
+    /// exists while it does.
     private func actions(_ finding: SecretFinding, pending: [SecretFinding]) -> some View {
         HStack(spacing: 12) {
             Button("How to solve this") {
@@ -86,7 +84,6 @@ struct SecretsPane: View {
         }
     }
 
-    /// The provider's name when every pending finding is from one.
     private func providerName(_ pending: [SecretFinding]) -> String? {
         let ids = Set(pending.map(\.providerID))
         guard ids.count == 1, let id = ids.first else { return nil }
@@ -99,8 +96,7 @@ struct SecretsPane: View {
         return "\(count) \(noun) in \(place)"
     }
 
-    /// One line on what the scanner is doing, for the empty pane, the
-    /// settings page and the spinner's tooltip. Nil when it is off.
+    /// Nil when the scanner is off.
     static func statusText(_ status: SecretScanner.Status, now: Date = .now) -> String? {
         switch status {
         case .off, .unavailable:
