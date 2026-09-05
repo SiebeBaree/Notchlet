@@ -32,7 +32,7 @@ nonisolated protocol LogLineParser: Sendable {
 /// start. Files older than `since` are skipped by their modification date
 /// alone and dropped from memory. Files parse in parallel, at most four at
 /// a time, so a first read of a year of logs uses the machine without
-/// starving it. Roots are in order of preference; see `logFiles`.
+/// starving it. Roots are in order of preference; see `LogFiles.list`.
 actor LogDirectoryReader<Parser: LogLineParser> {
     private struct Cached {
         var size: UInt64
@@ -41,15 +41,6 @@ actor LogDirectoryReader<Parser: LogLineParser> {
         var offset: UInt64
         var state: Parser.State
         var events: [UsageEvent]
-    }
-
-    private struct Job: Sendable {
-        let url: URL
-        let size: UInt64
-        let modified: Date
-        let offset: UInt64
-        let state: Parser.State
-        let events: [UsageEvent]
     }
 
     private nonisolated static var parallelism: Int { 4 }
@@ -62,30 +53,31 @@ actor LogDirectoryReader<Parser: LogLineParser> {
     }
 
     func events(since: Date?) async throws -> [UsageEvent] {
-        let files = Self.logFiles(under: roots, modifiedSince: since)
+        let files = LogFiles.list(under: roots, withExtension: "jsonl", modifiedSince: since)
         var kept: [String: Cached] = [:]
-        var jobs: [Job] = []
+        var jobs: [(url: URL, from: Cached)] = []
         for file in files {
-            if let cached = cache[file.url.path], cached.size == file.size, cached.modified == file.modified {
+            let cached = cache[file.url.path]
+            if let cached, cached.size == file.size, cached.modified == file.modified {
                 kept[file.url.path] = cached
-            } else if let cached = cache[file.url.path], file.size >= cached.offset {
-                jobs.append(Job(
-                    url: file.url, size: file.size, modified: file.modified,
-                    offset: cached.offset, state: cached.state, events: cached.events
-                ))
-            } else {
-                jobs.append(Job(
-                    url: file.url, size: file.size, modified: file.modified,
-                    offset: 0, state: Parser.initialState, events: []
-                ))
+                continue
             }
+            var from = Cached(
+                size: file.size, modified: file.modified, offset: 0, state: Parser.initialState, events: []
+            )
+            if let cached, file.size >= cached.offset {
+                from.offset = cached.offset
+                from.state = cached.state
+                from.events = cached.events
+            }
+            jobs.append((file.url, from))
         }
 
         try await withThrowingTaskGroup(of: (String, Cached).self) { group in
             var pending = jobs[...]
             func startNext() {
                 guard let job = pending.popFirst() else { return }
-                group.addTask { try (job.url.path, Self.parse(job)) }
+                group.addTask { try (job.url.path, Self.parse(job.url, from: job.from)) }
             }
             for _ in 0 ..< Self.parallelism {
                 startNext()
@@ -101,51 +93,15 @@ actor LogDirectoryReader<Parser: LogLineParser> {
         return kept.values.flatMap(\.events)
     }
 
-    /// Reads a file from the job's offset, continuing its parser state.
-    private nonisolated static func parse(_ job: Job) throws -> Cached {
-        var state = job.state
-        var events = job.events
-        let offset = try LineReader.forEachLine(in: job.url, from: job.offset) { line in
-            if let event = Parser.parse(line, state: &state) {
-                events.append(event)
+    /// Reads the file from the cached offset, continuing its parser state.
+    private nonisolated static func parse(_ url: URL, from: Cached) throws -> Cached {
+        var cached = from
+        cached.offset = try LineReader.forEachLine(in: url, from: from.offset) { line in
+            if let event = Parser.parse(line, state: &cached.state) {
+                cached.events.append(event)
             }
         }
-        return Cached(size: job.size, modified: job.modified, offset: offset, state: state, events: events)
-    }
-
-    private struct LogFile {
-        let url: URL
-        let size: UInt64
-        let modified: Date
-    }
-
-    /// Every `.jsonl` under the roots, with the attributes the cache keys
-    /// on, minus files last written before `since`. Roots are in order of
-    /// preference: a file name already seen under an earlier root is a
-    /// copy (Codex archives a thread by moving it) and is skipped.
-    private nonisolated static func logFiles(under roots: [URL], modifiedSince since: Date?) -> [LogFile] {
-        let keys: Set<URLResourceKey> = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
-        var files: [LogFile] = []
-        var seenNames: Set<String> = []
-        for root in roots {
-            guard let enumerator = FileManager.default.enumerator(
-                at: root, includingPropertiesForKeys: Array(keys), options: []
-            ) else { continue }
-            var names: Set<String> = []
-            for case let url as URL in enumerator where url.pathExtension == "jsonl" {
-                guard !seenNames.contains(url.lastPathComponent),
-                      let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
-                      let size = values.fileSize, let modified = values.contentModificationDate
-                else { continue }
-                names.insert(url.lastPathComponent)
-                if let since, modified < since {
-                    continue
-                }
-                files.append(LogFile(url: url, size: UInt64(size), modified: modified))
-            }
-            seenNames.formUnion(names)
-        }
-        return files
+        return cached
     }
 }
 

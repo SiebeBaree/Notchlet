@@ -19,6 +19,9 @@ nonisolated struct AgentHookMessage: Equatable, Sendable {
     /// launchd job.
     let bundleID: String?
     let effect: AgentHookEffect
+
+    /// The `AgentWait.id` this message is about.
+    var waitID: String { "\(provider)/\(sessionID)" }
 }
 
 /// The pure side of agent waits: turning the bytes the hook script sends

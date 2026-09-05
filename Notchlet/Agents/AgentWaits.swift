@@ -67,7 +67,7 @@ final class AgentWaits {
     /// One message from the hook script.
     func receive(_ data: Data) {
         guard let message = AgentWaitRules.parse(data) else { return }
-        let id = "\(message.provider)/\(message.sessionID)"
+        let id = message.waitID
         switch message.effect {
         case .ignore:
             return

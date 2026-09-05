@@ -1,8 +1,8 @@
 import Foundation
 
-/// The betterleaks binary shipped next to the app binary, run as a child
-/// process on the background tier so a scan never competes with the user's
-/// own work. `Scripts/fetch-betterleaks.sh` pins the version.
+/// The betterleaks binary shipped next to the app binary, run on the
+/// background tier so a scan never competes with the user's own work.
+/// `Scripts/fetch-betterleaks.sh` pins the version.
 ///
 /// Validation stays off: the scanner never calls a vendor's API to test a
 /// key. The report arrives as JSON on stdout and is reduced to
@@ -105,51 +105,19 @@ nonisolated enum Betterleaks {
         }
     }
 
-    /// `Process` is not Sendable; this hands one across the task boundary
-    /// so cancellation can still reach it.
-    private final class Child: @unchecked Sendable {
-        let process = Process()
-    }
-
-    /// Runs the binary to completion off the main actor and returns its
-    /// stdout. The child is moved to the background tier right after it
-    /// starts, which is what `taskpolicy -b` does: CPU and I/O throttled the
-    /// way Time Machine is. The working directory is a temporary one so a
-    /// `.betterleaks.toml` or ignore file of the user's never changes the
-    /// rules, and the environment is minimal for the same reason.
+    /// The working directory is a temporary one so a `.betterleaks.toml`
+    /// or ignore file of the user's never changes the rules, and the
+    /// environment is minimal for the same reason.
     private static func run(_ executable: URL, _ arguments: [String], input: Data?) async throws -> Data {
-        let child = Child()
-        return try await withTaskCancellationHandler {
-            try await Task.detached {
-                let process = child.process
-                process.executableURL = executable
-                process.arguments = arguments
-                process.currentDirectoryURL = FileManager.default.temporaryDirectory
-                process.environment = ["HOME": FileManager.default.homeDirectoryForCurrentUser.path]
-                let stdout = Pipe()
-                process.standardOutput = stdout
-                process.standardError = FileHandle.nullDevice
-                let stdin = input.map { _ in Pipe() }
-                process.standardInput = stdin ?? FileHandle.nullDevice
-                try process.run()
-                setpriority(PRIO_DARWIN_PROCESS, id_t(process.processIdentifier), PRIO_DARWIN_BG)
-                if let stdin, let input {
-                    // The report is written after all input is read, so
-                    // feeding stdin to the end before reading stdout cannot
-                    // deadlock. The throwing variant: a child that exited
-                    // early would otherwise raise through the pipe.
-                    try? stdin.fileHandleForWriting.write(contentsOf: input)
-                    try? stdin.fileHandleForWriting.close()
-                }
-                let data = stdout.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                guard process.terminationStatus == 0 else {
-                    throw ScanError.failed(status: process.terminationStatus)
-                }
-                return data
-            }.value
-        } onCancel: {
-            child.process.terminate()
-        }
+        let exit = try await ChildProcess.run(
+            executable,
+            arguments,
+            input: input,
+            background: true,
+            environment: ["HOME": FileManager.default.homeDirectoryForCurrentUser.path],
+            currentDirectory: FileManager.default.temporaryDirectory
+        )
+        guard exit.status == 0 else { throw ScanError.failed(status: exit.status) }
+        return exit.output
     }
 }
