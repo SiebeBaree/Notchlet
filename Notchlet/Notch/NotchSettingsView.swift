@@ -22,6 +22,8 @@ struct NotchSettingsView: View {
     @AppStorage(UsageStore.intervalDefaultsKey) private var refreshMinutes = 10
     @State private var autoChecksForUpdates: Bool
     @State private var page: Page = .main
+    /// Takes the version label's slot until the pane closes.
+    @State private var notice: String?
 
     init(store: UsageStore, updater: UpdateController, scanner: SecretScanner, alerts: UsageAlerts, waits: AgentWaits) {
         self.store = store
@@ -145,6 +147,18 @@ struct NotchSettingsView: View {
                 }
             }
 
+            #if DEBUG
+                HStack(spacing: 10) {
+                    Text("Fire")
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.white.opacity(0.85))
+                    Spacer()
+                    ForEach(DebugTrigger.allCases, id: \.self) { trigger in
+                        HoverTextButton(trigger.title) { fire(trigger) }
+                    }
+                }
+            #endif
+
             NotchRule()
 
             // The only way out: the panel never activates, so Cmd+Q never
@@ -164,7 +178,7 @@ struct NotchSettingsView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                 } else {
-                    Text("Notchlet \(DeviceInfo.appVersion)")
+                    Text(notice ?? versionText)
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.4))
                     Spacer()
@@ -172,12 +186,33 @@ struct NotchSettingsView: View {
                         NSApp.terminate(nil)
                     }
                     HoverTextButton("Check for updates") {
-                        updater.checkForUpdates()
+                        if DeviceInfo.isDevelopment {
+                            notice = "Development builds cannot check for updates"
+                        } else {
+                            updater.checkForUpdates()
+                        }
                     }
                 }
             }
         }
     }
+
+    private var versionText: String {
+        DeviceInfo.isDevelopment ? "Notchlet Development" : "Notchlet \(DeviceInfo.appVersion)"
+    }
+
+    #if DEBUG
+        /// Three seconds is time to move the mouse out: an alert only opens
+        /// a closed notch, and a wait only outlines one.
+        private func fire(_ trigger: DebugTrigger) {
+            notice = "\(trigger.title) fires in 3s, move the mouse out"
+            let targets = DebugTrigger.Targets(store: store, scanner: scanner, alerts: alerts, waits: waits)
+            Task {
+                try? await Task.sleep(for: .seconds(3))
+                trigger.fire(targets)
+            }
+        }
+    #endif
 
     private func linkRow(_ label: String, action: @escaping () -> Void) -> some View {
         HStack {

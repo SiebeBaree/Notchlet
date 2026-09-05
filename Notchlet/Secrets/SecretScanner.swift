@@ -16,6 +16,9 @@ final class SecretScanner {
     private(set) var isScanning = false
     private(set) var failedProviderIDs: Set<String> = []
     private(set) var alertGeneration = 0
+    /// `DebugTrigger`'s made-up finding, kept out of the saved state; empty
+    /// in release builds.
+    private var testFindings: [SecretFinding] = []
     private var loop: Task<Void, Never>?
     private var isTicking = false
     private let presence = UserPresence()
@@ -41,8 +44,25 @@ final class SecretScanner {
 
     /// Newest first.
     var pending: [SecretFinding] {
-        state.findings.filter { $0.status == .pending }.sorted { $0.firstSeenAt > $1.firstSeenAt }
+        (state.findings + testFindings).filter { $0.status == .pending }.sorted { $0.firstSeenAt > $1.firstSeenAt }
     }
+
+    #if DEBUG
+        func showTestFinding(providerID: String) {
+            testFindings = [SecretFinding(
+                id: "debug",
+                ruleID: "stripe-access-token",
+                kind: "Stripe Access Token",
+                preview: "sk_liv…Q4",
+                length: 32,
+                providerID: providerID,
+                locations: [],
+                firstSeenAt: .now,
+                status: .pending
+            )]
+            alertGeneration += 1
+        }
+    #endif
 
     func providerName(_ id: String) -> String? {
         store.entries.first { $0.id == id }?.provider.name
@@ -185,7 +205,10 @@ final class SecretScanner {
 
     @discardableResult
     private func setStatus(_ status: SecretFinding.Status, of id: String) -> SecretFinding? {
-        guard let index = state.findings.firstIndex(where: { $0.id == id }) else { return nil }
+        guard let index = state.findings.firstIndex(where: { $0.id == id }) else {
+            testFindings.removeAll { $0.id == id }
+            return nil
+        }
         state.findings[index].status = status
         try? stateStore.save(state)
         return state.findings[index]

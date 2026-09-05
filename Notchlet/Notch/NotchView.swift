@@ -201,7 +201,28 @@ struct NotchView: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .topLeading) { cornerHeader }
         .overlay(alignment: .topTrailing) { cornerIcons }
+    }
+
+    /// A lone provider's name sits beside the cutout, in the strip that
+    /// would otherwise be empty. A name too long for the strip wraps to a
+    /// second line, then shrinks.
+    @ViewBuilder
+    private var cornerHeader: some View {
+        if pane == .usage, let entry = UsagePane.soloEntry(in: store) {
+            BrandRow(provider: entry.provider)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+                .frame(
+                    maxWidth: (expandedWidth - notchSize.width) / 2 + NotchGeometry.notchTopCornerRadius - 26,
+                    alignment: .leading
+                )
+                .frame(height: notchSize.height)
+                .padding(.leading, 20)
+                .contentShape(.rect)
+                .onTapGesture { showHistory(for: entry.id) }
+        }
     }
 
     /// The key's slot holds a spinner while a scan runs and the key only
