@@ -18,8 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var services: Services?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // As the unit tests' host app, don't touch credentials or the
-        // network: the keychain permission prompt would hang the test runner.
+        // As the tests' host app, stay away from credentials and the
+        // network: the keychain prompt would hang the test runner.
         guard NSClassFromString("XCTestCase") == nil else { return }
         let services = Self.makeServices()
         self.services = services
@@ -28,8 +28,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         services.scanner.start()
         services.waits.start()
         services.notchController.showWindow(nil)
-        // Refetch whatever came due during sleep instead of trusting a
-        // slept-through timer.
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(didWake),
@@ -44,8 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func makeServices() -> Services {
-        // Order is the settings order, and the order installed CLIs claim
-        // the active slots on first launch.
+        // Settings order, and the order installed CLIs claim the active slots.
         let store = UsageStore(providers: [
             ClaudeCodeUsageProvider(),
             CodexUsageProvider(),

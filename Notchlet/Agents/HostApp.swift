@@ -1,12 +1,10 @@
 import AppKit
 import Darwin
 
-/// Which app a CLI runs in. LaunchServices puts `__CFBundleIdentifier` in
-/// the environment of everything a GUI app starts and children inherit it,
-/// so the hook script reports it directly; that covers terminals, editors,
-/// T3 Code and tmux. When it is missing (ssh, a launchd job) the parent
-/// chain is walked from the CLI's pid to the first process that is a
-/// running app, the way CodexBar finds a session's terminal.
+/// LaunchServices puts `__CFBundleIdentifier` in the environment of
+/// everything a GUI app starts and children inherit it, so the hook script
+/// reports it directly. When it is missing (ssh, a launchd job) the parent
+/// chain is walked to the first running app, the way CodexBar does.
 enum HostApp {
     static func resolve(bundleID: String?, pid: pid_t) -> String? {
         if let bundleID, !bundleID.isEmpty {

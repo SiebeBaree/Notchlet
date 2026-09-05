@@ -1,13 +1,11 @@
 import Foundation
 
-/// Writes the hook script and puts it into each CLI's own hook config, and
-/// takes exactly those entries out again. Claude Code and Codex share one
-/// JSON shape (event to matcher groups to command hooks), Cursor has a flat
-/// list per event, OpenCode loads a plugin file. Every other key in those
-/// files is left as it was; a file that does not parse is left alone.
+/// Writes the hook script into each CLI's own hook config and takes exactly
+/// those entries out again. Claude Code and Codex share one JSON shape,
+/// Cursor has a flat list per event, OpenCode loads a plugin file. A file
+/// that does not parse is left alone.
 struct AgentHookInstaller {
-    /// Home for the CLI configs and the dot folder. Tests point it at a
-    /// temp directory.
+    /// Tests point this at a temp directory.
     var home = FileManager.default.homeDirectoryForCurrentUser
 
     var directory: URL { home.appending(path: ".notchlet") }
@@ -60,8 +58,7 @@ struct AgentHookInstaller {
         }
     }
 
-    /// Removes the hooks from every CLI that has them, whether or not it
-    /// is still installed, then the script.
+    /// From every CLI, whether or not it is still installed.
     func remove() {
         for target in AgentCLI.allCases {
             do {
@@ -117,10 +114,8 @@ struct AgentHookInstaller {
         }
     }
 
-    /// Rewrites the `hooks` object of a JSON file: for each event, drops the
-    /// entries that are Notchlet's and appends a fresh one when installing.
-    /// Removing from a file that does not exist is a no-op; installing
-    /// creates it.
+    /// For each event, drops the entries that are Notchlet's and appends a
+    /// fresh one when installing. Every other key stays as it was.
     private func edit(
         _ url: URL, install: Bool, events: [String], version: Int? = nil, entry: () -> [String: Any]
     ) throws {
@@ -159,8 +154,8 @@ struct AgentHookInstaller {
         try data.write(to: url, options: .atomic)
     }
 
-    /// An entry is Notchlet's when its command, or every command in its
-    /// group, is exactly the hook script with one of the provider tags.
+    /// Its command, or every command in its group, is exactly the hook
+    /// script with one of the provider tags.
     static func isNotchlet(_ entry: [String: Any], script: String) -> Bool {
         let commands = Set(AgentCLI.allCases.map { "\(script) \($0.rawValue)" })
         if let command = entry["command"] as? String {

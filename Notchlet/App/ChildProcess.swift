@@ -39,8 +39,8 @@ nonisolated enum ChildProcess {
                 if let stdin, let input {
                     // Fed to the end before stdout is read: every tool here
                     // writes only after reading all of its input. The
-                    // throwing variant, so a child that exited early does
-                    // not raise through the pipe.
+                    // throwing write, so a child that exited early does not
+                    // raise through the pipe.
                     try? stdin.fileHandleForWriting.write(contentsOf: input)
                     try? stdin.fileHandleForWriting.close()
                 }
