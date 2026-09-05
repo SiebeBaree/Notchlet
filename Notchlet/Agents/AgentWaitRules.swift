@@ -10,7 +10,7 @@ nonisolated enum AgentHookEffect: Equatable, Sendable {
 /// A hook message after parsing: the script's header line resolved against
 /// the CLI's own payload.
 nonisolated struct AgentHookMessage: Equatable, Sendable {
-    let provider: String
+    let provider: AgentCLI
     let sessionID: String
     /// The CLI's pid as the script saw it, the start of the parent walk.
     let pid: pid_t
@@ -21,7 +21,7 @@ nonisolated struct AgentHookMessage: Equatable, Sendable {
     let effect: AgentHookEffect
 
     /// The `AgentWait.id` this message is about.
-    var waitID: String { "\(provider)/\(sessionID)" }
+    var waitID: String { "\(provider.rawValue)/\(sessionID)" }
 }
 
 /// The pure side of agent waits: turning the bytes the hook script sends
@@ -63,8 +63,9 @@ nonisolated enum AgentWaitRules {
         let body = data[data.index(after: newline)...]
         guard let payload = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
         let bundleID = fields.count > 2 ? String(fields[2]).trimmingCharacters(in: .whitespaces) : ""
-        let provider = resolveProvider(tag: String(fields[0]), payload: payload)
-        guard let sessionID = sessionID(provider: provider, payload: payload) else { return nil }
+        guard let provider = resolveProvider(tag: String(fields[0]), payload: payload),
+              let sessionID = sessionID(provider: provider, payload: payload)
+        else { return nil }
         return AgentHookMessage(
             provider: provider,
             sessionID: sessionID,
@@ -74,25 +75,25 @@ nonisolated enum AgentWaitRules {
         )
     }
 
-    static func resolveProvider(tag: String, payload: [String: Any]) -> String {
-        payload["cursor_version"] != nil ? "cursor" : tag
+    static func resolveProvider(tag: String, payload: [String: Any]) -> AgentCLI? {
+        payload["cursor_version"] != nil ? .cursor : AgentCLI(rawValue: tag)
     }
 
-    static func sessionID(provider: String, payload: [String: Any]) -> String? {
+    static func sessionID(provider: AgentCLI, payload: [String: Any]) -> String? {
         switch provider {
-        case "cursor":
+        case .cursor:
             payload["conversation_id"] as? String
-        case "opencode":
+        case .opencode:
             (payload["properties"] as? [String: Any])?["sessionID"] as? String
-        default:
+        case .claudeCode, .codex:
             payload["session_id"] as? String
         }
     }
 
-    static func effect(provider: String, payload: [String: Any]) -> AgentHookEffect {
+    static func effect(provider: AgentCLI, payload: [String: Any]) -> AgentHookEffect {
         let event = payload["hook_event_name"] as? String
         switch provider {
-        case "claude-code":
+        case .claudeCode:
             switch event {
             case "Stop": return .wait(.finished)
             case "Notification":
@@ -101,20 +102,20 @@ nonisolated enum AgentWaitRules {
             case "UserPromptSubmit", "SessionEnd": return .clear
             default: return .ignore
             }
-        case "codex":
+        case .codex:
             switch event {
             case "Stop": return .wait(.finished)
             case "PermissionRequest": return .wait(.needsInput)
             case "UserPromptSubmit", "SessionEnd", "Interrupt": return .clear
             default: return .ignore
             }
-        case "cursor":
+        case .cursor:
             switch event {
             case "stop": return payload["status"] as? String == "completed" ? .wait(.finished) : .clear
             case "beforeSubmitPrompt", "sessionEnd": return .clear
             default: return .ignore
             }
-        case "opencode":
+        case .opencode:
             let properties = payload["properties"] as? [String: Any]
             switch payload["type"] as? String {
             case "session.idle": return .wait(.finished)
@@ -128,8 +129,6 @@ nonisolated enum AgentWaitRules {
             case "session.deleted", "permission.replied": return .clear
             default: return .ignore
             }
-        default:
-            return .ignore
         }
     }
 }

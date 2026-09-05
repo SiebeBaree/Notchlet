@@ -12,6 +12,7 @@ final class SecretScanner {
 
     private let store: UsageStore
     private let stateStore: SecretStateStore
+    private let defaults: UserDefaults
     private(set) var state: SecretScanState
     /// True while betterleaks is running, not while the loop merely looks.
     private(set) var isScanning = false
@@ -25,9 +26,10 @@ final class SecretScanner {
     /// until they are back.
     private let presence = UserPresence()
 
-    init(store: UsageStore, stateStore: SecretStateStore = .default) {
+    init(store: UsageStore, stateStore: SecretStateStore = .default, defaults: UserDefaults = .standard) {
         self.store = store
         self.stateStore = stateStore
+        self.defaults = defaults
         state = stateStore.load() ?? SecretScanState()
     }
 
@@ -36,11 +38,11 @@ final class SecretScanner {
 
     /// On by default; the settings toggle flips it.
     var isEnabled: Bool {
-        UserDefaults.standard.object(forKey: Self.enabledDefaultsKey) as? Bool ?? true
+        defaults.object(forKey: Self.enabledDefaultsKey) as? Bool ?? true
     }
 
     func setEnabled(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: Self.enabledDefaultsKey)
+        defaults.set(enabled, forKey: Self.enabledDefaultsKey)
         Analytics.capture(.settingChanged(key: "secret_scan", value: String(enabled)))
         reschedule()
     }

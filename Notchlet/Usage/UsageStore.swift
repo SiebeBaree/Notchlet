@@ -47,6 +47,7 @@ final class UsageStore {
     /// it triggers an immediate refetch.
     private static let openInterval: TimeInterval = 60
 
+    private let defaults: UserDefaults
     private(set) var entries: [Entry]
     /// Per-provider visibility from settings. Unset means "on when the CLI
     /// is installed", capped at `maxActiveProviders`, so a fresh launch
@@ -60,14 +61,15 @@ final class UsageStore {
     /// The usage alerts hang off this so they cost nothing beyond the poll.
     var snapshotObserver: ((_ providerID: String, _ previous: UsageSnapshot?, _ current: UsageSnapshot) -> Void)?
 
-    init(providers: [any UsageProvider]) {
+    init(providers: [any UsageProvider], defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         entries = providers.map { Entry(provider: $0, snapshot: nil) }
         // Stored choices first, then installed CLIs fill the remaining slots
         // in registration order. A fresh install with four CLIs shows the
         // first three and leaves the fourth one toggle away.
         var enabled: [String: Bool] = [:]
         for provider in providers {
-            enabled[provider.id] = UserDefaults.standard.object(forKey: Self.enabledDefaultsKey(provider.id)) as? Bool
+            enabled[provider.id] = defaults.object(forKey: Self.enabledDefaultsKey(provider.id)) as? Bool
         }
         var openSlots = Self.maxActiveProviders - enabled.values.filter { $0 == true }.count
         for provider in providers where enabled[provider.id] == nil {
@@ -100,7 +102,7 @@ final class UsageStore {
             return
         }
         providerEnabled[providerID] = enabled
-        UserDefaults.standard.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
+        defaults.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
         // Re-enabling fetches right away if the data is due; disabling just
         // drops the provider from the loop.
         reschedule()
@@ -151,7 +153,7 @@ final class UsageStore {
         if isPanelOpen {
             return Self.openInterval
         }
-        let minutes = UserDefaults.standard.integer(forKey: Self.intervalDefaultsKey)
+        let minutes = defaults.integer(forKey: Self.intervalDefaultsKey)
         return TimeInterval(Self.intervalChoicesMinutes.contains(minutes) ? minutes : 10) * 60
     }
 

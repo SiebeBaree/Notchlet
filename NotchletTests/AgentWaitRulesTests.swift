@@ -14,7 +14,7 @@ struct AgentWaitRulesTests {
         {"session_id":"abc","cwd":"/tmp","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"Done"}
         """)
         #expect(stop == AgentHookMessage(
-            provider: "claude-code", sessionID: "abc", pid: 4242, bundleID: "com.t3tools.t3code",
+            provider: .claudeCode, sessionID: "abc", pid: 4242, bundleID: "com.t3tools.t3code",
             effect: .wait(.finished)
         ))
         let prompt = message(
@@ -72,7 +72,7 @@ struct AgentWaitRulesTests {
         let parsed = message("claude-code", json: """
         {"conversation_id":"c9","hook_event_name":"stop","status":"completed","cursor_version":"1.9"}
         """)
-        #expect(parsed?.provider == "cursor")
+        #expect(parsed?.provider == .cursor)
         #expect(parsed?.sessionID == "c9")
     }
 
@@ -106,14 +106,14 @@ struct AgentWaitRulesTests {
 
     @Test func focusClearsTheHostOrAnyTerminalWhenUnknown() {
         let hosted = AgentWait(
-            provider: "codex",
+            provider: .codex,
             sessionID: "a",
             kind: .finished,
             host: "com.t3tools.t3code"
         )
         #expect(AgentWaitRules.clears(hosted, activated: "com.t3tools.t3code"))
         #expect(!AgentWaitRules.clears(hosted, activated: "com.mitchellh.ghostty"))
-        let orphan = AgentWait(provider: "codex", sessionID: "b", kind: .finished, host: nil)
+        let orphan = AgentWait(provider: .codex, sessionID: "b", kind: .finished, host: nil)
         #expect(AgentWaitRules.clears(orphan, activated: "com.mitchellh.ghostty"))
         #expect(AgentWaitRules.clears(orphan, activated: "com.jetbrains.WebStorm"))
         #expect(!AgentWaitRules.clears(orphan, activated: "com.apple.Safari"))

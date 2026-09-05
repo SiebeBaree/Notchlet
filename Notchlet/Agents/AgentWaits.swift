@@ -87,12 +87,12 @@ final class AgentWaits {
                 AgentWait(provider: message.provider, sessionID: message.sessionID, kind: kind, host: host),
                 at: 0
             )
-            Analytics.capture(.agentWaitShown(provider: message.provider, kind: kind.rawValue))
+            Analytics.capture(.agentWaitShown(provider: message.provider.rawValue, kind: kind.rawValue))
         }
     }
 
-    private var targets: [AgentHookInstaller.Target] {
-        installedProviderIDs().compactMap(AgentHookInstaller.Target.init(rawValue:))
+    private var targets: [AgentCLI] {
+        installedProviderIDs().compactMap(AgentCLI.init(rawValue:))
     }
 
     private func listen() {

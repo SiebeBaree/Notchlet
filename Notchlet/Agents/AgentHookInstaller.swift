@@ -6,13 +6,6 @@ import Foundation
 /// list per event, OpenCode loads a plugin file. Every other key in those
 /// files is left as it was; a file that does not parse is left alone.
 struct AgentHookInstaller {
-    enum Target: String, CaseIterable {
-        case claudeCode = "claude-code"
-        case codex
-        case cursor
-        case opencode
-    }
-
     /// Home for the CLI configs and the dot folder. Tests point it at a
     /// temp directory.
     var home = FileManager.default.homeDirectoryForCurrentUser
@@ -47,7 +40,7 @@ struct AgentHookInstaller {
         """
     }
 
-    func install(_ targets: [Target]) {
+    func install(_ targets: [AgentCLI]) {
         do {
             try FileManager.default.createDirectory(
                 at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
@@ -70,7 +63,7 @@ struct AgentHookInstaller {
     /// Removes the hooks from every CLI that has them, whether or not it
     /// is still installed, then the script.
     func remove() {
-        for target in Target.allCases {
+        for target in AgentCLI.allCases {
             do {
                 try apply(target, install: false)
             } catch {
@@ -80,7 +73,7 @@ struct AgentHookInstaller {
         try? FileManager.default.removeItem(at: scriptURL)
     }
 
-    func configURL(for target: Target) -> URL {
+    func configURL(for target: AgentCLI) -> URL {
         switch target {
         case .claudeCode: home.appending(path: ".claude/settings.json")
         case .codex: home.appending(path: ".codex/hooks.json")
@@ -89,11 +82,11 @@ struct AgentHookInstaller {
         }
     }
 
-    private func command(for target: Target) -> String {
+    private func command(for target: AgentCLI) -> String {
         "\(scriptURL.path) \(target.rawValue)"
     }
 
-    private func apply(_ target: Target, install: Bool) throws {
+    private func apply(_ target: AgentCLI, install: Bool) throws {
         let url = configURL(for: target)
         switch target {
         case .opencode:
@@ -169,7 +162,7 @@ struct AgentHookInstaller {
     /// An entry is Notchlet's when its command, or every command in its
     /// group, is exactly the hook script with one of the provider tags.
     static func isNotchlet(_ entry: [String: Any], script: String) -> Bool {
-        let commands = Set(Target.allCases.map { "\(script) \($0.rawValue)" })
+        let commands = Set(AgentCLI.allCases.map { "\(script) \($0.rawValue)" })
         if let command = entry["command"] as? String {
             return commands.contains(command)
         }
