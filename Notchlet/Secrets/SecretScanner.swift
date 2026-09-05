@@ -97,11 +97,7 @@ final class SecretScanner {
     }
 
     /// Restarts the loop: what a wake from sleep or the toggle calls.
-    func reschedule() {
-        reschedule(after: 0)
-    }
-
-    private func reschedule(after delay: TimeInterval) {
+    func reschedule(after delay: TimeInterval = 0) {
         loop?.cancel()
         loop = nil
         guard isEnabled, isAvailable else { return }

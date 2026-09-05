@@ -18,8 +18,6 @@ struct HistoryPane: View {
     @State private var range: UsageHistory.Range = .month
     @State private var showsAllModels = false
 
-    private static let visibleModels = 4
-
     var body: some View {
         let providers = history.providersWithHistory
         let calendar = history.calendar

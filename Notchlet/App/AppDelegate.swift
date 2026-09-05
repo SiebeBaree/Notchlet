@@ -1,7 +1,7 @@
 import AppKit
 import notify
 
-/// Owns the notch panel, the updater and analytics for the lifetime of the
+/// Builds every service at launch and keeps them alive for the life of the
 /// app.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: UsageStore?
@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             OpenCodeUsageProvider(),
         ])
         self.store = store
-        store.startRefreshing()
+        store.reschedule()
         // History reads the CLIs' logs and seals finished days into the
         // archive, so it runs from first launch whether or not the pane is
         // ever opened.

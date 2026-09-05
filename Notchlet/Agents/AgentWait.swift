@@ -16,7 +16,6 @@ nonisolated struct AgentWait: Hashable, Sendable, Identifiable {
     let sessionID: String
     let kind: Kind
     let host: String?
-    let since: Date
 
     var id: String { "\(provider)/\(sessionID)" }
 }

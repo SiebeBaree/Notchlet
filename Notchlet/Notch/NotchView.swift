@@ -7,9 +7,9 @@ import SwiftUI
 /// provider's breakdown below. Clicking a gauge, or the history icon in the
 /// corner, swaps the card for the history pane at the same width.
 ///
-/// The hosting window is always `NotchGeometry.panelSize`, but only the
-/// notch shape is drawn: the panel is non-opaque and nothing else paints a
-/// background, so clicks in the transparent area go to the window below.
+/// Only the notch shape is drawn: the panel is non-opaque and nothing else
+/// paints a background, so clicks in the transparent area go to the window
+/// below. The window controller sizes the window to what is drawn.
 struct NotchView: View {
     /// What the expanded panel shows: usage, past usage behind the history
     /// icon, leaked secrets behind the key, a usage alert that opened the

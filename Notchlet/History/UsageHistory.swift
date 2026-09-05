@@ -191,17 +191,11 @@ final class UsageHistory {
             guard let self else { return }
             for provider in providersWithHistory where histories[provider.id] == nil {
                 if let archive = await ingestor.archive(for: provider.id) {
-                    histories[provider.id] = ProviderHistory(archive: archive, live: [], ingestedAt: .distantPast)
+                    histories[provider.id] = ProviderHistory(archive: archive, live: [])
                 }
             }
         }
         reschedule(after: Self.launchDelay)
-    }
-
-    /// Restarts the loop, fetching right away when the data is old enough:
-    /// what a wake from sleep or a change of providers calls.
-    func reschedule() {
-        reschedule(after: 0)
     }
 
     /// What the pane calls on open: fresh data does nothing, stale data
@@ -215,7 +209,9 @@ final class UsageHistory {
         }
     }
 
-    private func reschedule(after delay: TimeInterval) {
+    /// Restarts the loop, fetching right away when the data is old enough:
+    /// what a wake from sleep or a change of providers calls.
+    func reschedule(after delay: TimeInterval = 0) {
         loop?.cancel()
         loop = Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))

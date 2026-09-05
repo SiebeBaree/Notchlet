@@ -101,12 +101,6 @@ final class UsageStore {
         reschedule()
     }
 
-    /// Fetches now and keeps the scheduling loop alive for the lifetime of
-    /// the store.
-    func startRefreshing() {
-        reschedule()
-    }
-
     /// Fetches one provider right away, cooldowns included: the user just
     /// changed how it signs in, so whatever it last knew is moot. A provider
     /// that is switched off is fetched once anyway, so its settings page can

@@ -5,7 +5,6 @@ import Foundation
 nonisolated struct ProviderHistory: Equatable, Sendable {
     var archive: ProviderArchive
     var live: [DailyUsage]
-    var ingestedAt: Date
 
     var rows: [DailyUsage] { archive.rows + live }
 }
@@ -81,10 +80,6 @@ actor HistoryIngestor {
             loaded[providerID] = archive
         }
 
-        return ProviderHistory(
-            archive: archive,
-            live: rows.filter { $0.day > plan.sealThrough },
-            ingestedAt: now
-        )
+        return ProviderHistory(archive: archive, live: rows.filter { $0.day > plan.sealThrough })
     }
 }

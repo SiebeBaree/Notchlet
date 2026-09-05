@@ -9,12 +9,10 @@ import os
 /// token every 8 hours while it runs, rewriting the keychain item each time;
 /// see `CredentialSupport.keychainData` for why that read stays silent.
 ///
-/// While Claude Code is idle the token simply expires, which used to leave
-/// the notch stale until the next `claude` run. Now an expired token is
-/// refreshed the way a second Claude Code process would do it, following
-/// Claude Code's own lock and compare-and-swap protocol (see
-/// `ClaudeCodeCredentialStore`), so Claude Code picks the new token up
-/// instead of being signed out by it.
+/// While Claude Code is idle the token expires, and Notchlet refreshes it
+/// the way a second Claude Code process would, following Claude Code's own
+/// lock and compare-and-swap protocol (see `ClaudeCodeCredentialStore`), so
+/// Claude Code picks the new token up instead of being signed out by it.
 struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     let id = "claude-code"
     let name = "Claude"

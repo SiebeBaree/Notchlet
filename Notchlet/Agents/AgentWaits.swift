@@ -84,13 +84,7 @@ final class AgentWaits {
                 return
             }
             waits.insert(
-                AgentWait(
-                    provider: message.provider,
-                    sessionID: message.sessionID,
-                    kind: kind,
-                    host: host,
-                    since: .now
-                ),
+                AgentWait(provider: message.provider, sessionID: message.sessionID, kind: kind, host: host),
                 at: 0
             )
             Analytics.capture(.agentWaitShown(provider: message.provider, kind: kind.rawValue))

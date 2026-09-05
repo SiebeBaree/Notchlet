@@ -11,8 +11,6 @@ import Foundation
 /// the auth headers per option and the response mapping. Adopt this base
 /// protocol directly only for a provider that is not HTTP-shaped (say, one
 /// that reads session logs).
-/// Sendable so the store can fetch several providers concurrently;
-/// implementations are stateless structs.
 protocol UsageProvider: Sendable {
     /// Stable identifier, used as a dictionary key and for settings.
     var id: String { get }

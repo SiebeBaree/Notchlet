@@ -109,12 +109,11 @@ struct AgentWaitRulesTests {
             provider: "codex",
             sessionID: "a",
             kind: .finished,
-            host: "com.t3tools.t3code",
-            since: .now
+            host: "com.t3tools.t3code"
         )
         #expect(AgentWaitRules.clears(hosted, activated: "com.t3tools.t3code"))
         #expect(!AgentWaitRules.clears(hosted, activated: "com.mitchellh.ghostty"))
-        let orphan = AgentWait(provider: "codex", sessionID: "b", kind: .finished, host: nil, since: .now)
+        let orphan = AgentWait(provider: "codex", sessionID: "b", kind: .finished, host: nil)
         #expect(AgentWaitRules.clears(orphan, activated: "com.mitchellh.ghostty"))
         #expect(AgentWaitRules.clears(orphan, activated: "com.jetbrains.WebStorm"))
         #expect(!AgentWaitRules.clears(orphan, activated: "com.apple.Safari"))
