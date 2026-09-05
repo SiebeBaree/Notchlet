@@ -32,7 +32,7 @@ nonisolated enum ChildProcess {
                 process.standardError = FileHandle.nullDevice
                 let stdin = input.map { _ in Pipe() }
                 process.standardInput = stdin ?? FileHandle.nullDevice
-                try process.run()
+                try child.launch()
                 if background {
                     setpriority(PRIO_DARWIN_PROCESS, id_t(process.processIdentifier), PRIO_DARWIN_BG)
                 }
@@ -49,13 +49,38 @@ nonisolated enum ChildProcess {
                 return Exit(status: process.terminationStatus, output: output)
             }.value
         } onCancel: {
-            child.process.terminate()
+            child.cancel()
         }
     }
 
     /// `Process` is not Sendable; this carries one across the task
-    /// boundary so cancellation can still reach it.
+    /// boundary so cancellation can still reach it. The lock orders
+    /// launch against cancel: `terminate()` on a process that never
+    /// launched raises, and a cancel that lands first must keep the
+    /// detached task from launching at all.
     private final class Child: @unchecked Sendable {
         let process = Process()
+        private let lock = NSLock()
+        private var launched = false
+        private var cancelled = false
+
+        func launch() throws {
+            try lock.withLock {
+                if cancelled {
+                    throw CancellationError()
+                }
+                try process.run()
+                launched = true
+            }
+        }
+
+        func cancel() {
+            lock.withLock {
+                cancelled = true
+                if launched {
+                    process.terminate()
+                }
+            }
+        }
     }
 }
