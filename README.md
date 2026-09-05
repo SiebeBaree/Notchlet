@@ -46,7 +46,7 @@ Notchlet reads the limits from the same endpoints the CLIs read them from, with 
 
 | Provider | Signs in with | Limits |
 | --- | --- | --- |
-| Claude Code | Its keychain item, or its credentials file | 5h, weekly, per-model weekly |
+| Claude Code | Its keychain item, its credentials file, or Claude Desktop | 5h, weekly, per-model weekly |
 | Codex | Its `auth.json` | Whatever your ChatGPT plan gets |
 | Cursor | Cursor.app's own state, or a session token you paste | Monthly, plus the Cursor models and other models pools |
 | OpenCode | The key `/connect` saved, or a key you paste | OpenCode Go: 5h, weekly, monthly |

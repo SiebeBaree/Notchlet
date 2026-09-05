@@ -2,10 +2,12 @@ import Foundation
 import os
 
 /// Reads the OAuth token Claude Code stored at login (keychain, with
-/// `~/.claude/.credentials.json` as fallback) and calls the endpoint behind
-/// its `/usage` screen. Claude Code rotates the token every 8 hours while
-/// it runs; once it has expired, Notchlet refreshes it the way a second
-/// Claude Code process would (`ClaudeCodeCredentialStore`).
+/// `~/.claude/.credentials.json` as fallback, then the one Claude Desktop
+/// keeps for its Code tab) and calls the endpoint behind its `/usage`
+/// screen. Claude Code rotates the token every 8 hours while it runs; once
+/// it has expired, Notchlet refreshes it the way a second Claude Code
+/// process would (`ClaudeCodeCredentialStore`). Desktop's token is only
+/// ever read (`ClaudeDesktopTokenCache`).
 struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     let id = "claude-code"
     let name = "Claude"
@@ -15,12 +17,13 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
 
     static let keychainOption = AuthOption(id: "keychain", label: "Claude Code")
     static let fileOption = AuthOption(id: "file", label: "Credentials file")
-    let authOptions = [Self.keychainOption, Self.fileOption]
+    static let desktopOption = AuthOption(id: "desktop", label: "Claude Desktop")
+    let authOptions = [Self.keychainOption, Self.fileOption, Self.desktopOption]
     let history: (any UsageHistorySource)? = ClaudeCodeHistorySource()
     let secrets: (any SecretScanSource)? = ClaudeCodeSecretSource()
 
     var isInstalled: Bool {
-        CredentialSupport.homePathExists(".claude")
+        CredentialSupport.homePathExists(".claude") || ClaudeDesktopTokenCache.isPresent
     }
 
     private static let sessionDuration: TimeInterval = 5 * 3600
@@ -30,10 +33,11 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
 
     private struct Cached: Sendable {
         let optionID: String
-        let credentials: ClaudeTokenRefresh.Credentials
+        let accessToken: String
+        let expiresAt: Date
     }
 
-    /// Reused until it expires: the keychain read spawns a process and a
+    /// Reused until it expires: every option's read spawns a process and a
     /// token lasts hours. A rejected request clears it.
     private let cache = OSAllocatedUnfairLock<Cached?>(initialState: nil)
     /// A refresh token the server rejected, skipped until Claude Code
@@ -41,8 +45,19 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     private let deadRefreshToken = OSAllocatedUnfairLock<String?>(initialState: nil)
 
     func authHeaders(for option: AuthOption) async throws -> [String: String] {
-        if let cached = cache.withLock({ $0 }), cached.optionID == option.id, !cached.credentials.isExpired() {
-            return Self.headers(token: cached.credentials.accessToken)
+        if let cached = cache.withLock({ $0 }), cached.optionID == option.id, cached.expiresAt > .now {
+            return Self.headers(token: cached.accessToken)
+        }
+        if option.id == Self.desktopOption.id {
+            guard let token = await ClaudeDesktopTokenCache.read() else {
+                throw ProviderError.notAvailable(.signedOut)
+            }
+            guard token.expiresAt > .now else {
+                throw ProviderError.notAvailable(.expired)
+            }
+            let fresh = Cached(optionID: option.id, accessToken: token.accessToken, expiresAt: token.expiresAt)
+            cache.withLock { $0 = fresh }
+            return Self.headers(token: token.accessToken)
         }
         let backend: ClaudeCodeCredentialStore.Backend = option.id == Self.fileOption.id ? .file : .keychain
         guard let stored = await store.read(backend),
@@ -55,7 +70,8 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         } else {
             credentials
         }
-        cache.withLock { $0 = Cached(optionID: option.id, credentials: current) }
+        let fresh = Cached(optionID: option.id, accessToken: current.accessToken, expiresAt: current.expiresAt)
+        cache.withLock { $0 = fresh }
         return Self.headers(token: current.accessToken)
     }
 
