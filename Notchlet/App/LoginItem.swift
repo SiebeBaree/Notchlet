@@ -12,21 +12,23 @@ enum LoginItem {
         SMAppService.mainApp.status == .enabled
     }
 
+    /// `.requiresApproval` is registered too, waiting on the user.
+    private static var isRegistered: Bool {
+        let status = SMAppService.mainApp.status
+        return status == .enabled || status == .requiresApproval
+    }
+
     static func seedIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: seededKey) else { return }
         #if DEBUG
         // Would launch the DerivedData build at every restart, and the
         // marker lives in the defaults the release build reads.
         #else
-            let service = SMAppService.mainApp
-            if service.status == .notRegistered {
-                do {
-                    try service.register()
-                } catch {
-                    // Not marking a failure is what makes the next launch retry.
-                    return
-                }
+            if !isRegistered {
+                try? SMAppService.mainApp.register()
             }
+            // Not marking a failure is what makes the next launch retry.
+            guard isRegistered else { return }
             UserDefaults.standard.set(true, forKey: seededKey)
         #endif
     }
@@ -42,7 +44,7 @@ enum LoginItem {
             }
             return service.status == .enabled
         }
-        if service.status == .notRegistered {
+        if !isRegistered {
             // Registering an already-registered app throws.
             try? service.register()
         }
