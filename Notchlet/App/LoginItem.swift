@@ -14,16 +14,25 @@ enum LoginItem {
 
     static func seedIfNeeded() {
         guard !UserDefaults.standard.bool(forKey: seededKey) else { return }
-        UserDefaults.standard.set(true, forKey: seededKey)
         #if DEBUG
-        // Would launch the DerivedData build at every restart.
+        // Would launch the DerivedData build at every restart, and the
+        // marker lives in the defaults the release build reads.
         #else
-            setEnabled(true)
+            let service = SMAppService.mainApp
+            if service.status == .notRegistered {
+                do {
+                    try service.register()
+                } catch {
+                    // Not marking a failure is what makes the next launch retry.
+                    return
+                }
+            }
+            UserDefaults.standard.set(true, forKey: seededKey)
         #endif
     }
 
-    /// Reports what the switch should show, which is not always what was
-    /// asked for.
+    /// Reports what the switch should show, which is the status after the
+    /// attempt, not what was asked for.
     @discardableResult
     static func setEnabled(_ enabled: Bool) -> Bool {
         let service = SMAppService.mainApp
@@ -31,22 +40,17 @@ enum LoginItem {
             if service.status != .notRegistered {
                 try? service.unregister()
             }
-            return false
+            return service.status == .enabled
         }
-        do {
+        if service.status == .notRegistered {
             // Registering an already-registered app throws.
-            if service.status != .enabled {
-                try service.register()
-            }
-        } catch {
-            return false
+            try? service.register()
         }
         // The one state registering cannot fix: the user denied Notchlet
         // under Login Items, and only System Settings can undo that.
-        guard service.status != .requiresApproval else {
+        if service.status == .requiresApproval {
             SMAppService.openSystemSettingsLoginItems()
-            return false
         }
-        return true
+        return service.status == .enabled
     }
 }

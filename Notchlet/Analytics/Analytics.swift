@@ -58,6 +58,12 @@ enum Analytics {
                 PostHogSDK.shared.optOut()
             }
             PostHogSDK.shared.register(DeviceInfo.superProperties())
+            // Registered properties persist in the SDK's own storage, so an
+            // install that already sent these keeps sending them until they
+            // are removed by name.
+            for key in ["plan_codex", "plan_cursor"] {
+                PostHogSDK.shared.unregister(key)
+            }
             isBootstrapped = true
 
             captureLaunchEvents()
