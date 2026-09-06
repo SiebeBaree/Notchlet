@@ -14,7 +14,10 @@ final class UpdateController: NSObject {
     override init() {
         super.init()
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
+            // A development build leaves it unstarted, which would otherwise
+            // keep checking the feed on its own schedule even though the
+            // manual check is blocked.
+            startingUpdater: !DeviceInfo.isDevelopment,
             updaterDelegate: self,
             userDriverDelegate: self
         )

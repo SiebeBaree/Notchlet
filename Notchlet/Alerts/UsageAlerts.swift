@@ -77,9 +77,13 @@ final class UsageAlerts {
     }
 
     #if DEBUG
-        /// 80% on the given window, for `DebugTrigger`. Not saved.
+        private var testRule: UsageAlertRule?
+
+        /// 80% on the given window, for `DebugTrigger`. Never saved: a real
+        /// alert firing before it is dismissed would otherwise write it out.
         func showTestNotice(providerID: String, window: UsageWindow) {
             let rule = UsageAlertRule(providerID: providerID, windowID: window.id, percent: 80)
+            testRule = rule
             state.pending.removeAll { $0.rule == rule }
             state.pending.insert(UsageAlertNotice(rule: rule, window: window, firedAt: .now), at: 0)
             alertGeneration += 1
@@ -95,7 +99,11 @@ final class UsageAlerts {
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(state) {
+        var persisted = state
+        #if DEBUG
+            persisted.pending.removeAll { $0.rule == testRule }
+        #endif
+        if let data = try? JSONEncoder().encode(persisted) {
             defaults.set(data, forKey: Self.defaultsKey)
         }
     }
