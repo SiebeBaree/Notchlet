@@ -33,8 +33,6 @@ protocol HTTPUsageProvider: UsageProvider {
     /// Throws `notAvailable` when the option has no usable credential.
     func authHeaders(for option: AuthOption) async throws -> [String: String]
     func parseWindows(from data: Data) throws -> [UsageWindow]
-    /// Anonymous analytics only.
-    func parsePlanTier(from data: Data) -> String?
     /// Drops credentials cached between fetches for this option and reports
     /// whether there were any, so a rejection can be retried with a fresh
     /// read once.
@@ -42,10 +40,6 @@ protocol HTTPUsageProvider: UsageProvider {
 }
 
 extension HTTPUsageProvider {
-    func parsePlanTier(from data: Data) -> String? {
-        nil
-    }
-
     func forgetCredentials(for option: AuthOption) -> Bool {
         false
     }
@@ -94,7 +88,6 @@ extension HTTPUsageProvider {
         return try UsageSnapshot(
             windows: parseWindows(from: data),
             fetchedAt: .now,
-            planTier: parsePlanTier(from: data),
             authOptionID: option.id
         )
     }
