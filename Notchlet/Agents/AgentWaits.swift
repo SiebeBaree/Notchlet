@@ -82,6 +82,15 @@ final class AgentWaits {
         }
     }
 
+    #if DEBUG
+        /// A wait with no host, for `DebugTrigger`: a hover or any terminal
+        /// or editor coming to the front clears it.
+        func showTestWait(kind: AgentWait.Kind) {
+            waits.removeAll { $0.sessionID == "debug" }
+            waits.insert(AgentWait(provider: .claudeCode, sessionID: "debug", kind: kind, host: nil), at: 0)
+        }
+    #endif
+
     private var targets: [AgentCLI] {
         installedProviderIDs().compactMap(AgentCLI.init(rawValue:))
     }

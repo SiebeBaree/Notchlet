@@ -96,7 +96,7 @@ struct UsageCopyTests {
             )
         }
 
-        #expect(status(nil) == "Waiting for the first refresh")
+        #expect(status(nil) == "Fetching usage")
         #expect(status(.ok, option: cli) == "Using Codex CLI")
         #expect(status(.ok, option: pasted) == "Using the pasted API key")
         #expect(status(.notAvailable(.signedOut)) == "Not signed in. Run codex login.")
@@ -105,6 +105,26 @@ struct UsageCopyTests {
         #expect(status(.rateLimited, retryAt: now.addingTimeInterval(240)) == "Rate limited, retrying in 4m")
         #expect(status(.error, retryAt: now.addingTimeInterval(120)) == "Request failed, retrying in 2m")
         #expect(status(.error) == "Request failed, retrying soon")
+    }
+
+    @Test func pendingStatusHasAShortTitleAndTheFullLine() {
+        func status(_ state: UsageStore.ProviderState?, retryAt: Date? = nil) -> (title: String, detail: String) {
+            UsageCopy.pendingStatus(state: state, signInHint: "Run codex login", retryAt: retryAt, now: now)
+        }
+
+        #expect(status(nil) == ("Fetching", "Fetching usage"))
+        #expect(status(.ok) == ("No limits", "This plan reports no rate limits"))
+        #expect(status(.notAvailable(.signedOut)) == ("Not signed in", "Not signed in. Run codex login."))
+        #expect(status(.notAvailable(.expired)).title == "Login expired")
+        #expect(status(.rateLimited, retryAt: now.addingTimeInterval(240)).detail == "Rate limited, retrying in 4m")
+        #expect(status(.error).detail == "Request failed, retrying soon")
+    }
+
+    @Test func noProviderTextListsTheCLIs() {
+        #expect(UsageCopy.noProviderText(names: ["Claude Code", "Codex", "Cursor"])
+            ==
+            "No coding agent found. Install Claude Code, Codex or Cursor, or turn one on under Providers in settings.")
+        #expect(UsageCopy.noProviderText(names: ["Codex"]).hasPrefix("No coding agent found. Install Codex,"))
     }
 
     @Test func alertHeadlineNamesTheWindowAndTheMark() {

@@ -77,11 +77,16 @@ final class UsageAlerts {
     }
 
     #if DEBUG
-        /// 80% on the given window, for checking the card. Not saved.
+        private var testNotice: UsageAlertNotice?
+
+        /// 80% on the given window, for `DebugTrigger`. Never saved: `save()`
+        /// drops this exact notice, so a real one for the same rule still lands.
         func showTestNotice(providerID: String, window: UsageWindow) {
             let rule = UsageAlertRule(providerID: providerID, windowID: window.id, percent: 80)
+            let notice = UsageAlertNotice(rule: rule, window: window, firedAt: .now)
+            testNotice = notice
             state.pending.removeAll { $0.rule == rule }
-            state.pending.insert(UsageAlertNotice(rule: rule, window: window, firedAt: .now), at: 0)
+            state.pending.insert(notice, at: 0)
             alertGeneration += 1
         }
     #endif
@@ -95,7 +100,11 @@ final class UsageAlerts {
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(state) {
+        var persisted = state
+        #if DEBUG
+            persisted.pending.removeAll { $0 == testNotice }
+        #endif
+        if let data = try? JSONEncoder().encode(persisted) {
             defaults.set(data, forKey: Self.defaultsKey)
         }
     }
