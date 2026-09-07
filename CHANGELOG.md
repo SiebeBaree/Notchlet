@@ -8,6 +8,20 @@
   anything anywhere. A find opens the notch with the kind of key, its first and last
   characters, and a link to how to fix it. Ignore it or report a
   false positive. One toggle in settings turns scanning off.
+- A notification, whether a limit passed a mark or a key was found, now
+  stays in the notch until you deal with it, and opens with the same
+  animation as a hover.
+- Notchlet starts at login, on a fresh install and once after this update.
+  The switch in settings still turns it off.
+- The share image can say how much you got for your subscription: type what
+  you pay a month in the share editor and the 30-day image shows the cost
+  as a multiple of it. The image is a quarter of the size it was and copies
+  in a third of the time.
+- Settings explain the secret scanner and the agent line behind an info
+  icon instead of a line of text, and the Claude sign-in picker no longer
+  stretches its page.
+- The historic view shows $0 for an empty period and drops the "History
+  since" note.
 
 ## 0.3.0
 

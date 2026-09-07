@@ -72,11 +72,14 @@ nonisolated struct ShareCard: Equatable, Sendable {
         graph == .none ? 5 : 3
     }
 
+    /// `planPrice` is what the person pays a month for these providers;
+    /// over 30 days with cost on it becomes the multiple they got for it.
     static func make(
         options: ShareOptions,
         providers: [Provider],
         ledger: UsageLedger,
         coverageStart: DayKey?,
+        planPrice: Double? = nil,
         today: DayKey,
         calendar: Calendar
     ) -> ShareCard {
@@ -90,16 +93,21 @@ nonisolated struct ShareCard: Equatable, Sendable {
         let caption: String
         var stats: [Stat] = []
         if summary.tokens == 0 {
+            // The view's headline already says "No usage".
             headline = .none
-            caption = "No \(who) usage \(when)"
+            caption = "\(who.prefix(1).uppercased() + who.dropFirst()) \(when)"
         } else if options.showsCost, let cost = summary.cost {
             headline = .cost(HistoryCopy.cost(cost))
-            caption = "\(who.prefix(1).uppercased() + who.dropFirst()) usage at API list prices"
+            caption = "\(who.prefix(1).uppercased() + who.dropFirst()) usage at API prices"
             stats.append(Stat(value: HistoryCopy.tokens(summary.tokens), label: "tokens"))
-            stats.append(Stat(value: count(summary.requests), label: "requests"))
-            if options.period == .today {
-                stats.append(Stat(value: count(models.count), label: models.count == 1 ? "model" : "models"))
+            // Four stats is what fits beside the headline, so the plan
+            // multiple takes the requests' slot.
+            if options.period == .month, let plan = planStat(cost: cost, planPrice: planPrice) {
+                stats.append(plan)
             } else {
+                stats.append(Stat(value: count(summary.requests), label: "requests"))
+            }
+            if options.period != .today {
                 stats += dayStats(ledger: ledger, span: span, period: options.period, calendar: calendar)
             }
         } else {
@@ -109,22 +117,18 @@ nonisolated struct ShareCard: Equatable, Sendable {
             if options.period != .today {
                 stats += dayStats(ledger: ledger, span: span, period: options.period, calendar: calendar)
             }
-            stats.append(Stat(value: count(models.count), label: models.count == 1 ? "model" : "models"))
         }
 
         var activity: ActivityGrid?
         var spend: SpendSeries?
-        var graphStart: DayKey?
         switch summary.tokens == 0 ? .none : options.graph {
         case .activity:
             let gridSpan = today.advanced(by: -(ActivityGrid.weeks * 7), calendar: calendar) ... today
-            let grid = ActivityGrid(
+            activity = ActivityGrid(
                 today: today, calendar: calendar,
                 tokens: ledger.byDay(gridSpan).mapValues(\.summary.tokens),
                 coverageStart: coverageStart
             )
-            activity = grid
-            graphStart = grid.start
         case .spend:
             let start = today.advanced(by: 1 - SpendSeries.days, calendar: calendar)
             spend = SpendSeries(
@@ -132,7 +136,6 @@ nonisolated struct ShareCard: Equatable, Sendable {
                 costs: ledger.byDay(start ... today).compactMapValues(\.summary.cost),
                 coverageStart: coverageStart
             )
-            graphStart = start
         case .none:
             break
         }
@@ -148,15 +151,7 @@ nonisolated struct ShareCard: Equatable, Sendable {
             }
             : []
 
-        // Coverage inside the period is said in the header; the footer
-        // only repeats it when the graph reaches further back.
-        let coverageInPeriod = coverageStart.map { $0 > span.lowerBound } ?? false
-        var caveats = HistoryCopy.caveats(
-            unpricedModels: headline.isCost ? summary.unpricedModels : [],
-            coverageStart: coverageInPeriod ? nil : coverageStart,
-            graphStart: graphStart ?? span.lowerBound,
-            calendar: calendar
-        )
+        var caveats = HistoryCopy.caveats(unpricedModels: headline.isCost ? summary.unpricedModels : [])
         if caveats.isEmpty {
             caveats = [tagline]
         }
@@ -237,6 +232,25 @@ nonisolated struct ShareCard: Equatable, Sendable {
             Stat(value: period == .year ? count(active) : "\(active) of \(period.days)", label: "days active"),
             Stat(value: streak == 1 ? "1 day" : "\(streak) days", label: "longest streak"),
         ]
+    }
+
+    /// "4.6x" over "your $200 plan": what the month's API cost is as a
+    /// multiple of the subscription. Nil without a price.
+    static func planStat(cost: Double, planPrice: Double?) -> Stat? {
+        guard let planPrice, planPrice > 0 else { return nil }
+        let multiple = cost / planPrice
+        let tenths = (multiple * 10).rounded() / 10
+        let value = tenths >= 10 || tenths == tenths.rounded()
+            ? String(Int(tenths.rounded()))
+            : String(format: "%.1f", tenths)
+        return Stat(value: "\(value)x", label: "your \(planLabel(planPrice)) plan")
+    }
+
+    /// "$200", or "$19.99" when the cents matter.
+    private static func planLabel(_ price: Double) -> String {
+        price == price.rounded()
+            ? "$" + Int(price).formatted(.number.locale(Locale(identifier: "en_US")))
+            : HistoryCopy.cost(price)
     }
 
     /// "3,418".

@@ -10,11 +10,18 @@ final class ShareEditorModel {
     private static let graphKey = "share.graph"
     private static let modelsKey = "share.models"
     private static let themeKey = "share.theme"
+    private static let plansKey = "share.plans"
 
     let history: UsageHistory
     var scope: UsageHistory.Scope
     var options: ShareOptions {
         didSet { save() }
+    }
+
+    /// Dollars a month per scope, so All can hold the sum of several
+    /// subscriptions while each provider keeps its own.
+    private var planPrices: [String: Double] {
+        didSet { UserDefaults.standard.set(planPrices, forKey: Self.plansKey) }
     }
 
     private(set) var toast: String?
@@ -43,6 +50,20 @@ final class ShareEditorModel {
             options.theme = theme
         }
         self.options = options
+        planPrices = defaults.dictionary(forKey: Self.plansKey) as? [String: Double] ?? [:]
+    }
+
+    var planPrice: Double? {
+        get { planPrices[effectiveScope.rawValue] }
+        set {
+            planPrices[effectiveScope.rawValue] = newValue.flatMap { $0 > 0 ? $0 : nil }
+            Analytics.capture(.settingChanged(key: "share_plan_price", value: planPrice == nil ? "cleared" : "set"))
+        }
+    }
+
+    /// The multiple needs a month of cost to compare with a monthly price.
+    var showsPlan: Bool {
+        options.period == .month && options.showsCost && summary.cost != nil && !isReadingLogs && summary.tokens > 0
     }
 
     private func save() {
@@ -96,6 +117,7 @@ final class ShareEditorModel {
             providers: scopedProviders,
             ledger: history.ledger(effectiveScope),
             coverageStart: history.coverageStart(effectiveScope),
+            planPrice: planPrice,
             today: history.today,
             calendar: history.calendar
         )
@@ -105,13 +127,17 @@ final class ShareEditorModel {
         !isReadingLogs && card.hasUsage
     }
 
+    private func image() -> CGImage? {
+        ShareRenderer.image(card: card, theme: theme, calendar: history.calendar)
+    }
+
     private func png() -> Data? {
-        ShareRenderer.png(card: card, theme: theme, calendar: history.calendar)
+        image().flatMap(ShareRenderer.png)
     }
 
     func copy() {
-        guard canExport, let png = png() else { return }
-        ShareRenderer.copy(png)
+        guard canExport, let image = image() else { return }
+        ShareRenderer.copy(image)
         show(toast: "Copied. Paste it anywhere.")
         track("copy")
     }
@@ -126,8 +152,8 @@ final class ShareEditorModel {
     }
 
     func share() {
-        guard canExport, let anchor = shareAnchor, let png = png(), let image = NSImage(data: png) else { return }
-        let picker = NSSharingServicePicker(items: [image])
+        guard canExport, let anchor = shareAnchor, let image = image() else { return }
+        let picker = NSSharingServicePicker(items: [NSImage(cgImage: image, size: ShareCardView.size)])
         picker.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
         track("share")
     }

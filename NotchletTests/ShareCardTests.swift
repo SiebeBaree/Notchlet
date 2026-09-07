@@ -37,18 +37,18 @@ struct ShareCardTests {
     ])
 
     private func make(_ options: ShareOptions, providers: [ShareCard.Provider] = [claude],
-                      coverageStart: DayKey? = nil) -> ShareCard
+                      coverageStart: DayKey? = nil, planPrice: Double? = nil) -> ShareCard
     {
         ShareCard.make(
             options: options, providers: providers, ledger: ledger,
-            coverageStart: coverageStart, today: today, calendar: calendar
+            coverageStart: coverageStart, planPrice: planPrice, today: today, calendar: calendar
         )
     }
 
     @Test func costHeadlineWithItsStats() {
         let card = make(ShareOptions(period: .week))
         #expect(card.headline == .cost("$120.02"))
-        #expect(card.caption == "Claude Code usage at API list prices")
+        #expect(card.caption == "Claude Code usage at API prices")
         #expect(card.period == "Last 7 days · Aug 28 to Sep 3, 2026")
         #expect(card.stats.map(\.value) == ["5M", "18", "5 of 7", "2 days"])
         #expect(card.stats.map(\.label) == ["tokens", "requests", "days active", "longest streak"])
@@ -65,8 +65,7 @@ struct ShareCardTests {
         let card = make(options, providers: [Self.claude, Self.codex])
         #expect(card.headline == .tokens("5M"))
         #expect(card.caption == "tokens with Claude Code and Codex in 30 days")
-        #expect(card.stats.map(\.label) == ["requests", "days active", "longest streak", "models"])
-        #expect(card.stats.last?.value == "3")
+        #expect(card.stats.map(\.label) == ["requests", "days active", "longest streak"])
         // Unpriced models are only a caveat when a cost is shown.
         #expect(card.footer == ShareCard.tagline)
     }
@@ -74,8 +73,30 @@ struct ShareCardTests {
     @Test func todayHasNoDayStats() {
         let card = make(ShareOptions(period: .today))
         #expect(card.period == "Today · Sep 3, 2026")
-        #expect(card.stats.map(\.label) == ["tokens", "requests", "model"])
+        #expect(card.stats.map(\.label) == ["tokens", "requests"])
         #expect(card.headline == .cost("$7.50"))
+    }
+
+    @Test func planPriceBecomesAMultipleOverThirtyDays() {
+        let card = make(ShareOptions(period: .month), planPrice: 20)
+        #expect(card.headline == .cost("$120.02"))
+        #expect(card.stats.map(\.label) == ["tokens", "your $20 plan", "days active", "longest streak"])
+        #expect(card.stats[1].value == "6x")
+        // Only a month compares with a monthly price, and only in dollars.
+        #expect(make(ShareOptions(period: .week), planPrice: 20).stats.map(\.label).contains("requests"))
+        var tokens = ShareOptions(period: .month)
+        tokens.showsCost = false
+        #expect(make(tokens, planPrice: 20).stats.map(\.label).contains("requests"))
+    }
+
+    @Test func planMultipleReadsCleanly() {
+        #expect(ShareCard.planStat(cost: 8000, planPrice: 200)?.value == "40x")
+        #expect(ShareCard.planStat(cost: 913.10, planPrice: 200)?.value == "4.6x")
+        #expect(ShareCard.planStat(cost: 1000, planPrice: 200)?.value == "5x")
+        #expect(ShareCard.planStat(cost: 80, planPrice: 200)?.value == "0.4x")
+        #expect(ShareCard.planStat(cost: 80, planPrice: 19.99)?.label == "your $19.99 plan")
+        #expect(ShareCard.planStat(cost: 80, planPrice: 0) == nil)
+        #expect(ShareCard.planStat(cost: 80, planPrice: nil) == nil)
     }
 
     @Test func nothingInThePeriodMeansNoHeadline() {
@@ -86,7 +107,7 @@ struct ShareCardTests {
         )
         #expect(card.headline == .none)
         #expect(card.hasUsage == false)
-        #expect(card.caption == "No Claude Code usage in 30 days")
+        #expect(card.caption == "Claude Code in 30 days")
         #expect(card.stats.isEmpty)
         #expect(card.models.isEmpty)
         #expect(card.hasGraph == false)
@@ -99,12 +120,12 @@ struct ShareCardTests {
         #expect(card.stats[2].value == "5")
     }
 
-    @Test func coverageOlderThanThePeriodStaysInTheFooter() {
+    @Test func coverageOlderThanThePeriodLeavesTheHeaderAlone() {
         var options = ShareOptions(period: .week)
         options.showsCost = false
         let card = make(options, coverageStart: TestSupport.day("2026-05-01"))
         #expect(card.period == "Last 7 days · Aug 28 to Sep 3, 2026")
-        #expect(card.footer == "History since May 1")
+        #expect(card.footer == ShareCard.tagline)
     }
 
     @Test func modelRowsGrowWithoutAGraph() {
@@ -142,6 +163,9 @@ struct ShareCardTests {
         let bitmap = try #require(NSBitmapImageRep(data: png))
         #expect(bitmap.pixelsWide == 2400)
         #expect(bitmap.pixelsHigh == 1350)
+        // 16 bits per channel is what ImageRenderer gives by default, and a
+        // 10 MB PNG with it.
+        #expect(bitmap.bitsPerSample == 8)
         let corner = try #require(bitmap.colorAt(x: 10, y: 10))
         let middle = try #require(bitmap.colorAt(x: 1200, y: 700))
         #expect(corner != middle)

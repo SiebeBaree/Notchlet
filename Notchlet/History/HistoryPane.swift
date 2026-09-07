@@ -55,12 +55,7 @@ struct HistoryPane: View {
                 providers: providers,
                 showsAll: $showsAllModels
             )
-            footer(
-                unpricedModels: selected.unpricedModels,
-                coverageStart: coverageStart,
-                graphStart: grid.start,
-                providers: providers
-            )
+            footer(unpricedModels: selected.unpricedModels, providers: providers)
         }
     }
 
@@ -107,12 +102,7 @@ struct HistoryPane: View {
     }
 
     /// The caveats, or what is standing in the way of any numbers at all.
-    private func footer(
-        unpricedModels: [String],
-        coverageStart: DayKey?,
-        graphStart: DayKey,
-        providers: [any UsageProvider]
-    ) -> some View {
+    private func footer(unpricedModels: [String], providers: [any UsageProvider]) -> some View {
         let failed = providers.filter { history.failedProviderIDs.contains($0.id) }
         let text: String = if providers.isEmpty {
             "No usage logs found"
@@ -121,10 +111,7 @@ struct HistoryPane: View {
         } else if history.lastIngestAt == nil {
             "Reading logs"
         } else {
-            HistoryCopy.footer(
-                unpricedModels: unpricedModels, coverageStart: coverageStart,
-                graphStart: graphStart, calendar: history.calendar
-            )
+            HistoryCopy.footer(unpricedModels: unpricedModels)
         }
         return Text(text)
             .font(.system(size: 10))
@@ -147,10 +134,12 @@ private struct RangeTile: View {
                     .font(.system(size: 10.5))
                     .foregroundStyle(.white.opacity(isSelected ? 0.85 : 0.5))
                 if summary.tokens == 0 {
-                    Text("No usage")
-                        .font(.system(size: 13))
+                    Text("$0")
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.4))
-                        .padding(.top, 4)
+                    Text("0 tokens")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.white.opacity(0.55))
                 } else if let cost = summary.cost {
                     Text(HistoryCopy.cost(cost))
                         .font(.system(size: 20, weight: .semibold))

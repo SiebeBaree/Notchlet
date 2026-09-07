@@ -117,6 +117,8 @@ struct NotchSettingsView: View {
             )
             toggleRow(
                 "Scan chats for leaked secrets",
+                tip: scanner.isAvailable ? Self
+                    .secretScanTip(providerNames: scannedProviderNames) : "Needs Apple silicon",
                 isOn: Binding(
                     get: { secretScanEnabled && scanner.isAvailable },
                     set: { enabled in
@@ -126,19 +128,18 @@ struct NotchSettingsView: View {
                 )
             )
             .disabled(!scanner.isAvailable)
-            if let status = scanner.isAvailable ? SecretsPane.statusText(scanner.status) : "Needs Apple silicon" {
-                Text(status)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .padding(.top, -6)
-            }
+            // A tip drops over the rows below it, so each row with one
+            // sits above the next.
+            .zIndex(2)
             toggleRow(
                 "Show when an agent needs you",
+                tip: Self.agentWaitTip,
                 isOn: Binding(
                     get: { waits.isEnabled },
                     set: { waits.setEnabled($0) }
                 )
             )
+            .zIndex(1)
             HStack {
                 Text("Refresh every")
                     .font(.system(size: 11.5))
@@ -216,9 +217,26 @@ struct NotchSettingsView: View {
         DeviceInfo.isDevelopment ? "Notchlet Development" : "Notchlet \(DeviceInfo.appVersion)"
     }
 
+    private var scannedProviderNames: [String] {
+        store.entries.filter { $0.provider.secrets != nil }.map(\.provider.name)
+    }
+
+    static func secretScanTip(providerNames: [String]) -> String {
+        let hours = Int(SecretScanSchedule.interval / 3600)
+        let cadence = hours == 1 ? "every hour" : "every \(hours) hours"
+        let chats = providerNames.isEmpty ? "your chats" : "your \(providerNames.joined(separator: " and ")) chats"
+        return "Runs betterleaks over \(chats) on this Mac, once the Mac has been idle for two minutes and then "
+            + "\(cadence) over what changed. Nothing leaves the Mac."
+    }
+
+    static let agentWaitTip = "Draws a line around the notch while an agent waits on you. Blue means it finished "
+        + "its turn, amber means it is asking for permission or an answer. Hovering, switching back to its terminal "
+        + "or sending the next prompt clears it."
+
     #if DEBUG
-        /// Three seconds is time to move the mouse out: an alert only opens
-        /// a closed notch, and a wait only outlines one.
+        /// Three seconds is time to move the mouse out: a notification
+        /// waits for the hover to end, and a wait only outlines a closed
+        /// notch.
         private func fire(_ trigger: DebugTrigger) {
             notice = "\(trigger.title) fires in 3s, move the mouse out"
             let targets = DebugTrigger.Targets(store: store, scanner: scanner, alerts: alerts, waits: waits)
@@ -243,16 +261,59 @@ struct NotchSettingsView: View {
         .onTapGesture(perform: action)
     }
 
-    private func toggleRow(_ label: String, isOn: Binding<Bool>) -> some View {
-        HStack {
+    private func toggleRow(_ label: String, tip: String? = nil, isOn: Binding<Bool>) -> some View {
+        ToggleRow(label: label, tip: tip, isOn: isOn)
+    }
+}
+
+/// A switch with its label and, when there is more to say, an info icon
+/// whose explanation drops in under the row while hovered. Drawn inside
+/// the notch rather than as a system tooltip, which is its own window and
+/// slow to appear.
+private struct ToggleRow: View {
+    let label: String
+    let tip: String?
+    let isOn: Binding<Bool>
+
+    @State private var showsTip = false
+
+    var body: some View {
+        HStack(spacing: 5) {
             Text(label)
                 .font(.system(size: 11.5))
                 .foregroundStyle(.white.opacity(0.85))
+            if tip != nil {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(showsTip ? 0.85 : 0.4))
+                    .frame(width: 14, height: 14)
+                    .contentShape(.rect)
+                    .onHover { hovering in
+                        withAnimation(.easeOut(duration: 0.12)) {
+                            showsTip = hovering
+                        }
+                    }
+            }
             Spacer()
             Toggle(label, isOn: isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .controlSize(.mini)
+        }
+        .overlay(alignment: .bottomLeading) {
+            if showsTip, let tip {
+                Text(tip)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .frame(width: 300, alignment: .leading)
+                    .background(Color(white: 0.16), in: .rect(cornerRadius: 6))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.14)))
+                    .alignmentGuide(.bottom) { $0[.top] - 6 }
+                    .transition(.opacity)
+            }
         }
     }
 }

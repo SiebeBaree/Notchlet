@@ -1,8 +1,8 @@
 import AppKit
 import Observation
 
-/// The scan loop and what it found, one provider at a time. New findings
-/// open the notch through `alertGeneration`, once someone is at the Mac.
+/// The scan loop and what it found, one provider at a time. The notch
+/// stays open on `pending` until every finding is dealt with.
 @Observable
 final class SecretScanner {
     static let enabledDefaultsKey = "secretScanEnabled"
@@ -15,13 +15,11 @@ final class SecretScanner {
     /// While betterleaks runs, not while the loop merely looks.
     private(set) var isScanning = false
     private(set) var failedProviderIDs: Set<String> = []
-    private(set) var alertGeneration = 0
     /// `DebugTrigger`'s made-up finding, kept out of the saved state; empty
     /// in release builds.
     private var testFindings: [SecretFinding] = []
     private var loop: Task<Void, Never>?
     private var isTicking = false
-    private let presence = UserPresence()
 
     init(store: UsageStore, stateStore: SecretStateStore = .default, defaults: UserDefaults = .standard) {
         self.store = store
@@ -60,7 +58,6 @@ final class SecretScanner {
                 firstSeenAt: .now,
                 status: .pending
             )]
-            alertGeneration += 1
         }
     #endif
 
@@ -128,7 +125,6 @@ final class SecretScanner {
             idleSeconds: UserPresence.idleSeconds,
             thermalState: ProcessInfo.processInfo.thermalState
         )
-        var new = 0
         for provider in providers {
             let lastScanAt = state.lastScanAt[provider.id]
             let action = SecretScanSchedule.action(lastScanAt: lastScanAt, now: .now, conditions: conditions)
@@ -144,7 +140,6 @@ final class SecretScanner {
                 state.lastScanAt[provider.id] = startedAt
                 try? stateStore.save(state)
                 failedProviderIDs.remove(provider.id)
-                new += merged.new
                 Analytics.capture(.secretScanCompleted(
                     provider: provider.id,
                     kind: action == .full ? "full" : "hourly",
@@ -156,11 +151,6 @@ final class SecretScanner {
                 return
             } catch {
                 failedProviderIDs.insert(provider.id)
-            }
-        }
-        if new > 0 {
-            presence.whenActive { [weak self] in
-                self?.alertGeneration += 1
             }
         }
     }

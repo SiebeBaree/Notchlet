@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The collapsed notch shape shows nothing; hovering expands it into the
-/// usage card, and the corner icons swap in the other panes. Only the
-/// notch shape is drawn: the panel is non-opaque, so clicks in the
-/// transparent area go to the window below.
+/// usage card, and the corner icons swap in the other panes. A
+/// notification holds it open until it is dealt with. Only the notch shape
+/// is drawn: the panel is non-opaque, so clicks in the transparent area go
+/// to the window below.
 struct NotchView: View {
     private enum Pane {
         case usage
@@ -32,8 +33,6 @@ struct NotchView: View {
     @State private var openedAt: Date?
     @State private var openDebounce: Task<Void, Never>?
     @State private var isHovering = false
-    /// Folds an alert the user never hovered back into the notch.
-    @State private var autoCollapse: Task<Void, Never>?
     /// Mirrors `waits.isWaiting` while collapsed so the change can animate
     /// and the window can shrink after it.
     @State private var isOutlined = false
@@ -42,20 +41,31 @@ struct NotchView: View {
         max(notchSize.width + 220, 430)
     }
 
+    /// The notification the notch holds open until it is dealt with: a
+    /// usage alert first, then leaked secrets.
+    private var notificationPane: Pane? {
+        if alerts.current != nil {
+            return .alerts
+        }
+        if !scanner.pending.isEmpty {
+            return .secrets
+        }
+        return nil
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             shape
                 .onHover { hovering in
                     isHovering = hovering
                     if hovering {
-                        autoCollapse?.cancel()
                         waits.clearAll(by: "hover")
-                        // An unacknowledged alert comes first on every hover.
-                        if !isExpanded, alerts.current != nil {
-                            pane = .alerts
-                        }
+                    } else if let notificationPane {
+                        // Leaving hands the notch back to the notification.
+                        focusedProviderID = nil
+                        show(notificationPane)
                     }
-                    setExpanded(hovering)
+                    setExpanded(hovering || notificationPane != nil)
                     store.setPanelOpen(hovering)
                     trackOpenClose(hovering: hovering)
                 }
@@ -67,27 +77,40 @@ struct NotchView: View {
                 setOutlined(waiting)
             }
         }
-        .onChange(of: scanner.alertGeneration) { _, _ in showAlert(.secrets) }
-        .onChange(of: alerts.alertGeneration) { _, _ in showAlert(.alerts) }
-        .onChange(of: alerts.current == nil) { _, none in
-            if none, pane == .alerts {
-                show(.usage)
+        .onChange(of: notificationPane, initial: true) { _, target in
+            let onNotification = pane == .alerts || pane == .secrets
+            if let target {
+                // Someone reading another pane is not interrupted; they see
+                // it when they leave.
+                if !isHovering || onNotification {
+                    showNotification(target)
+                }
+            } else {
+                if onNotification {
+                    show(.usage)
+                }
+                if !isHovering {
+                    setExpanded(false)
+                }
             }
         }
     }
 
-    /// Opens the notch for twelve seconds, or for as long as the mouse is
-    /// in it. Not through `setPanelOpen`: an alert is not the user looking
-    /// at usage, so it never speeds up the polling. A panel already open on
-    /// another pane keeps it.
-    private func showAlert(_ target: Pane) {
-        guard !isExpanded else { return }
-        pane = target
-        setExpanded(true)
-        autoCollapse = Task {
-            try? await Task.sleep(for: .seconds(12))
-            guard !Task.isCancelled, !isHovering else { return }
-            setExpanded(false)
+    /// Not through `setPanelOpen`: a notification is not the user looking
+    /// at usage, so it never speeds up the polling. The hop off the current
+    /// update matters: `onChange` runs inside SwiftUI's update, where the
+    /// window growing and the card expanding would land in one animated
+    /// transaction and the card would grow out of the top-left corner
+    /// instead of the notch.
+    private func showNotification(_ target: Pane) {
+        Task { @MainActor in
+            guard notificationPane == target else { return }
+            if isExpanded {
+                show(target)
+            } else {
+                pane = target
+                setExpanded(true)
+            }
         }
     }
 
@@ -143,6 +166,7 @@ struct NotchView: View {
     /// The window grows before the card appears and shrinks only once the
     /// collapse has settled; a hover that returns mid-collapse keeps it.
     private func setExpanded(_ expanded: Bool) {
+        guard expanded != isExpanded else { return }
         if expanded {
             resizePanel(true, false)
         }
