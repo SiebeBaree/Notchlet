@@ -1,7 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
+- The notch draws a line around itself while an agent is waiting on you. Blue
+  when it finished, amber when it is asking something. One switch in settings
+  installs a two-line hook into Claude Code, Codex, Cursor and OpenCode, and
+  takes exactly those lines back out again. The line clears when you hover the
+  notch, when you switch back to the terminal that runs the agent, or on that
+  session's next prompt.
+- A notification when a limit passes a mark you set. Pick a percent per limit
+  in settings and the notch opens on the refresh that already happens, once
+  per cycle, remembered across relaunches.
+- Claude Code limits without the CLI. If Claude Desktop is signed in, Notchlet
+  reads the token it saved for its Code tab. It never refreshes that token, so
+  Desktop stays signed in.
+- A provider with no gauges says why: not signed in, login expired, rate
+  limited, or a plan that reports no limits, and what to do about it.
 - Leaked secrets in your chats. Notchlet ships betterleaks and scans the
   Claude Code and Codex transcripts on this Mac for API keys and tokens, once
   when the Mac is idle and then hourly over what changed, never sending
