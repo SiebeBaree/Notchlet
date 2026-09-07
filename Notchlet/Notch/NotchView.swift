@@ -36,6 +36,10 @@ struct NotchView: View {
     /// Mirrors `waits.isWaiting` while collapsed so the change can animate
     /// and the window can shrink after it.
     @State private var isOutlined = false
+    /// The root's height as SwiftUI last laid it out, which lags the
+    /// window by an update, and whether an expansion is waiting on it.
+    @State private var rootHeight: CGFloat = 0
+    @State private var expandsWhenRootGrows = false
 
     private var expandedWidth: CGFloat {
         max(notchSize.width + 220, 430)
@@ -77,6 +81,13 @@ struct NotchView: View {
         // shape from the window's left edge whenever the resize and the
         // expansion land in one animated update.
         .frame(width: NotchGeometry.panelSize.width)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            rootHeight = height
+            if expandsWhenRootGrows, height >= NotchGeometry.panelSize.height {
+                expandsWhenRootGrows = false
+                animateExpansion()
+            }
+        }
         .onChange(of: waits.isWaiting, initial: true) { _, waiting in
             if !isExpanded {
                 setOutlined(waiting)
@@ -163,24 +174,42 @@ struct NotchView: View {
 
     /// The window grows before the card appears and shrinks only once the
     /// collapse has settled; a hover that returns mid-collapse keeps it.
+    /// The card waits for the root to be laid out at the grown window:
+    /// SwiftUI takes the new size an update late, and until then the old
+    /// layout sits at the bottom-left of the grown view, so an expansion
+    /// started in the same update as that catch-up slides the card in from
+    /// the corner instead of growing it out of the notch.
     private func setExpanded(_ expanded: Bool) {
-        guard expanded != isExpanded else { return }
+        let isOpening = isExpanded || expandsWhenRootGrows
+        guard expanded != isOpening else { return }
+        expandsWhenRootGrows = false
         if expanded {
             resizePanel(true, false)
+            if rootHeight >= NotchGeometry.panelSize.height {
+                animateExpansion()
+            } else {
+                expandsWhenRootGrows = true
+            }
+            return
         }
         withAnimation(.spring(duration: 0.35, bounce: 0.15), completionCriteria: .removed) {
-            isExpanded = expanded
+            isExpanded = false
             // A wait that arrived while the card was open shows on the
             // way back down.
-            isOutlined = !expanded && waits.isWaiting
-            if !expanded {
-                focusedProviderID = nil
-                pane = .usage
-            }
+            isOutlined = waits.isWaiting
+            focusedProviderID = nil
+            pane = .usage
         } completion: {
             if !isExpanded {
                 resizePanel(false, isOutlined)
             }
+        }
+    }
+
+    private func animateExpansion() {
+        withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+            isExpanded = true
+            isOutlined = false
         }
     }
 
