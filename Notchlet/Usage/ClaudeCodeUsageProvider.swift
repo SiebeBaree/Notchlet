@@ -35,6 +35,8 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         let optionID: String
         let accessToken: String
         let expiresAt: Date
+        /// Desktop's token says nothing about the plan.
+        var plan: UsagePlan?
     }
 
     /// Reused until it expires: every option's read spawns a process and a
@@ -70,9 +72,16 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         } else {
             credentials
         }
-        let fresh = Cached(optionID: option.id, accessToken: current.accessToken, expiresAt: current.expiresAt)
+        let fresh = Cached(
+            optionID: option.id, accessToken: current.accessToken, expiresAt: current.expiresAt, plan: current.plan
+        )
         cache.withLock { $0 = fresh }
         return Self.headers(token: current.accessToken)
+    }
+
+    /// The usage response never names the plan; the credentials do.
+    func plan(from data: Data) -> UsagePlan? {
+        cache.withLock { $0?.plan }
     }
 
     /// Detached so a cancelled poll cannot abandon it halfway: once the

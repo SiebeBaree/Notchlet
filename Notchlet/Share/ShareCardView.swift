@@ -165,7 +165,7 @@ struct ShareCardView: View {
                             .font(.system(size: 15))
                             .foregroundStyle(theme.muted)
                     }
-                    .frame(width: Self.contentWidth / 4, alignment: .leading)
+                    .frame(width: Self.contentWidth / CGFloat(max(card.stats.count, 1)), alignment: .leading)
                 }
             }
             .padding(.top, 44)

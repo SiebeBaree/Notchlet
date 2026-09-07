@@ -40,11 +40,13 @@ struct ProviderSettingsPage: View {
                     ProviderToggle(store: store, entry: entry)
                 }
                 if provider.authOptions.count > 1 {
-                    HStack {
+                    // Under the label, not beside it: four segments do not
+                    // fit next to one, and a segmented control that is
+                    // squeezed grows tall instead of narrow.
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Sign in with")
                             .font(.system(size: 11.5))
                             .foregroundStyle(.white.opacity(0.85))
-                        Spacer()
                         Picker("Sign in with", selection: $selection) {
                             Text("Auto").tag(AuthSelection.auto)
                             ForEach(provider.authOptions) { option in
@@ -54,7 +56,6 @@ struct ProviderSettingsPage: View {
                         .labelsHidden()
                         .pickerStyle(.segmented)
                         .controlSize(.small)
-                        .fixedSize()
                         .onChange(of: selection) { _, selection in
                             ProviderAuthSettings.setSelection(selection, for: providerID)
                             store.refreshNow(providerID)

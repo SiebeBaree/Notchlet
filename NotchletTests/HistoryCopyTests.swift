@@ -36,16 +36,9 @@ struct HistoryCopyTests {
     }
 
     @Test func footerNamesTheGapsInOrder() {
-        let graphStart = TestSupport.day("2025-09-01")
-        #expect(HistoryCopy.footer(unpricedModels: [], coverageStart: nil, graphStart: graphStart, calendar: utc)
-            == "Cost at API list prices")
-        #expect(HistoryCopy.footer(
-            unpricedModels: ["codex-auto-review"], coverageStart: TestSupport.day("2025-01-01"),
-            graphStart: graphStart, calendar: utc
-        ) == "Cost at API list prices · codex-auto-review not priced")
-        #expect(HistoryCopy.footer(
-            unpricedModels: ["a", "b", "c"], coverageStart: TestSupport.day("2026-07-24"),
-            graphStart: graphStart, calendar: utc
-        ) == "Cost at API list prices · a and 2 more not priced · History since Jul 24")
+        #expect(HistoryCopy.footer(unpricedModels: []) == "Cost at API prices")
+        #expect(HistoryCopy.footer(unpricedModels: ["codex-auto-review"])
+            == "Cost at API prices · codex-auto-review not priced")
+        #expect(HistoryCopy.footer(unpricedModels: ["a", "b", "c"]) == "Cost at API prices · a and 2 more not priced")
     }
 }

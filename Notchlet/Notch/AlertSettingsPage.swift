@@ -61,11 +61,11 @@ private struct ThresholdChip: View {
             Text("\(percent)")
                 .font(.system(size: 10.5, weight: isOn ? .semibold : .regular))
                 .monospacedDigit()
-                .foregroundStyle(isOn ? .black : .white.opacity(isHovering ? 0.85 : 0.5))
+                .foregroundStyle(isOn ? .white : .white.opacity(isHovering ? 0.85 : 0.5))
                 .frame(width: 34)
                 .padding(.vertical, 2)
                 .background(
-                    isOn ? NotchPalette.amber : .white.opacity(isHovering ? 0.12 : 0.06),
+                    isOn ? NotchPalette.blue : .white.opacity(isHovering ? 0.12 : 0.06),
                     in: .capsule
                 )
                 .contentShape(.capsule)

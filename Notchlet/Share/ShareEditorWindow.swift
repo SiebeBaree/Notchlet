@@ -6,10 +6,12 @@ final class ShareEditorWindowController: NSWindowController {
     static let windowSize = CGSize(width: 980, height: 640)
 
     private let history: UsageHistory
+    private let store: UsageStore
     private var model: ShareEditorModel?
 
-    init(history: UsageHistory) {
+    init(history: UsageHistory, store: UsageStore) {
         self.history = history
+        self.store = store
         super.init(window: nil)
     }
 
@@ -26,7 +28,7 @@ final class ShareEditorWindowController: NSWindowController {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let model = ShareEditorModel(history: history, scope: scope)
+        let model = ShareEditorModel(history: history, store: store, scope: scope)
         self.model = model
         let window = ShareEditorWindow(
             contentRect: CGRect(origin: .zero, size: Self.windowSize),

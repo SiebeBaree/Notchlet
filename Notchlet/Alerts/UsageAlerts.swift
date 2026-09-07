@@ -8,9 +8,7 @@ final class UsageAlerts {
     static let defaultsKey = "usageAlerts"
 
     private let defaults: UserDefaults
-    private let presence = UserPresence()
     private(set) var state: UsageAlertState
-    private(set) var alertGeneration = 0
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -19,7 +17,8 @@ final class UsageAlerts {
 
     var rules: Set<UsageAlertRule> { state.rules }
 
-    /// The newest notice nobody has acknowledged.
+    /// The newest notice nobody has acknowledged; the notch stays open on
+    /// it.
     var current: UsageAlertNotice? { state.pending.first }
 
     func isOn(_ rule: UsageAlertRule) -> Bool {
@@ -71,9 +70,6 @@ final class UsageAlerts {
             ))
         }
         save()
-        presence.whenActive { [weak self] in
-            self?.alertGeneration += 1
-        }
     }
 
     #if DEBUG
@@ -87,7 +83,6 @@ final class UsageAlerts {
             testNotice = notice
             state.pending.removeAll { $0.rule == rule }
             state.pending.insert(notice, at: 0)
-            alertGeneration += 1
         }
     #endif
 

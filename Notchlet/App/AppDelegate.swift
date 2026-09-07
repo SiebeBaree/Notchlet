@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let waits = AgentWaits { store.entries.filter(\.provider.isInstalled).map(\.id) }
         let updater = UpdateController()
-        let shareController = ShareEditorWindowController(history: history)
+        let shareController = ShareEditorWindowController(history: history, store: store)
         let notchController = NotchWindowController(
             store: store, history: history, updater: updater, scanner: scanner, alerts: alerts, waits: waits
         ) { scope in

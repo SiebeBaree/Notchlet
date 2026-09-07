@@ -47,6 +47,8 @@ struct UsageSnapshot: Equatable {
     /// Which auth option produced this snapshot, for the settings status
     /// line.
     var authOptionID: String?
+    /// The subscription behind these limits, when the provider says.
+    var plan: UsagePlan?
 
     /// What the summary gauge shows: the shortest window, the one that runs
     /// out in normal use. Among equals the first wins, so a provider whose

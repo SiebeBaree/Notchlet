@@ -152,6 +152,13 @@ struct ShareEditorView: View {
             isOn: $model.options.showsModels,
             isAvailable: hasUsage
         )
+        includeRow(
+            "Plan",
+            detail: model.planDetail,
+            isOn: $model.options.showsPlan,
+            isAvailable: hasUsage && model.options.period == .month && model.options.showsCost
+                && model.planPrice != nil
+        )
     }
 
     private var graphDetail: String {

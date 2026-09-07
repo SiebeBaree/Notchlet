@@ -1,8 +1,10 @@
 import SwiftUI
 
 enum NotchPalette {
-    /// Attention: a leaked key, a lit alert chip, a rate-limited provider.
+    /// Attention: a leaked key, a rate-limited provider.
     static let amber = Color(red: 0.85, green: 0.64, blue: 0.26)
+    /// The activity graph's blue, for a chosen chip.
+    static let blue = ActivityPalette.levels[2]
     static let rule = Color.white.opacity(0.15)
 
     static func pace(_ verdict: BurnProjection.Verdict?) -> Color {

@@ -71,34 +71,22 @@ nonisolated enum HistoryCopy {
         )
     }
 
-    /// "Cost at API list prices · gpt-5.7 not priced · History since Aug 12".
-    static func footer(unpricedModels: [String], coverageStart: DayKey?, graphStart: DayKey,
-                       calendar: Calendar) -> String
-    {
-        (["Cost at API list prices"] + caveats(
-            unpricedModels: unpricedModels, coverageStart: coverageStart, graphStart: graphStart, calendar: calendar
-        )).joined(separator: " · ")
+    /// "Cost at API prices · gpt-5.7 not priced".
+    static func footer(unpricedModels: [String]) -> String {
+        (["Cost at API prices"] + caveats(unpricedModels: unpricedModels)).joined(separator: " · ")
     }
 
-    /// What could not be priced, then how far back the archive goes when
-    /// that is less than the graph shows.
-    static func caveats(unpricedModels: [String], coverageStart: DayKey?, graphStart: DayKey,
-                        calendar: Calendar) -> [String]
-    {
-        var parts: [String] = []
+    /// What could not be priced.
+    static func caveats(unpricedModels: [String]) -> [String] {
         switch unpricedModels.count {
         case 0:
-            break
+            []
         case 1:
-            parts.append("\(unpricedModels[0]) not priced")
+            ["\(unpricedModels[0]) not priced"]
         case 2:
-            parts.append("\(unpricedModels[0]) and \(unpricedModels[1]) not priced")
+            ["\(unpricedModels[0]) and \(unpricedModels[1]) not priced"]
         default:
-            parts.append("\(unpricedModels[0]) and \(unpricedModels.count - 1) more not priced")
+            ["\(unpricedModels[0]) and \(unpricedModels.count - 1) more not priced"]
         }
-        if let coverageStart, coverageStart > graphStart {
-            parts.append("History since \(shortDay(coverageStart, calendar: calendar))")
-        }
-        return parts
     }
 }

@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The collapsed notch shape shows nothing; hovering expands it into the
-/// usage card, and the corner icons swap in the other panes. Only the
-/// notch shape is drawn: the panel is non-opaque, so clicks in the
-/// transparent area go to the window below.
+/// usage card, and the corner icons swap in the other panes. A
+/// notification holds it open until it is dealt with. Only the notch shape
+/// is drawn: the panel is non-opaque, so clicks in the transparent area go
+/// to the window below.
 struct NotchView: View {
     private enum Pane {
         case usage
@@ -32,14 +33,28 @@ struct NotchView: View {
     @State private var openedAt: Date?
     @State private var openDebounce: Task<Void, Never>?
     @State private var isHovering = false
-    /// Folds an alert the user never hovered back into the notch.
-    @State private var autoCollapse: Task<Void, Never>?
     /// Mirrors `waits.isWaiting` while collapsed so the change can animate
     /// and the window can shrink after it.
     @State private var isOutlined = false
+    /// The root's height as SwiftUI last laid it out, which lags the
+    /// window by an update, and whether an expansion is waiting on it.
+    @State private var rootHeight: CGFloat = 0
+    @State private var expandsWhenRootGrows = false
 
     private var expandedWidth: CGFloat {
         max(notchSize.width + 220, 430)
+    }
+
+    /// The notification the notch holds open until it is dealt with: a
+    /// usage alert first, then leaked secrets.
+    private var notificationPane: Pane? {
+        if alerts.current != nil {
+            return .alerts
+        }
+        if !scanner.pending.isEmpty {
+            return .secrets
+        }
+        return nil
     }
 
     var body: some View {
@@ -48,46 +63,63 @@ struct NotchView: View {
                 .onHover { hovering in
                     isHovering = hovering
                     if hovering {
-                        autoCollapse?.cancel()
                         waits.clearAll(by: "hover")
-                        // An unacknowledged alert comes first on every hover.
-                        if !isExpanded, alerts.current != nil {
-                            pane = .alerts
-                        }
+                    } else if let notificationPane {
+                        // Leaving hands the notch back to the notification.
+                        focusedProviderID = nil
+                        show(notificationPane)
                     }
-                    setExpanded(hovering)
+                    setExpanded(hovering || notificationPane != nil)
                     store.setPanelOpen(hovering)
                     trackOpenClose(hovering: hovering)
                 }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
+        // The panel's full width whatever the window is: both window sizes
+        // are centred on the notch, so an overflowing root keeps the shape
+        // in place, while a root that follows the window would slide the
+        // shape from the window's left edge whenever the resize and the
+        // expansion land in one animated update.
+        .frame(width: NotchGeometry.panelSize.width)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            rootHeight = height
+            if expandsWhenRootGrows, height >= NotchGeometry.panelSize.height {
+                expandsWhenRootGrows = false
+                animateExpansion()
+            }
+        }
         .onChange(of: waits.isWaiting, initial: true) { _, waiting in
             if !isExpanded {
                 setOutlined(waiting)
             }
         }
-        .onChange(of: scanner.alertGeneration) { _, _ in showAlert(.secrets) }
-        .onChange(of: alerts.alertGeneration) { _, _ in showAlert(.alerts) }
-        .onChange(of: alerts.current == nil) { _, none in
-            if none, pane == .alerts {
-                show(.usage)
+        .onChange(of: notificationPane, initial: true) { _, target in
+            let onNotification = pane == .alerts || pane == .secrets
+            if let target {
+                // Someone reading another pane is not interrupted; they see
+                // it when they leave.
+                if !isHovering || onNotification {
+                    showNotification(target)
+                }
+            } else {
+                if onNotification {
+                    show(.usage)
+                }
+                if !isHovering {
+                    setExpanded(false)
+                }
             }
         }
     }
 
-    /// Opens the notch for twelve seconds, or for as long as the mouse is
-    /// in it. Not through `setPanelOpen`: an alert is not the user looking
-    /// at usage, so it never speeds up the polling. A panel already open on
-    /// another pane keeps it.
-    private func showAlert(_ target: Pane) {
-        guard !isExpanded else { return }
-        pane = target
-        setExpanded(true)
-        autoCollapse = Task {
-            try? await Task.sleep(for: .seconds(12))
-            guard !Task.isCancelled, !isHovering else { return }
-            setExpanded(false)
+    /// Not through `setPanelOpen`: a notification is not the user looking
+    /// at usage, so it never speeds up the polling.
+    private func showNotification(_ target: Pane) {
+        if isExpanded {
+            show(target)
+        } else {
+            pane = target
+            setExpanded(true)
         }
     }
 
@@ -142,23 +174,42 @@ struct NotchView: View {
 
     /// The window grows before the card appears and shrinks only once the
     /// collapse has settled; a hover that returns mid-collapse keeps it.
+    /// The card waits for the root to be laid out at the grown window:
+    /// SwiftUI takes the new size an update late, and until then the old
+    /// layout sits at the bottom-left of the grown view, so an expansion
+    /// started in the same update as that catch-up slides the card in from
+    /// the corner instead of growing it out of the notch.
     private func setExpanded(_ expanded: Bool) {
+        let isOpening = isExpanded || expandsWhenRootGrows
+        guard expanded != isOpening else { return }
+        expandsWhenRootGrows = false
         if expanded {
             resizePanel(true, false)
+            if rootHeight >= NotchGeometry.panelSize.height {
+                animateExpansion()
+            } else {
+                expandsWhenRootGrows = true
+            }
+            return
         }
         withAnimation(.spring(duration: 0.35, bounce: 0.15), completionCriteria: .removed) {
-            isExpanded = expanded
+            isExpanded = false
             // A wait that arrived while the card was open shows on the
             // way back down.
-            isOutlined = !expanded && waits.isWaiting
-            if !expanded {
-                focusedProviderID = nil
-                pane = .usage
-            }
+            isOutlined = waits.isWaiting
+            focusedProviderID = nil
+            pane = .usage
         } completion: {
             if !isExpanded {
                 resizePanel(false, isOutlined)
             }
+        }
+    }
+
+    private func animateExpansion() {
+        withAnimation(.spring(duration: 0.35, bounce: 0.15)) {
+            isExpanded = true
+            isOutlined = false
         }
     }
 

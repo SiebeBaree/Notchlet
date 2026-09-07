@@ -6,24 +6,48 @@ import UniformTypeIdentifiers
 enum ShareRenderer {
     static let scale: CGFloat = 2
 
+    /// Drawn into an 8-bit RGB bitmap of our own: `cgImage` hands back 16
+    /// bits per channel with alpha, which made a 10 MB PNG that took a
+    /// second to encode.
     static func image(card: ShareCard, theme: ShareTheme, calendar: Calendar) -> CGImage? {
         let renderer = ImageRenderer(content: ShareCardView(card: card, theme: theme, calendar: calendar))
-        renderer.scale = scale
         renderer.isOpaque = true
-        return renderer.cgImage
+        var image: CGImage?
+        renderer.render(rasterizationScale: scale) { size, draw in
+            guard let context = CGContext(
+                data: nil,
+                width: Int(size.width * scale),
+                height: Int(size.height * scale),
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ) else { return }
+            context.scaleBy(x: scale, y: scale)
+            draw(context)
+            image = context.makeImage()
+        }
+        return image
     }
 
     static func png(card: ShareCard, theme: ShareTheme, calendar: Calendar) -> Data? {
-        guard let image = image(card: card, theme: theme, calendar: calendar) else { return nil }
-        return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+        image(card: card, theme: theme, calendar: calendar).flatMap(png)
     }
 
-    /// PNG for apps that take it, TIFF for the ones that only take that.
-    static func copy(_ png: Data) {
+    static func png(_ image: CGImage) -> Data? {
+        NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
+    }
+
+    /// PNG for apps that take it, TIFF for the ones that only take that,
+    /// both from the same bitmap.
+    static func copy(_ image: CGImage) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setData(png, forType: .png)
-        if let tiff = NSImage(data: png)?.tiffRepresentation {
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        if let png = bitmap.representation(using: .png, properties: [:]) {
+            pasteboard.setData(png, forType: .png)
+        }
+        if let tiff = bitmap.tiffRepresentation {
             pasteboard.setData(tiff, forType: .tiff)
         }
     }
