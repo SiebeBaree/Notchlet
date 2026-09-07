@@ -68,35 +68,40 @@ struct CursorUsageProvider: HTTPUsageProvider {
         return "WorkosCursorSessionToken=\(userID)%3A%3A\(jwt)"
     }
 
+    private struct Response: Decodable {
+        struct Meter: Decodable {
+            var used: Double?
+            var limit: Double?
+            var totalPercentUsed: Double?
+            var autoPercentUsed: Double?
+            var apiPercentUsed: Double?
+        }
+
+        struct IndividualUsage: Decodable {
+            var plan: Meter?
+            var overall: Meter?
+        }
+
+        struct TeamUsage: Decodable {
+            var pooled: Meter?
+        }
+
+        var billingCycleStart: String?
+        var billingCycleEnd: String?
+        var membershipType: String?
+        var individualUsage: IndividualUsage?
+        var teamUsage: TeamUsage?
+    }
+
+    func plan(from data: Data) -> UsagePlan? {
+        UsagePlan.cursor(membershipType: (try? JSONDecoder().decode(Response.self, from: data))?.membershipType)
+    }
+
     /// The three percent fields of `individualUsage.plan` are the headline
     /// and the two pools. Accounts without percentages (team, enterprise)
     /// fall back to the first spend meter with a cap. Percent fields are
     /// already percentages, even below 1.
     func parseWindows(from data: Data) throws -> [UsageWindow] {
-        struct Response: Decodable {
-            struct Meter: Decodable {
-                var used: Double?
-                var limit: Double?
-                var totalPercentUsed: Double?
-                var autoPercentUsed: Double?
-                var apiPercentUsed: Double?
-            }
-
-            struct IndividualUsage: Decodable {
-                var plan: Meter?
-                var overall: Meter?
-            }
-
-            struct TeamUsage: Decodable {
-                var pooled: Meter?
-            }
-
-            var billingCycleStart: String?
-            var billingCycleEnd: String?
-            var individualUsage: IndividualUsage?
-            var teamUsage: TeamUsage?
-        }
-
         let response = try JSONDecoder().decode(Response.self, from: data)
         let cycleStart = response.billingCycleStart.flatMap(UsageDate.parse)
         let cycleEnd = response.billingCycleEnd.flatMap(UsageDate.parse)

@@ -269,7 +269,9 @@ struct NotchSettingsView: View {
 /// A switch with its label and, when there is more to say, an info icon
 /// whose explanation drops in under the row while hovered. Drawn inside
 /// the notch rather than as a system tooltip, which is its own window and
-/// slow to appear.
+/// slow to appear. The tip is always in the tree and only fades: inserting
+/// a view rebuilds the hover tracking under the cursor, which ended the
+/// hover the moment it began.
 private struct ToggleRow: View {
     let label: String
     let tip: String?
@@ -288,11 +290,7 @@ private struct ToggleRow: View {
                     .foregroundStyle(.white.opacity(showsTip ? 0.85 : 0.4))
                     .frame(width: 14, height: 14)
                     .contentShape(.rect)
-                    .onHover { hovering in
-                        withAnimation(.easeOut(duration: 0.12)) {
-                            showsTip = hovering
-                        }
-                    }
+                    .onHover { showsTip = $0 }
             }
             Spacer()
             Toggle(label, isOn: isOn)
@@ -301,7 +299,7 @@ private struct ToggleRow: View {
                 .controlSize(.mini)
         }
         .overlay(alignment: .bottomLeading) {
-            if showsTip, let tip {
+            if let tip {
                 Text(tip)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.white.opacity(0.85))
@@ -312,7 +310,9 @@ private struct ToggleRow: View {
                     .background(Color(white: 0.16), in: .rect(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.14)))
                     .alignmentGuide(.bottom) { $0[.top] - 6 }
-                    .transition(.opacity)
+                    .opacity(showsTip ? 1 : 0)
+                    .animation(.easeOut(duration: 0.12), value: showsTip)
+                    .allowsHitTesting(false)
             }
         }
     }

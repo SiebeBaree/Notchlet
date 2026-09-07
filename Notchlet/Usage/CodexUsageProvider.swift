@@ -52,6 +52,13 @@ struct CodexUsageProvider: HTTPUsageProvider {
         return headers
     }
 
+    func plan(from data: Data) -> UsagePlan? {
+        struct Response: Decodable { var planType: String? }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return UsagePlan.chatGPT(planType: (try? decoder.decode(Response.self, from: data))?.planType)
+    }
+
     /// `rate_limit.primary_window` and `secondary_window`, either of which
     /// can be null.
     func parseWindows(from data: Data) throws -> [UsageWindow] {

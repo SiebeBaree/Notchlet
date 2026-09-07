@@ -10,18 +10,14 @@ final class ShareEditorModel {
     private static let graphKey = "share.graph"
     private static let modelsKey = "share.models"
     private static let themeKey = "share.theme"
-    private static let plansKey = "share.plans"
+    private static let planKey = "share.plan"
 
     let history: UsageHistory
+    /// For the plans behind the live limits.
+    private let store: UsageStore
     var scope: UsageHistory.Scope
     var options: ShareOptions {
         didSet { save() }
-    }
-
-    /// Dollars a month per scope, so All can hold the sum of several
-    /// subscriptions while each provider keeps its own.
-    private var planPrices: [String: Double] {
-        didSet { UserDefaults.standard.set(planPrices, forKey: Self.plansKey) }
     }
 
     private(set) var toast: String?
@@ -29,8 +25,9 @@ final class ShareEditorModel {
     /// What the share picker pops out of.
     weak var shareAnchor: NSView?
 
-    init(history: UsageHistory, scope: UsageHistory.Scope) {
+    init(history: UsageHistory, store: UsageStore, scope: UsageHistory.Scope) {
         self.history = history
+        self.store = store
         self.scope = scope
         let defaults = UserDefaults.standard
         var options = ShareOptions()
@@ -49,21 +46,44 @@ final class ShareEditorModel {
         if let theme = defaults.string(forKey: Self.themeKey).flatMap(ShareThemeID.init(rawValue:)) {
             options.theme = theme
         }
+        if defaults.object(forKey: Self.planKey) != nil {
+            options.showsPlan = defaults.bool(forKey: Self.planKey)
+        }
         self.options = options
-        planPrices = defaults.dictionary(forKey: Self.plansKey) as? [String: Double] ?? [:]
     }
 
-    var planPrice: Double? {
-        get { planPrices[effectiveScope.rawValue] }
-        set {
-            planPrices[effectiveScope.rawValue] = newValue.flatMap { $0 > 0 ? $0 : nil }
-            Analytics.capture(.settingChanged(key: "share_plan_price", value: planPrice == nil ? "cleared" : "set"))
+    /// The plans behind the providers on the image, in scope order.
+    /// Nil for a provider that has not reported one.
+    var plans: [(provider: ShareCard.Provider, plan: UsagePlan?)] {
+        scopedProviders.map { provider in
+            (provider, store.entries.first { $0.id == provider.id }?.snapshot?.plan)
         }
     }
 
-    /// The multiple needs a month of cost to compare with a monthly price.
-    var showsPlan: Bool {
-        options.period == .month && options.showsCost && summary.cost != nil && !isReadingLogs && summary.tokens > 0
+    /// Every provider on the image needs a priced plan for the sum to mean
+    /// anything.
+    var planPrice: Double? {
+        let prices = plans.compactMap(\.plan?.monthlyPrice)
+        guard prices.count == plans.count, !prices.isEmpty else { return nil }
+        return prices.reduce(0, +)
+    }
+
+    /// What the plan row says under its title: the plans and the price, or
+    /// what is missing.
+    var planDetail: String {
+        guard options.period == .month, options.showsCost, summary.cost != nil, !isReadingLogs, summary.tokens > 0
+        else { return "Needs 30 days with cost on" }
+        if let planPrice {
+            let names = plans.compactMap(\.plan?.name)
+            return "\(names.joined(separator: " and ")), \(ShareCard.planLabel(planPrice)) a month"
+        }
+        if let missing = plans.first(where: { $0.plan == nil }) {
+            return "\(missing.provider.name) has not said which plan"
+        }
+        if let unpriced = plans.first(where: { $0.plan?.monthlyPrice == nil })?.plan {
+            return "No list price for \(unpriced.name)"
+        }
+        return "No plan found"
     }
 
     private func save() {
@@ -72,6 +92,7 @@ final class ShareEditorModel {
         defaults.set(options.showsCost, forKey: Self.costKey)
         defaults.set(options.graph.rawValue, forKey: Self.graphKey)
         defaults.set(options.showsModels, forKey: Self.modelsKey)
+        defaults.set(options.showsPlan, forKey: Self.planKey)
         defaults.set(options.theme.rawValue, forKey: Self.themeKey)
     }
 

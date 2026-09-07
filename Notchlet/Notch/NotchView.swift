@@ -71,7 +71,12 @@ struct NotchView: View {
                 }
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
+        // The panel's full width whatever the window is: both window sizes
+        // are centred on the notch, so an overflowing root keeps the shape
+        // in place, while a root that follows the window would slide the
+        // shape from the window's left edge whenever the resize and the
+        // expansion land in one animated update.
+        .frame(width: NotchGeometry.panelSize.width)
         .onChange(of: waits.isWaiting, initial: true) { _, waiting in
             if !isExpanded {
                 setOutlined(waiting)
@@ -97,20 +102,13 @@ struct NotchView: View {
     }
 
     /// Not through `setPanelOpen`: a notification is not the user looking
-    /// at usage, so it never speeds up the polling. The hop off the current
-    /// update matters: `onChange` runs inside SwiftUI's update, where the
-    /// window growing and the card expanding would land in one animated
-    /// transaction and the card would grow out of the top-left corner
-    /// instead of the notch.
+    /// at usage, so it never speeds up the polling.
     private func showNotification(_ target: Pane) {
-        Task { @MainActor in
-            guard notificationPane == target else { return }
-            if isExpanded {
-                show(target)
-            } else {
-                pane = target
-                setExpanded(true)
-            }
+        if isExpanded {
+            show(target)
+        } else {
+            pane = target
+            setExpanded(true)
         }
     }
 

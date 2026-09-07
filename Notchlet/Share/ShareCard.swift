@@ -18,6 +18,9 @@ nonisolated struct ShareOptions: Equatable, Sendable {
     var showsCost = true
     var graph: ShareGraph = .activity
     var showsModels = true
+    /// The month's cost as a multiple of the subscription, when every
+    /// provider on the image has a priced plan.
+    var showsPlan = true
     var theme: ShareThemeID = .notch
 }
 
@@ -102,7 +105,9 @@ nonisolated struct ShareCard: Equatable, Sendable {
             stats.append(Stat(value: HistoryCopy.tokens(summary.tokens), label: "tokens"))
             // Four stats is what fits beside the headline, so the plan
             // multiple takes the requests' slot.
-            if options.period == .month, let plan = planStat(cost: cost, planPrice: planPrice) {
+            if options.period == .month, options.showsPlan,
+               let plan = planStat(cost: cost, planPrice: planPrice, providers: providers.count)
+            {
                 stats.append(plan)
             } else {
                 stats.append(Stat(value: count(summary.requests), label: "requests"))
@@ -235,19 +240,21 @@ nonisolated struct ShareCard: Equatable, Sendable {
     }
 
     /// "4.6x" over "your $200 plan": what the month's API cost is as a
-    /// multiple of the subscription. Nil without a price.
-    static func planStat(cost: Double, planPrice: Double?) -> Stat? {
+    /// multiple of the subscription, or of the subscriptions added up when
+    /// the image covers more than one provider. Nil without a price.
+    static func planStat(cost: Double, planPrice: Double?, providers: Int = 1) -> Stat? {
         guard let planPrice, planPrice > 0 else { return nil }
         let multiple = cost / planPrice
         let tenths = (multiple * 10).rounded() / 10
         let value = tenths >= 10 || tenths == tenths.rounded()
             ? String(Int(tenths.rounded()))
             : String(format: "%.1f", tenths)
-        return Stat(value: "\(value)x", label: "your \(planLabel(planPrice)) plan")
+        let label = providers > 1 ? "your \(planLabel(planPrice)) in plans" : "your \(planLabel(planPrice)) plan"
+        return Stat(value: "\(value)x", label: label)
     }
 
     /// "$200", or "$19.99" when the cents matter.
-    private static func planLabel(_ price: Double) -> String {
+    static func planLabel(_ price: Double) -> String {
         price == price.rounded()
             ? "$" + Int(price).formatted(.number.locale(Locale(identifier: "en_US")))
             : HistoryCopy.cost(price)

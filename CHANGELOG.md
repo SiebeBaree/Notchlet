@@ -13,13 +13,14 @@
   animation as a hover.
 - Notchlet starts at login, on a fresh install and once after this update.
   The switch in settings still turns it off.
-- The share image can say how much you got for your subscription: type what
-  you pay a month in the share editor and the 30-day image shows the cost
-  as a multiple of it. The image is a quarter of the size it was and copies
-  in a third of the time.
+- The share image says how much you got for your subscription. Claude Code,
+  Codex and Cursor report the plan behind their limits, so the 30-day image
+  shows the cost at API prices as a multiple of what that plan costs, with
+  no typing. The image is a quarter of the size it was and copies in a third
+  of the time.
 - Settings explain the secret scanner and the agent line behind an info
-  icon instead of a line of text, and the Claude sign-in picker no longer
-  stretches its page.
+  icon instead of a line of text, the Claude sign-in picker no longer
+  stretches its page, and a chosen alert mark is blue.
 - The historic view shows $0 for an empty period and drops the "History
   since" note.
 

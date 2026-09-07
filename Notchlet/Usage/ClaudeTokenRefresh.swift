@@ -16,6 +16,7 @@ enum ClaudeTokenRefresh {
         var refreshToken: String?
         var expiresAt: Date
         var scopes: [String]
+        var plan: UsagePlan?
 
         init?(json: Data) {
             guard let object = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
@@ -29,6 +30,10 @@ enum ClaudeTokenRefresh {
             refreshToken = (oauth["refreshToken"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             self.expiresAt = Date(timeIntervalSince1970: expiresAt / 1000)
             scopes = oauth["scopes"] as? [String] ?? []
+            plan = UsagePlan.claude(
+                subscriptionType: oauth["subscriptionType"] as? String,
+                rateLimitTier: oauth["rateLimitTier"] as? String
+            )
         }
 
         /// Claude Code refreshes five minutes before expiry; waiting for the

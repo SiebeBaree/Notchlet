@@ -152,38 +152,13 @@ struct ShareEditorView: View {
             isOn: $model.options.showsModels,
             isAvailable: hasUsage
         )
-        planRow(isAvailable: model.showsPlan)
-    }
-
-    /// What the person pays a month, typed once per scope; the card turns
-    /// it into the multiple they got.
-    private func planRow(isAvailable: Bool) -> some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Plan")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(.white.opacity(isAvailable ? 0.9 : 0.4))
-                Text(isAvailable ? "What you pay a month, as a multiple" : "Needs 30 days with cost on")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.45))
-            }
-            Spacer()
-            HStack(spacing: 4) {
-                Text("$")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.6))
-                TextField("0", value: $model.planPrice, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 64)
-                Text("/mo")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
-            .controlSize(.small)
-            .disabled(!isAvailable)
-        }
-        .padding(.vertical, 4)
+        includeRow(
+            "Plan",
+            detail: model.planDetail,
+            isOn: $model.options.showsPlan,
+            isAvailable: hasUsage && model.options.period == .month && model.options.showsCost
+                && model.planPrice != nil
+        )
     }
 
     private var graphDetail: String {
