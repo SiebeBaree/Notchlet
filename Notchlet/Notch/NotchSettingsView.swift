@@ -278,6 +278,7 @@ private struct ToggleRow: View {
     let isOn: Binding<Bool>
 
     @State private var showsTip = false
+    @State private var rowHeight: CGFloat = 0
 
     var body: some View {
         HStack(spacing: 5) {
@@ -298,7 +299,8 @@ private struct ToggleRow: View {
                 .toggleStyle(.switch)
                 .controlSize(.mini)
         }
-        .overlay(alignment: .bottomLeading) {
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowHeight = $0 }
+        .overlay(alignment: .topLeading) {
             if let tip {
                 Text(tip)
                     .font(.system(size: 10.5))
@@ -309,10 +311,13 @@ private struct ToggleRow: View {
                     .frame(width: 300, alignment: .leading)
                     .background(Color(white: 0.16), in: .rect(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(.white.opacity(0.14)))
-                    .alignmentGuide(.bottom) { $0[.top] - 6 }
                     .opacity(showsTip ? 1 : 0)
                     .animation(.easeOut(duration: 0.12), value: showsTip)
                     .allowsHitTesting(false)
+                    // An offset rather than an alignment guide: the guide
+                    // held for the first row and not the second, which hung
+                    // its tip upward over the rows above.
+                    .offset(y: rowHeight + 6)
             }
         }
     }
