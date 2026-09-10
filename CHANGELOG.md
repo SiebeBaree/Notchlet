@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Gauge time markers are off by default. Turn them on in settings, where an
+  info icon explains what they mean. The marker is thicker, solid white and
+  edged in black so it is easier to see on every gauge color.
+
 ## 0.4.0
 
 - The notch draws a line around itself while an agent is waiting on you. Blue
