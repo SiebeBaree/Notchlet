@@ -20,6 +20,7 @@ struct NotchSettingsView: View {
     @AppStorage("analyticsOptOut") private var analyticsOptOut = false
     @AppStorage(SecretScanner.enabledDefaultsKey) private var secretScanEnabled = true
     @AppStorage(UsageStore.intervalDefaultsKey) private var refreshMinutes = 10
+    @AppStorage(UsageRing.timeMarkerDefaultsKey) private var showGaugeTimeMarker = false
     @State private var autoChecksForUpdates: Bool
     /// Mirrors SMAppService, which the system can overrule.
     @State private var startsAtLogin = LoginItem.isEnabled
@@ -140,6 +141,13 @@ struct NotchSettingsView: View {
                 )
             )
             .zIndex(1)
+            toggleRow(
+                "Show time marker on gauges",
+                tip: "Marks how much of your limit would be left with even usage until reset. "
+                    + "Halfway through a 5-hour limit, the marker sits at 50%, at the bottom of the gauge.",
+                isOn: $showGaugeTimeMarker
+            )
+            .zIndex(0.5)
             HStack {
                 Text("Refresh every")
                     .font(.system(size: 11.5))

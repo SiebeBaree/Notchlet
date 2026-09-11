@@ -44,9 +44,11 @@ struct BrandRow: View {
     }
 }
 
-/// The tick across the track marks where the remaining arc should end right
-/// now at an even burn.
 struct UsageRing: View {
+    static let timeMarkerDefaultsKey = "showGaugeTimeMarker"
+
+    @AppStorage(UsageRing.timeMarkerDefaultsKey) private var showTimeMarker = false
+
     let remainingFraction: Double
     var expectedRemainingFraction: Double?
     let color: Color
@@ -60,10 +62,11 @@ struct UsageRing: View {
                 .trim(from: 0, to: remainingFraction)
                 .stroke(color, style: StrokeStyle(lineWidth: diameter / 12, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            if let expectedRemainingFraction {
+            if showTimeMarker, let expectedRemainingFraction {
                 Capsule()
-                    .fill(.white.opacity(0.55))
-                    .frame(width: 1.5, height: diameter / 12 + 4)
+                    .fill(.white)
+                    .background(Capsule().stroke(.black, lineWidth: 2))
+                    .frame(width: 3, height: diameter / 12 + 6)
                     .offset(y: -diameter / 2)
                     .rotationEffect(.degrees(expectedRemainingFraction * 360))
             }
