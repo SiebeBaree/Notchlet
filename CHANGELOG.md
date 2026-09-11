@@ -4,6 +4,10 @@
 
 - Claude Desktop token renewal reuses its storage key in memory. Failed
   Keychain reads pause until you retry in provider settings.
+- Share graphs fit the selected period: numbers for Today, compact charts for
+  7 days, daily charts for 30 days and a Calendar grid for 12 months. Choose
+  Activity, Spend, Calendar or None, remembered per period. Graphs leave out
+  dates before recorded history and keep quiet days visible.
 
 ## 0.4.0
 

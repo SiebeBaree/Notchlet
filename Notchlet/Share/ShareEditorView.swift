@@ -136,10 +136,13 @@ struct ShareEditorView: View {
             Picker("Graph", selection: $model.options.graph) {
                 Text("Activity").tag(ShareGraph.activity)
                 Text("Spend").tag(ShareGraph.spend)
+                    .disabled(summary.cost == nil)
+                Text("Calendar").tag(ShareGraph.calendar)
+                    .disabled(model.options.period == .week)
                 Text("None").tag(ShareGraph.none)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
+            .disabled(!hasUsage || model.graphPresentation.days < 2)
             .controlSize(.small)
             Text(graphDetail)
                 .font(.system(size: 11))
@@ -148,7 +151,8 @@ struct ShareEditorView: View {
         .padding(.vertical, 4)
         includeRow(
             "Models",
-            detail: hasUsage ? "Top \(ShareCard.modelRowCount(graph: model.options.graph)), with share bars" : noUsage,
+            detail: hasUsage ? "Top \(ShareCard.modelRowCount(graph: model.graphPresentation.graph)), with share bars" :
+                noUsage,
             isOn: $model.options.showsModels,
             isAvailable: hasUsage
         )
@@ -162,11 +166,7 @@ struct ShareEditorView: View {
     }
 
     private var graphDetail: String {
-        switch model.options.graph {
-        case .activity: "12 months of tokens per day"
-        case .spend: "Cost per day, 30 days"
-        case .none: "Just the numbers"
-        }
+        model.isReadingLogs ? "Reading logs" : model.graphPresentation.detail
     }
 
     private func includeRow(_ title: String, detail: String, isOn: Binding<Bool>, isAvailable: Bool) -> some View {

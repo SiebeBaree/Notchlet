@@ -1,6 +1,6 @@
 import Foundation
 
-/// The 53-week grid behind the activity graph, the way GitHub lays it out.
+/// Defaults to 53 weeks in the historic view; sharing can request a shorter span.
 /// Levels are quartiles of the days that had any usage, so one heavy month
 /// does not flatten the rest of the year. Days before coverage are unknown,
 /// not quiet.
@@ -28,15 +28,27 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
         let text: String
     }
 
+    let columnCount: Int
     let start: DayKey
     let end: DayKey
     let cells: [Cell]
     let monthLabels: [MonthLabel]
 
-    init(today: DayKey, calendar: Calendar, tokens: [DayKey: Int], coverageStart: DayKey?) {
-        let weekday = calendar.component(.weekday, from: today.start(in: calendar))
+    init(
+        today: DayKey,
+        calendar: Calendar,
+        tokens: [DayKey: Int],
+        coverageStart: DayKey?,
+        start requestedStart: DayKey? = nil
+    ) {
+        let anchor = requestedStart ?? today
+        let weekday = calendar.component(.weekday, from: anchor.start(in: calendar))
         let daysIntoWeek = (weekday - calendar.firstWeekday + 7) % 7
-        let start = today.advanced(by: -(daysIntoWeek + (Self.weeks - 1) * 7), calendar: calendar)
+        let start = anchor.advanced(
+            by: -(daysIntoWeek + (requestedStart == nil ? (Self.weeks - 1) * 7 : 0)),
+            calendar: calendar
+        )
+        columnCount = (start.days(through: today, calendar: calendar).count + 6) / 7
         self.start = start
         end = today
 
@@ -66,7 +78,7 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
             // three columns of room.
             if row == 0, day.month != previousMonth {
                 previousMonth = day.month
-                if column - lastLabelColumn >= 3, column <= Self.weeks - 3 {
+                if column - lastLabelColumn >= 3, column <= columnCount - (requestedStart == nil ? 3 : 1) {
                     labels.append(MonthLabel(column: column, text: labelCalendar.shortMonthSymbols[day.month - 1]))
                     lastLabelColumn = column
                 }
@@ -77,7 +89,7 @@ nonisolated struct ActivityGrid: Equatable, Sendable {
     }
 
     func cell(atColumn column: Int, row: Int) -> Cell? {
-        guard (0 ..< Self.weeks).contains(column), (0 ..< Self.rows).contains(row) else { return nil }
+        guard (0 ..< columnCount).contains(column), (0 ..< Self.rows).contains(row) else { return nil }
         let index = column * 7 + row
         return index < cells.count ? cells[index] : nil
     }

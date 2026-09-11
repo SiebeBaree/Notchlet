@@ -8,6 +8,7 @@ final class ShareEditorModel {
     private static let periodKey = "share.period"
     private static let costKey = "share.cost"
     private static let graphKey = "share.graph"
+    private static let graphsKey = "share.graphsByPeriod"
     private static let modelsKey = "share.models"
     private static let themeKey = "share.theme"
     private static let planKey = "share.plan"
@@ -37,9 +38,10 @@ final class ShareEditorModel {
         if defaults.object(forKey: Self.costKey) != nil {
             options.showsCost = defaults.bool(forKey: Self.costKey)
         }
-        if let graph = defaults.string(forKey: Self.graphKey).flatMap(ShareGraph.init(rawValue:)) {
-            options.graph = graph
-        }
+        options.restoreGraphs(
+            defaults.dictionary(forKey: Self.graphsKey) as? [String: String] ?? [:],
+            legacy: defaults.string(forKey: Self.graphKey).flatMap(ShareGraph.init(rawValue:))
+        )
         if defaults.object(forKey: Self.modelsKey) != nil {
             options.showsModels = defaults.bool(forKey: Self.modelsKey)
         }
@@ -90,7 +92,7 @@ final class ShareEditorModel {
         let defaults = UserDefaults.standard
         defaults.set(options.period.rawValue, forKey: Self.periodKey)
         defaults.set(options.showsCost, forKey: Self.costKey)
-        defaults.set(options.graph.rawValue, forKey: Self.graphKey)
+        defaults.set(options.savedGraphs, forKey: Self.graphsKey)
         defaults.set(options.showsModels, forKey: Self.modelsKey)
         defaults.set(options.showsPlan, forKey: Self.planKey)
         defaults.set(options.theme.rawValue, forKey: Self.themeKey)
@@ -129,7 +131,18 @@ final class ShareEditorModel {
     }
 
     var summary: UsageLedger.Summary {
-        history.summary(options.period, scope: effectiveScope)
+        history.ledger(effectiveScope).summary(graphPresentation.span)
+    }
+
+    var graphPresentation: ShareGraphPresentation {
+        let span = options.period.span(endingOn: history.today, calendar: history.calendar)
+        let coverage = history.coverageStart(effectiveScope)
+        let coveredSpan = min(history.today, max(span.lowerBound, coverage ?? span.lowerBound)) ... history.today
+        let summary = history.ledger(effectiveScope).summary(coveredSpan)
+        return ShareGraphPresentation(
+            options: options, coverageStart: coverage, today: history.today, calendar: history.calendar,
+            hasUsage: !isReadingLogs && summary.tokens > 0, hasCost: summary.cost != nil
+        )
     }
 
     var card: ShareCard {
