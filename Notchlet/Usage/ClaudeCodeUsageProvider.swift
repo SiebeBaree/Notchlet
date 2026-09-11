@@ -30,6 +30,7 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
     private static let weekDuration: TimeInterval = 7 * 24 * 3600
 
     private let store = ClaudeCodeCredentialStore()
+    private let desktop = ClaudeDesktopTokenCache.Reader()
 
     private struct Cached: Sendable {
         let optionID: String
@@ -51,7 +52,7 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
             return Self.headers(token: cached.accessToken)
         }
         if option.id == Self.desktopOption.id {
-            guard let token = await ClaudeDesktopTokenCache.read() else {
+            guard let token = try await desktop.read() else {
                 throw ProviderError.notAvailable(.signedOut)
             }
             guard token.expiresAt > .now else {
@@ -107,6 +108,10 @@ struct ClaudeCodeUsageProvider: HTTPUsageProvider {
         case .lockBusy, .failed:
             throw ProviderError.requestFailed
         }
+    }
+
+    func retryCredentialAccess() {
+        desktop.retryAccess()
     }
 
     func forgetCredentials(for option: AuthOption) -> Bool {

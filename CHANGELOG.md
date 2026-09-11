@@ -5,6 +5,8 @@
 - Gauge time markers are off by default. Turn them on in settings, where an
   info icon explains what they mean. The marker is thicker, solid white and
   edged in black so it is easier to see on every gauge color.
+- Claude Desktop token renewal reuses its storage key in memory. Failed
+  Keychain reads pause until you retry in provider settings.
 
 ## 0.4.0
 

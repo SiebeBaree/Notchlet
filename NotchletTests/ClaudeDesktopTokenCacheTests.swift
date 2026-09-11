@@ -13,6 +13,103 @@ struct ClaudeDesktopTokenCacheTests {
     """)!
     private let password = "notchlet-test-password"
 
+    @Test func tokenRotationAndExpiredCacheReuseTheStorageKey() async throws {
+        var payload = sealed
+        var reads = 0
+        let reader = ClaudeDesktopTokenCache.Reader(readCache: { payload }, readPassword: {
+            reads += 1
+            return password
+        })
+        #expect(try await reader.read()?.accessToken == "sk-ant-oat01-desktop")
+        // A new token encrypted with the same storage key, already expired.
+        payload =
+            try #require(
+                Data(
+                    base64Encoded: "djEwWUm2im8/6dfndgk1nItaXcZJvGBkmERLyUQ5FgipfJHqn7Mhahpvdhhl39onBNXDFjkjgWrFWci3iCtSjiQBYu38Sps76100FHJ25/GnQ4RCi/uYdUdxIx6xX5AVBGUaY2VEpMHPH5prqurs3ft2/LwHgMiV5gwFQJ2KLKjKcH8="
+                )
+            )
+        let rotated = try await reader.read()
+        #expect(rotated?.accessToken == "rotated")
+        #expect(rotated?.expiresAt == Date(timeIntervalSince1970: 1))
+        #expect(try await reader.read() == rotated)
+        reader.retryAccess()
+        #expect(try await reader.read() == rotated)
+        #expect(reads == 1)
+    }
+
+    @Test func deniedAccessWaitsForExplicitRetryEvenWhenTheFileChanges() async throws {
+        var reads = 0
+        var payload = sealed
+        let reader = ClaudeDesktopTokenCache.Reader(readCache: { payload }, readPassword: {
+            reads += 1
+            return reads == 1 ? nil : password
+        })
+        for _ in 0 ..< 2 {
+            do {
+                _ = try await reader.read()
+                Issue.record("Expected paused Keychain access")
+            } catch ProviderError.notAvailable(.keychainAccess) {} catch {
+                Issue.record("Unexpected error: \(error)")
+            }
+            payload = Data("changed".utf8)
+        }
+        #expect(reads == 1)
+        payload = sealed
+        reader.retryAccess()
+        #expect(try await reader.read()?.accessToken == "sk-ant-oat01-desktop")
+        #expect(reads == 2)
+    }
+
+    @Test func wrongStorageKeyRequiresExplicitRetry() async throws {
+        var reads = 0
+        let reader = ClaudeDesktopTokenCache.Reader(readCache: { sealed }, readPassword: {
+            reads += 1
+            return reads == 1 ? "old-key" : password
+        })
+        for _ in 0 ..< 2 {
+            do {
+                _ = try await reader.read()
+                Issue.record("Expected paused Keychain access")
+            } catch ProviderError.notAvailable(.keychainAccess) {} catch {
+                Issue.record("Unexpected error: \(error)")
+            }
+        }
+        #expect(reads == 1)
+        reader.retryAccess()
+        #expect(try await reader.read()?.accessToken == "sk-ant-oat01-desktop")
+        #expect(reads == 2)
+    }
+
+    @Test func overlappingReadsSharePermissionRequestDespiteCancellation() async throws {
+        var reads = 0
+        var resume: CheckedContinuation<String?, Never>?
+        let reader = ClaudeDesktopTokenCache.Reader(readCache: { sealed }, readPassword: {
+            reads += 1
+            return await withCheckedContinuation { resume = $0 }
+        })
+        let first = Task { try await reader.read() }
+        while resume == nil {
+            await Task.yield()
+        }
+        first.cancel()
+        reader.retryAccess()
+        let second = Task { try await reader.read() }
+        await Task.yield()
+        resume?.resume(returning: password)
+        #expect(try await first.value == second.value)
+        #expect(reads == 1)
+    }
+
+    @Test func missingCacheDoesNotReadKeychain() async throws {
+        var reads = 0
+        let reader = ClaudeDesktopTokenCache.Reader(readCache: { nil }, readPassword: {
+            reads += 1
+            return password
+        })
+        #expect(try await reader.read() == nil)
+        #expect(reads == 0)
+    }
+
     @Test func decryptsElectronSafeStorage() throws {
         let json = try #require(ClaudeDesktopTokenCache.decrypt(sealed, password: password))
         let token = try #require(ClaudeDesktopTokenCache.token(in: json))

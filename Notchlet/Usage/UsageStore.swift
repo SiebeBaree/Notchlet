@@ -103,6 +103,7 @@ final class UsageStore {
     /// can say whether the login works.
     func refreshNow(_ providerID: String) {
         guard let index = entries.firstIndex(where: { $0.id == providerID }) else { return }
+        entries[index].provider.retryCredentialAccess()
         entries[index].schedule = RefreshSchedule()
         if isEnabled(providerID) {
             reschedule()

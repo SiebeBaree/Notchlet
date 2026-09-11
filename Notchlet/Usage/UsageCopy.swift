@@ -93,10 +93,14 @@ enum UsageCopy {
         case .ok:
             return ("No limits", "This plan reports no rate limits")
         case let .notAvailable(problem):
+            if problem == .keychainAccess {
+                return ("Keychain access paused", "Keychain access paused. Retry in provider settings.")
+            }
             let title = switch problem {
             case .rejected: "Login rejected"
             case .expired: "Login expired"
             case .signedOut: "Not signed in"
+            case .keychainAccess: "Keychain access paused"
             }
             return (title, "\(title). \(signInHint).")
         case .rateLimited:
