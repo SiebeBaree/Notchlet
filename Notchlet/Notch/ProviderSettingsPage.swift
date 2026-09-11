@@ -69,6 +69,11 @@ struct ProviderSettingsPage: View {
                 Text(statusText(for: entry))
                     .font(.system(size: 10))
                     .foregroundStyle(isProblem(entry.state) ? NotchPalette.amber : .white.opacity(0.5))
+                if entry.state == .notAvailable(.keychainAccess) {
+                    HoverTextButton("Retry Keychain access") {
+                        store.refreshNow(providerID)
+                    }
+                }
                 ForEach(provider.authOptions.filter { $0.secretName != nil }) { option in
                     secretRow(option)
                 }

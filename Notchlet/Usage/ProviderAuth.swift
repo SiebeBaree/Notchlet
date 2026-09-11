@@ -88,6 +88,7 @@ nonisolated enum AuthProblem: Int, Comparable, Sendable {
     /// Past its expiry and could not be renewed.
     case expired
     case rejected
+    case keychainAccess
 
     static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.rawValue < rhs.rawValue

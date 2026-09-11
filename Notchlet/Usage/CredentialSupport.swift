@@ -18,11 +18,8 @@ enum CredentialSupport {
         FileManager.default.homeDirectoryForCurrentUser.appending(path: relativePath)
     }
 
-    /// Read through `/usr/bin/security` rather than the Security framework:
-    /// CLIs write their items with that tool, which keeps it on the access
-    /// list, whereas a read as Notchlet prompts for the keychain password
-    /// again after every token rotation. Notchlet's own items go through it
-    /// for the same reason.
+    /// CLI-created items can trust this tool across token rotation. Items
+    /// owned by desktop apps can still require macOS permission.
     static func keychainData(service: String, account: String? = nil) async -> Data? {
         var arguments = ["find-generic-password", "-s", service]
         if let account {
