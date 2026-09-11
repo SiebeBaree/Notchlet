@@ -19,9 +19,12 @@ protocol UsageProvider: Sendable {
     var secrets: (any SecretScanSource)? { get }
 
     func fetchUsage() async throws -> UsageSnapshot
+    /// Called only when the user explicitly retries or changes sign-in settings.
+    func retryCredentialAccess()
 }
 
 extension UsageProvider {
+    func retryCredentialAccess() {}
     var history: (any UsageHistorySource)? { nil }
     var secrets: (any SecretScanSource)? { nil }
 }

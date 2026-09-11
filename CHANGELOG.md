@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Claude Desktop token renewal reuses its storage key in memory. Failed
+  Keychain reads pause until you retry in provider settings.
+
 ## 0.4.0
 
 - The notch draws a line around itself while an agent is waiting on you. Blue

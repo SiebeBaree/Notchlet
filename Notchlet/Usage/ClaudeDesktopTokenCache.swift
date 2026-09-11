@@ -23,11 +23,8 @@ enum ClaudeDesktopTokenCache {
         CredentialSupport.homePathExists(configPath)
     }
 
-    /// The Code tab's token, expired or not; nil when Desktop has none or
-    /// the cache cannot be opened. The keychain read is a process spawn
-    /// (`CredentialSupport.keychainString`), so callers cache the result
-    /// until the token expires.
-    static func read() async -> Token? {
+    /// The encrypted payload can change without the storage key changing.
+    private static func sealedCache() -> Data? {
         struct Config: Decodable {
             var cache: String?
 
@@ -35,15 +32,74 @@ enum ClaudeDesktopTokenCache {
                 case cache = "oauth:tokenCacheV2"
             }
         }
-
         guard let config: Config = CredentialSupport.homeJSON(configPath),
-              let encoded = config.cache, let sealed = Data(base64Encoded: encoded),
-              let password = await CredentialSupport.keychainString(
-                  service: keychainService, account: keychainAccount
-              ),
-              let json = decrypt(sealed, password: password)
-        else { return nil }
-        return token(in: json)
+              let encoded = config.cache else { return nil }
+        return Data(base64Encoded: encoded)
+    }
+
+    /// Session-only: never copy Desktop's storage key to disk or alter its
+    /// Keychain permissions. A failed read waits for an explicit retry.
+    @MainActor
+    final class Reader {
+        private let readCache: () -> Data?
+        private let readPassword: () async -> String?
+        private var password: String?
+        private var pendingPassword: Task<String?, Never>?
+        private var accessBlocked = false
+        private var lastSealed: Data?
+        private var lastToken: Token?
+
+        init(
+            readCache: @escaping () -> Data? = { ClaudeDesktopTokenCache.sealedCache() },
+            readPassword: @escaping () async -> String? = {
+                await CredentialSupport.keychainString(service: keychainService, account: keychainAccount)
+            }
+        ) {
+            self.readCache = readCache
+            self.readPassword = readPassword
+        }
+
+        func retryAccess() {
+            guard pendingPassword == nil else { return }
+            if accessBlocked {
+                password = nil
+                accessBlocked = false
+                lastSealed = nil
+                lastToken = nil
+            }
+        }
+
+        func read() async throws -> Token? {
+            guard !accessBlocked else { throw ProviderError.notAvailable(.keychainAccess) }
+            guard let sealed = readCache() else { return nil }
+            if sealed == lastSealed {
+                return lastToken
+            }
+            if password == nil {
+                // Refresh rescheduling must not cancel a permission dialog or
+                // launch another read while the user is answering the first.
+                if pendingPassword == nil {
+                    pendingPassword = Task {
+                        let value = await readPassword()
+                        password = value
+                        accessBlocked = value == nil
+                        pendingPassword = nil
+                        return value
+                    }
+                }
+                _ = await pendingPassword?.value
+            }
+            guard let password,
+                  let json = decrypt(sealed, password: password),
+                  (try? JSONSerialization.jsonObject(with: json)) is [String: Any]
+            else {
+                accessBlocked = true
+                throw ProviderError.notAvailable(.keychainAccess)
+            }
+            lastSealed = sealed
+            lastToken = token(in: json)
+            return lastToken
+        }
     }
 
     /// Electron safeStorage on macOS: a `v10` prefix, then AES-128-CBC with
