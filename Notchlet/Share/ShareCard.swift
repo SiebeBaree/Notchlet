@@ -3,6 +3,7 @@ import Foundation
 nonisolated enum ShareGraph: String, CaseIterable, Sendable {
     case activity
     case spend
+    case calendar
     case none
 }
 
@@ -16,7 +17,43 @@ nonisolated enum ShareThemeID: String, CaseIterable, Sendable {
 nonisolated struct ShareOptions: Equatable, Sendable {
     var period: UsageHistory.Range = .month
     var showsCost = true
-    var graph: ShareGraph = .activity
+    private var graphs: [UsageHistory.Range: ShareGraph] = [:]
+    var graph: ShareGraph {
+        get { period == .today ? .none : graphs[period] ?? (period == .year ? .calendar : .activity) }
+        set {
+            if period != .today {
+                graphs[period] = newValue
+            }
+        }
+    }
+
+    init(period: UsageHistory.Range = .month, showsCost: Bool = true, graph: ShareGraph? = nil,
+         showsModels: Bool = true, showsPlan: Bool = true, theme: ShareThemeID = .notch)
+    {
+        self.period = period
+        self.showsCost = showsCost
+        self.showsModels = showsModels
+        self.showsPlan = showsPlan
+        self.theme = theme
+        if let graph {
+            self.graph = graph
+        }
+    }
+
+    mutating func restoreGraphs(_ saved: [String: String], legacy: ShareGraph?) {
+        for period in UsageHistory.Range.allCases where period != .today {
+            let choice = saved[period.rawValue].flatMap(ShareGraph.init(rawValue:))
+                ?? legacy.map { period == .year && $0 == .activity ? .calendar : $0 }
+            if let choice {
+                graphs[period] = choice
+            }
+        }
+    }
+
+    var savedGraphs: [String: String] {
+        Dictionary(uniqueKeysWithValues: graphs.map { ($0.key.rawValue, $0.value.rawValue) })
+    }
+
     var showsModels = true
     /// The month's cost as a multiple of the subscription, when every
     /// provider on the image has a priced plan.
@@ -61,14 +98,22 @@ nonisolated struct ShareCard: Equatable, Sendable {
     var headline: Headline
     var caption: String
     var stats: [Stat]
-    var activity: ActivityGrid?
+    var activity: ShareActivitySeries?
     var spend: SpendSeries?
+    var calendarGrid: ActivityGrid?
+    var graphPresentation: ShareGraphPresentation
     var models: [ModelRow]
     /// The pane's caveats, or the tagline.
     var footer: String
 
     var hasUsage: Bool { headline != .none }
-    var hasGraph: Bool { activity != nil || spend != nil }
+    var hasGraph: Bool { graphPresentation.graph != .none }
+    var compactGraph: Bool {
+        if let calendarGrid {
+            return calendarGrid.columnCount <= 24
+        }
+        return graphPresentation.days <= 14
+    }
 
     /// Three next to a graph, five without one.
     static func modelRowCount(graph: ShareGraph) -> Int {
@@ -86,11 +131,17 @@ nonisolated struct ShareCard: Equatable, Sendable {
         today: DayKey,
         calendar: Calendar
     ) -> ShareCard {
-        let span = options.period.span(endingOn: today, calendar: calendar)
+        let selectedSpan = options.period.span(endingOn: today, calendar: calendar)
+        let span = min(today, max(selectedSpan.lowerBound, coverageStart ?? selectedSpan.lowerBound)) ... today
         let summary = ledger.summary(span)
         let models = ledger.models(span)
         let who = providersPhrase(providers)
-        let when = periodPhrase(options.period)
+        let when = span.lowerBound > selectedSpan.lowerBound
+            ? "since \(HistoryCopy.fullDay(span.lowerBound, calendar: calendar))" : periodPhrase(options.period)
+        let presentation = ShareGraphPresentation(
+            options: options, coverageStart: coverageStart, today: today, calendar: calendar,
+            hasUsage: summary.tokens > 0, hasCost: summary.cost != nil
+        )
 
         let headline: Headline
         let caption: String
@@ -124,29 +175,29 @@ nonisolated struct ShareCard: Equatable, Sendable {
             }
         }
 
-        var activity: ActivityGrid?
+        var activity: ShareActivitySeries?
         var spend: SpendSeries?
-        switch summary.tokens == 0 ? .none : options.graph {
+        var calendarGrid: ActivityGrid?
+        let groups = presentation.groups(calendar: calendar)
+        switch presentation.graph {
         case .activity:
-            let gridSpan = today.advanced(by: -(ActivityGrid.weeks * 7), calendar: calendar) ... today
-            activity = ActivityGrid(
-                today: today, calendar: calendar,
-                tokens: ledger.byDay(gridSpan).mapValues(\.summary.tokens),
-                coverageStart: coverageStart
-            )
+            activity = ShareActivitySeries(groups: groups, ledger: ledger, weekly: presentation.weekly, end: today)
         case .spend:
-            let start = today.advanced(by: 1 - SpendSeries.days, calendar: calendar)
-            spend = SpendSeries(
+            spend = SpendSeries(points: groups.map { group in
+                let summary = ledger.summary(group)
+                return SpendSeries.Point(day: group.lowerBound, cost: summary.tokens == 0 ? 0 : summary.cost)
+            }, end: today)
+        case .calendar:
+            calendarGrid = ActivityGrid(
                 today: today, calendar: calendar,
-                costs: ledger.byDay(start ... today).compactMapValues(\.summary.cost),
-                coverageStart: coverageStart
+                tokens: ledger.byDay(span).mapValues(\.summary.tokens),
+                coverageStart: span.lowerBound, start: span.lowerBound
             )
-        case .none:
-            break
+        case .none: break
         }
 
         let rows: [ModelRow] = options.showsModels && summary.tokens > 0
-            ? models.prefix(modelRowCount(graph: options.graph)).map { model in
+            ? models.prefix(modelRowCount(graph: presentation.graph)).map { model in
                 ModelRow(
                     id: model.id,
                     name: model.model.map(ModelPrices.normalize) ?? "unknown model",
@@ -156,19 +207,22 @@ nonisolated struct ShareCard: Equatable, Sendable {
             }
             : []
 
-        var caveats = HistoryCopy.caveats(unpricedModels: headline.isCost ? summary.unpricedModels : [])
+        var caveats = HistoryCopy
+            .caveats(unpricedModels: headline.isCost || presentation.graph == .spend ? summary.unpricedModels : [])
         if caveats.isEmpty {
             caveats = [tagline]
         }
 
         return ShareCard(
             providers: providers,
-            period: periodLabel(options.period, span: span, coverageStart: coverageStart, calendar: calendar),
+            period: periodLabel(options.period, span: selectedSpan, coverageStart: coverageStart, calendar: calendar),
             headline: headline,
             caption: caption,
             stats: stats,
             activity: activity,
             spend: spend,
+            calendarGrid: calendarGrid,
+            graphPresentation: presentation,
             models: rows,
             footer: caveats.joined(separator: " · ")
         )
@@ -234,7 +288,11 @@ nonisolated struct ShareCard: Equatable, Sendable {
         let active = ledger.activeDays(span)
         let streak = ledger.longestStreak(span, calendar: calendar)
         return [
-            Stat(value: period == .year ? count(active) : "\(active) of \(period.days)", label: "days active"),
+            Stat(
+                value: period == .year ? count(active) :
+                    "\(active) of \(span.lowerBound.days(through: span.upperBound, calendar: calendar).count)",
+                label: "days active"
+            ),
             Stat(value: streak == 1 ? "1 day" : "\(streak) days", label: "longest streak"),
         ]
     }

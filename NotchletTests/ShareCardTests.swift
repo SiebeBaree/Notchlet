@@ -147,6 +147,70 @@ struct ShareCardTests {
         #expect(card.activity == nil)
     }
 
+    @Test(arguments: [UsageHistory.Range.week, .month, .year])
+    func activityMatchesSelectedPeriod(period: UsageHistory.Range) throws {
+        let activity = try #require(make(ShareOptions(period: period, graph: .activity)).activity)
+        let span = period.span(endingOn: today, calendar: calendar)
+        #expect(activity.points.count == (period == .year ? 53 : period.days))
+        #expect(activity.points.first?.day == span.lowerBound)
+        #expect(activity.end == today)
+        #expect(activity.points.reduce(0) { $0 + $1.tokens } == ledger.summary(span).tokens)
+    }
+
+    @Test(arguments: [UsageHistory.Range.week, .month, .year])
+    func spendMatchesSelectedPeriod(period: UsageHistory.Range) throws {
+        let spend = try #require(make(ShareOptions(period: period, graph: .spend)).spend)
+        #expect(spend.points.count == (period == .year ? 53 : period.days))
+        #expect(spend.points.first?.day == period.span(endingOn: today, calendar: calendar).lowerBound)
+        #expect(spend.end == today)
+        let total = spend.points.compactMap(\.cost).reduce(0, +)
+        #expect(abs(total - (ledger.summary(period.span(endingOn: today, calendar: calendar)).cost ?? 0)) < 0.001)
+    }
+
+    @Test func graphsStartAtCoverageAndKeepQuietDays() throws {
+        let coverage = TestSupport.day("2026-08-28")
+        let activity = try #require(make(ShareOptions(period: .year, graph: .activity), coverageStart: coverage)
+            .activity)
+        let spend = try #require(make(ShareOptions(period: .year, graph: .spend), coverageStart: coverage).spend)
+        #expect(activity.points.count == 7)
+        #expect(activity.points.first?.day == coverage)
+        #expect(spend.points.map(\.day) == activity.points.map(\.day))
+        let quiet = try #require(activity.points.first { $0.day == TestSupport.day("2026-08-30") })
+        #expect(quiet.tokens == 0)
+        #expect(quiet.level == 0)
+        #expect(spend.points.first { $0.day == quiet.day }?.cost == 0)
+    }
+
+    @Test(arguments: ShareGraph.allCases)
+    func oneDayNeverHasAGraph(graph: ShareGraph) {
+        #expect(!make(ShareOptions(period: .today, graph: graph)).hasGraph)
+        let card = make(ShareOptions(period: .year, graph: graph), coverageStart: today)
+        #expect(!card.hasGraph)
+        #expect(card.graphPresentation.detail == "Graphs need more than one day")
+    }
+
+    @Test func yearDefaultsToCalendarAndTrimsUnknownWeeks() throws {
+        let coverage = TestSupport.day("2026-08-28")
+        let card = make(ShareOptions(period: .year), coverageStart: coverage)
+        let grid = try #require(card.calendarGrid)
+        #expect(grid.columnCount == 2)
+        #expect(grid.cells.filter { $0.fill != .unknown }.count == 7)
+        #expect(grid.cells.filter { $0.fill != .unknown }.reduce(0) { $0 + $1.tokens } == ledger
+            .summary(coverage ... today).tokens)
+        #expect(card.compactGraph)
+    }
+
+    @Test func coverageChangesCaptionAndActiveDayDenominator() {
+        let card = make(ShareOptions(showsCost: false), coverageStart: TestSupport.day("2026-08-28"))
+        #expect(card.caption == "tokens with Claude Code since Aug 28, 2026")
+        #expect(card.stats.first { $0.label == "days active" }?.value == "5 of 7")
+    }
+
+    @Test func spendDisclosesUnpricedModelsWithATokenHeadline() {
+        let card = make(ShareOptions(showsCost: false, graph: .spend))
+        #expect(card.footer == "codex-auto-review not priced")
+    }
+
     @Test func providersPhrase() {
         #expect(ShareCard.providersPhrase([Self.claude]) == "Claude Code")
         #expect(ShareCard.providersPhrase([Self.claude, Self.codex]) == "Claude Code and Codex")

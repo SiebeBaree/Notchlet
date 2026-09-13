@@ -78,13 +78,31 @@ struct ShareCardView: View {
     @ViewBuilder
     private var main: some View {
         let blocks = (card.hasGraph ? 1 : 0) + (card.models.isEmpty ? 0 : 1)
-        if blocks == 0 {
-            poster
+        if !card.hasGraph {
+            VStack(spacing: 12) {
+                poster
+                if !card.models.isEmpty {
+                    models
+                }
+            }
+        } else if card.compactGraph {
+            VStack(spacing: 0) {
+                headline
+                Spacer(minLength: 24)
+                HStack(spacing: 70) {
+                    graph.frame(width: compactGraphWidth)
+                    if !card.models.isEmpty {
+                        compactModels
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                Spacer(minLength: 24)
+            }
         } else {
             VStack(spacing: 0) {
                 headline
                 Spacer(minLength: 20)
-                if card.activity != nil || card.spend != nil {
+                if card.hasGraph {
                     graph
                     if !card.models.isEmpty {
                         Spacer(minLength: 20)
@@ -146,7 +164,7 @@ struct ShareCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
             Text(headlineText)
-                .font(.system(size: 168, weight: .bold))
+                .font(.system(size: card.models.isEmpty ? 168 : 112, weight: .bold))
                 .tracking(-8)
                 .foregroundStyle(theme.text)
                 .fixedSize()
@@ -168,7 +186,7 @@ struct ShareCardView: View {
                     .frame(width: Self.contentWidth / CGFloat(max(card.stats.count, 1)), alignment: .leading)
                 }
             }
-            .padding(.top, 44)
+            .padding(.top, card.models.isEmpty ? 44 : 20)
             Spacer(minLength: 0)
         }
         .monospacedDigit()
@@ -180,26 +198,75 @@ struct ShareCardView: View {
 
     @ViewBuilder
     private var graph: some View {
-        if let grid = card.activity {
-            Canvas { context, size in
-                ActivityHeatmap.draw(
-                    grid, style: theme.graph, in: &context,
-                    column: size.width / CGFloat(ActivityGrid.weeks), top: 20
-                )
+        if let series = card.activity {
+            ShareActivityChart(series: series, style: theme.graph, calendar: calendar)
+                .frame(height: Self.graphHeight)
+        } else if let grid = card.calendarGrid {
+            HStack(spacing: 30) {
+                Canvas { context, size in
+                    var style = theme.graph
+                    style.unknown = nil
+                    ActivityHeatmap.draw(grid, style: style, in: &context,
+                                         column: min(20, size.width / CGFloat(grid.columnCount)), top: 20)
+                }
+                .frame(width: card.compactGraph ? CGFloat(grid.columnCount) * 20 : Self.contentWidth)
+                if grid.columnCount <= 12 {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let active = card.stats.first(where: { $0.label == "days active" }) {
+                            Text(active.value).font(.system(size: 30, weight: .semibold)).foregroundStyle(theme.text)
+                            Text("days active").font(.system(size: 14)).foregroundStyle(theme.muted)
+                        }
+                        Text(HistoryCopy.shortDay(card.graphPresentation.span.lowerBound, calendar: calendar)
+                            + " to " + HistoryCopy.shortDay(card.graphPresentation.span.upperBound, calendar: calendar))
+                            .font(.system(size: 14)).foregroundStyle(theme.muted)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            .frame(height: Self.graphHeight)
+            .frame(height: 160)
         } else if let series = card.spend {
             Canvas { context, size in
                 let plot = CGRect(x: 0, y: 22, width: size.width, height: size.height - 22 - 24)
                 SpendChart.draw(series, style: theme.graph, calendar: calendar, in: &context, plot: plot, size: size)
             }
             .overlay(alignment: .topLeading) {
-                Text("Cost per day, 30 days")
+                Text(card.graphPresentation.detail)
                     .font(.system(size: Self.graphLabelSize))
                     .foregroundStyle(theme.muted)
             }
             .frame(height: Self.graphHeight)
         }
+    }
+
+    private var compactGraphWidth: CGFloat {
+        if let grid = card.calendarGrid {
+            return grid.columnCount <= 12 ? 470 : CGFloat(grid.columnCount) * 20
+        }
+        return min(470, CGFloat(card.graphPresentation.days) * 67)
+    }
+
+    private var compactModels: some View {
+        VStack(spacing: 26) {
+            ForEach(card.models) { model in
+                VStack(spacing: 10) {
+                    HStack {
+                        Text(model.name).lineLimit(1).truncationMode(.middle)
+                        Spacer(minLength: 12)
+                        Text(model.tokens)
+                    }
+                    .font(.system(size: 15, design: .monospaced))
+                    .foregroundStyle(theme.muted)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(theme.bar)
+                            Capsule().fill(theme.barFill).frame(width: max(6, proxy.size.width * model.share))
+                        }
+                    }
+                    .frame(height: 10)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 
     /// Rows get taller when there is no graph to share the room.
