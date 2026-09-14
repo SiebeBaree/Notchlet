@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 
@@ -34,10 +35,10 @@ export function MenuBar({ light = false }: { light?: boolean }) {
             }`}
         >
             <div className={`${segmentClass} menu-tab-start pr-[58px] pl-4 sm:pl-6`}>
-                <span className="flex items-center gap-2 font-semibold">
+                <Link href="/" aria-label="Notchlet home" className="flex items-center gap-2 font-semibold">
                     <span aria-hidden className="h-[13px] w-5 rounded-[4px_4px_7px_7px] bg-current opacity-90" />
                     Notchlet
-                </span>
+                </Link>
             </div>
             <div className={`${segmentClass} menu-tab-end pr-4 pl-[58px] sm:pr-6`}>
                 <DownloadLink className="font-medium opacity-85 transition-opacity hover:opacity-100">

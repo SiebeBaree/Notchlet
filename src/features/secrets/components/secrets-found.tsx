@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Code, Section } from "@/components/article";
+import { ArticleHeader, Code, Section } from "@/components/article";
 
 import { type Guide, guideFor, labelFor, providerFor, type SecretKind } from "../guides";
 
@@ -21,60 +21,32 @@ export function SecretsFound({ rule, provider: providerId }: { rule?: string; pr
             : [...rotation[kind](guide), damageStep(guide), ...notchletStep(provider)];
 
     return (
-        <article className="bg-white">
-            <header className="relative overflow-hidden px-6 pt-40 pb-20">
-                <div
-                    aria-hidden
-                    className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,#efeafd,transparent_70%)]"
-                />
-                <div className="relative mx-auto max-w-3xl">
-                    <p className="font-mono text-[12px] font-medium text-brand">
-                        {rule === undefined ? "Leaked secret" : label}
-                        {provider && <span className="text-ink-3"> · {provider.name} chat</span>}
-                    </p>
-                    <h1 className="mt-5 font-display text-[42px] leading-[1.08] tracking-[-0.005em] text-balance text-ink sm:text-[60px]">
-                        One of your secrets got leaked, what now?
-                    </h1>
-                    <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-ink-3">
-                        Notchlet found {article(label)} {label} in{" "}
-                        {provider ? `a ${provider.name} chat` : "one of your AI chats"} on this Mac. It is fixable in
-                        about ten minutes. Do the steps in order.
-                    </p>
-                </div>
-            </header>
+        <article className="mx-auto max-w-7xl border-x border-line bg-white sm:mx-6 xl:mx-auto">
+            <ArticleHeader title="Notchlet found a possible secret in your chats.">
+                <p>
+                    Review the {label} found in {provider ? `a ${provider.name} chat` : "your chat history"}. If it is
+                    an active credential, follow the steps below to replace it.
+                </p>
+            </ArticleHeader>
 
-            <Section title="What happened." sub="And what did not.">
+            <Section title="Review the finding">
                 <p>
-                    Somewhere in a chat the key ended up in plain text. You pasted a <Code>.env</Code>, or the agent ran{" "}
-                    <Code>cat .env</Code> or a curl with the key in a header, and the output landed in the transcript.{" "}
-                    {provider ? (
-                        <>
-                            {provider.name} writes every transcript to <Code>{provider.path}</Code> and sent the
-                            conversation to {provider.company} to get an answer.
-                        </>
-                    ) : (
-                        <>
-                            The CLI writes every transcript to disk and sent the conversation to its maker to get an
-                            answer.
-                        </>
-                    )}{" "}
-                    So the key now lives in two places you do not control much: a file on this disk and a log on their
-                    servers.
+                    A credential can end up in a transcript when you paste a <Code>.env</Code> file or an agent prints a
+                    command containing it. The conversation may also have been sent to your AI provider. Notchlet cannot
+                    tell whether the credential is still active or has been used by someone else.
                 </p>
                 <p>
-                    Nobody at {provider?.company ?? "an AI lab"} is going to use it. Treat it as burned anyway. A new
-                    key costs nothing, and the old one might also be in a Time Machine backup, a shared session or a
-                    screenshot you forgot about. Rotating takes ten minutes. Finding out someone used it takes a lot
-                    longer.
+                    Check the matched text in Notchlet. If it is a real credential, replace it and revoke the old one.
+                    It may also appear in backups, shared sessions or screenshots.
                 </p>
                 <p>
-                    Notchlet read the file on your Mac and hashed what it found. The key never left the machine and
-                    Notchlet does not keep it either, only the first six and last two characters so you can tell which
-                    one it is.
+                    Notchlet scans files locally. It stores a hash and the first six and last two characters of a
+                    finding so you can identify it. It does not send findings to a server or test credentials against
+                    provider APIs.
                 </p>
             </Section>
 
-            <Section title="The fix." sub={fixSubtitle[kind]}>
+            <Section title="Resolve the finding" sub={fixSubtitle[kind]}>
                 <ol className="divide-y divide-line">
                     {steps.map((step, index) => (
                         <li
@@ -95,7 +67,7 @@ export function SecretsFound({ rule, provider: providerId }: { rule?: string; pr
                 </ol>
             </Section>
 
-            <Section title="Next time." sub="The key never enters the chat.">
+            <Section title="Keep credentials out of chats">
                 <p>
                     Do not paste a key into a chat. Put it in <Code>.env</Code> yourself and tell the agent the variable
                     name. <Code>STRIPE_SECRET_KEY</Code> is all it needs to write the code.
@@ -112,8 +84,8 @@ export function SecretsFound({ rule, provider: providerId }: { rule?: string; pr
                     in a terminal, so when a command touches <Code>.env</Code>, say no.
                 </p>
                 <p>
-                    Build with test keys. Stripe, Twilio and most payment or email services have a test mode whose keys
-                    move nothing real. Switch to live keys at deploy time, in the hosting dashboard, never in the chat.
+                    Use sandbox credentials during development when the service provides them. Add production
+                    credentials through your hosting dashboard or secret manager. Keep both out of chat messages.
                 </p>
             </Section>
         </article>
@@ -121,12 +93,12 @@ export function SecretsFound({ rule, provider: providerId }: { rule?: string; pr
 }
 
 const fixSubtitle: Record<SecretKind, string> = {
-    key: "Make a new one, swap it in, kill the old one.",
-    keypair: "Make a new one, swap it in, kill the old one.",
-    webhook: "Make a new one, swap it in, kill the old one.",
-    password: "Change it, then update it everywhere.",
-    session: "Sign out, then look around.",
-    public: "Shorter than usual.",
+    key: "Replace the key and revoke the old one.",
+    keypair: "Replace the key pair and remove the old authorization.",
+    webhook: "Replace the webhook URL.",
+    password: "Change the password and update the connections that use it.",
+    session: "Revoke the session and check account activity.",
+    public: "This identifier is intended to be public. Check nearby findings for credentials.",
 };
 
 function ExternalLink({ href, children }: { href: string; children: ReactNode }) {
@@ -172,8 +144,9 @@ const rotation: Record<Exclude<SecretKind, "public">, (guide: Guide | undefined)
             body: (
                 <>
                     <p>
-                        Make a new key with the same permissions as the old one and copy it somewhere for a minute. If
-                        the page has a Roll or Regenerate button, use it: that is steps one and three in one click.
+                        Create a replacement key with only the permissions your app needs. Store it in your secret
+                        manager or environment configuration. Check the service's rotation instructions before using a
+                        Roll or Regenerate action, since it may revoke the old key immediately.
                     </p>
                     {guide?.note && <p>{guide.note}</p>}
                     {rotateLink(guide)}
@@ -181,7 +154,7 @@ const rotation: Record<Exclude<SecretKind, "public">, (guide: Guide | undefined)
             ),
         },
         {
-            title: "Put it where the old one was",
+            title: "Update the apps that use it",
             body: (
                 <>
                     <p>
@@ -200,9 +173,9 @@ const rotation: Record<Exclude<SecretKind, "public">, (guide: Guide | undefined)
             title: "Delete the old key",
             body: (
                 <p>
-                    Once the new one works, go back and delete the old one. Not disable, delete. If you cannot tell
-                    whether something still uses it, delete it anyway and see what breaks. A broken deploy is a five
-                    minute fix. A stranger's usage on your card is not.
+                    After updating the apps that use the key, verify they work and revoke the old credential. If you
+                    suspect someone is actively using the exposed key, revoke it immediately and restore affected
+                    services with the replacement.
                 </p>
             ),
         },
@@ -308,8 +281,8 @@ function damageStep(guide: Guide | undefined): Step {
                     make.
                 </p>
                 <p>
-                    Found something? Email their support today, say the key leaked and ask for the charges to be
-                    reversed. They have a process for this.
+                    If you find unfamiliar activity, contact the service's support team. Include the affected credential
+                    identifier and dates, but do not send the credential itself.
                 </p>
                 {guide?.activity && (
                     <ExternalLink href={guide.activity.href}>
@@ -324,22 +297,20 @@ function damageStep(guide: Guide | undefined): Step {
 function notchletStep(provider: ReturnType<typeof providerFor>): Step[] {
     return [
         {
-            title: "Tell Notchlet",
+            title: "Dismiss the resolved finding",
             body: (
                 <>
                     <p>
-                        Hover the notch and hit Ignore on this key. Notchlet remembers it by its hash and stays quiet
-                        about it, even when the same key turns up in another chat.
+                        Once the credential has been revoked, choose Ignore in Notchlet. It remembers the finding by its
+                        hash and will not alert you again for the same value.
                     </p>
                     <p>
-                        Deleting the transcript is optional. A dead key in a file opens nothing.
+                        Deleting a transcript does not revoke the credential. After revoking it, you can also remove
+                        local copies.
                         {provider && (
                             <>
                                 {" "}
-                                If you want it gone anyway, the chats are in <Code>{provider.path}</Code>
-                                {provider.name === "Claude Code" &&
-                                    ", and Claude Code deletes them itself after 30 days"}
-                                .
+                                The chats are in <Code>{provider.path}</Code>.
                             </>
                         )}
                     </p>
@@ -357,12 +328,20 @@ function publicSteps(label: string): Step[] {
             title: "This one is not a secret",
             body: (
                 <p>
-                    {article(label) === "an" ? "An" : "A"} {label} is meant to be visible. It got flagged because it
-                    usually sits right next to a key that is not. Check the other findings in Notchlet and the rest of
-                    that chat.
+                    {article(label) === "an" ? "An" : "A"} {label} is meant to be visible. It may have been flagged
+                    alongside a private credential. Check the other findings in Notchlet and the surrounding chat before
+                    dismissing it.
                 </p>
             ),
         },
-        ...notchletStep(undefined),
+        {
+            title: "Dismiss the finding",
+            body: (
+                <p>
+                    After checking the surrounding chat for private credentials, choose Ignore on this public identifier
+                    in Notchlet.
+                </p>
+            ),
+        },
     ];
 }

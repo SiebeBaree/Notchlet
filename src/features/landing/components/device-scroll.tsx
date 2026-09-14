@@ -4,6 +4,8 @@ import type { MotionValue } from "motion/react";
 import { motion, useScroll, useSpring, useTransform } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
+import { useReducedMotion } from "@/lib/use-reduced-motion";
+
 import { FeatureBlock, features } from "./features";
 import { Hero } from "./hero";
 
@@ -31,11 +33,10 @@ function ScrollFeature({
     );
 }
 
-// The hero is the Mac's screen. Scrolling scales it down until the chassis around it (bezel and deck, parked
-// just offscreen at full size) comes into view, then the features fade in beside the laptop. Below md there is
-// no scroll room, so progress stays 0 and this renders as a plain fullscreen hero with features stacked after.
+// The fullscreen hero shrinks into the laptop. Mobile and reduced-motion layouts place features below it.
 export function DeviceScroll() {
     const ref = useRef<HTMLDivElement>(null);
+    const reducedMotion = useReducedMotion();
     const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
     // The spring keeps everything on the JS driver (motion's native ScrollTimeline mistracks the staggered
     // feature ranges) and smooths the scrub so wheel steps don't stutter the laptop.
@@ -57,19 +58,22 @@ export function DeviceScroll() {
 
     return (
         <>
-            <div ref={ref} className="relative md:h-[280vh]">
-                <div className="sticky top-0 h-svh overflow-hidden bg-white">
+            <div ref={ref} className={reducedMotion ? "relative" : "relative md:h-[280vh]"}>
+                <div className="sticky top-0 h-svh min-h-[720px] overflow-hidden bg-white md:min-h-0">
                     <div
                         aria-hidden
                         className="absolute inset-0 bg-[radial-gradient(52%_44%_at_50%_46%,#efeafd,transparent_72%)]"
                     />
                     <div className="relative flex h-full items-center justify-center">
                         <motion.div
-                            style={{ scale: cinematic ? scale : 1, y: cinematic ? y : 13 }}
+                            style={{
+                                scale: cinematic && !reducedMotion ? scale : 1,
+                                y: cinematic && !reducedMotion ? y : 13,
+                            }}
                             className="flex shrink-0 flex-col items-center will-change-transform"
                         >
                             <div className="rounded-t-[26px] rounded-b-[10px] bg-[#0a0a0c] p-[18px] shadow-[0_32px_90px_-28px_rgba(23,21,31,0.5)]">
-                                <div className="h-svh w-screen overflow-hidden rounded-[12px]">
+                                <div className="h-svh min-h-[720px] w-screen overflow-hidden rounded-[12px] md:min-h-0">
                                     <Hero />
                                 </div>
                             </div>
@@ -78,17 +82,21 @@ export function DeviceScroll() {
                             </div>
                         </motion.div>
                     </div>
-                    <div className="absolute inset-y-0 left-0 hidden w-[27%] flex-col items-end justify-center gap-16 pr-6 pl-[max(1.5rem,3.5vw)] md:flex">
-                        <ScrollFeature progress={progress} start={0.55} side="left" feature={features[0]!} />
-                        <ScrollFeature progress={progress} start={0.65} side="left" feature={features[1]!} />
-                    </div>
-                    <div className="absolute inset-y-0 right-0 hidden w-[27%] flex-col items-start justify-center gap-16 pr-[max(1.5rem,3.5vw)] pl-6 md:flex">
-                        <ScrollFeature progress={progress} start={0.6} side="right" feature={features[2]!} />
-                        <ScrollFeature progress={progress} start={0.7} side="right" feature={features[3]!} />
-                    </div>
+                    {!reducedMotion && (
+                        <>
+                            <div className="absolute inset-y-0 left-0 hidden w-[27%] flex-col items-end justify-center gap-16 pr-6 pl-[max(1.5rem,3.5vw)] md:flex">
+                                <ScrollFeature progress={progress} start={0.55} side="left" feature={features[0]} />
+                                <ScrollFeature progress={progress} start={0.65} side="left" feature={features[1]} />
+                            </div>
+                            <div className="absolute inset-y-0 right-0 hidden w-[27%] flex-col items-start justify-center gap-16 pr-[max(1.5rem,3.5vw)] pl-6 md:flex">
+                                <ScrollFeature progress={progress} start={0.6} side="right" feature={features[2]} />
+                                <ScrollFeature progress={progress} start={0.7} side="right" feature={features[3]} />
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
-            <section className="bg-white px-6 pt-20 pb-4 md:hidden">
+            <section className={`bg-white px-6 pt-16 pb-12 ${reducedMotion ? "" : "md:hidden"}`}>
                 <div className="mx-auto flex max-w-md flex-col gap-12">
                     {features.map((feature) => (
                         <FeatureBlock key={feature.title} feature={feature} />

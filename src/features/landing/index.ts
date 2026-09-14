@@ -6,6 +6,7 @@ export { Questions } from "./components/faq";
 export { Footer } from "./components/footer";
 export { History } from "./components/history";
 export { MenuBar } from "./components/menu-bar";
+export { ProviderLinks } from "./components/provider-links";
 export { Pricing } from "./components/pricing";
 export { Roadmap } from "./components/roadmap";
 export { latestDownloadUrl } from "./download";

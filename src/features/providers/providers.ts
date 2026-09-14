@@ -1,10 +1,7 @@
 import type { FaqItem } from "@/components/json-ld";
 
 // Where the agent itself shows the numbers: a slash command in the CLI or a page on the web.
-type BuiltIn = { sub: string; body: string } & (
-    | { command: string; where: string }
-    | { link: { href: string; label: string } }
-);
+type BuiltIn = { body: string } & ({ command: string; where: string } | { link: { href: string; label: string } });
 
 export type Provider = {
     slug: string;
@@ -28,13 +25,12 @@ export const providers: Provider[] = [
         title: "Check your Claude Code usage from the notch",
         description:
             "How to see how much of your Claude Code 5 hour and weekly limit is left, in the CLI with /usage or in your Mac's notch with Notchlet.",
-        heading: "Claude Code usage, without /usage.",
-        intro: "Claude Code caps you twice: a rolling 5 hour session and a weekly cap, with a separate weekly cap for some models. Hit either and Claude stops mid task until the window resets. The CLI knows the numbers and keeps them behind a slash command.",
+        heading: "Check your Claude Code usage.",
+        intro: "See your Claude Code session and weekly limits from the notch. Notchlet shows remaining usage, reset times and any separate limits your plan has for individual models.",
         builtIn: {
-            sub: "Ask the CLI.",
             command: "/usage",
             where: "inside a Claude Code session",
-            body: "It shows the session bar, the weekly bar and their reset times. That works, once, and it costs a terminal switch every time you want to look.",
+            body: "The command shows session usage, weekly usage and their reset times.",
         },
         windows: [
             {
@@ -44,7 +40,7 @@ export const providers: Provider[] = [
             { name: "Weekly", body: "Every model together, reset once a week." },
             { name: "Per model", body: "A second weekly cap for some models, shown as its own ring." },
         ],
-        signIn: "Notchlet reads the token Claude Code keeps in your keychain, with its credentials file as fallback, and calls the endpoint behind /usage. It reads the item the way Claude Code writes it, so there is no password prompt. When the token expires while Claude Code is idle, Notchlet refreshes it the way a second Claude Code process would, with the same locks and the same write-back, so Claude Code stays signed in.",
+        signIn: "Notchlet can use your Claude Code or Claude Desktop login. Choose a login source in provider settings. It reads saved credentials on your Mac and refreshes an expired Claude Code token using the same locking process as the CLI.",
         faq: [
             {
                 q: "How do I check my Claude Code usage?",
@@ -66,23 +62,22 @@ export const providers: Provider[] = [
         title: "Check your Codex usage from the notch",
         description:
             "How to see how much of your Codex rate limit is left, in the CLI with /status or in your Mac's notch with Notchlet.",
-        heading: "Codex usage, without /status.",
-        intro: "Codex meters your ChatGPT plan per window, and which windows you get depends on the plan: a 5 hour and a weekly window on Plus, weekly only on the Pro tiers. The CLI reports them behind /status.",
+        heading: "Check your Codex usage.",
+        intro: "See the Codex usage limits for your ChatGPT plan from the notch. Notchlet reads the windows and reset times reported by Codex.",
         builtIn: {
-            sub: "Ask the CLI.",
             command: "/status",
             where: "in the Codex CLI",
-            body: "It lists each window with the percentage used and the reset time. Then you switch back to whatever you were doing and forget the number.",
+            body: "The command lists each usage window and its reset time.",
         },
         windows: [
             { name: "5h", body: "A rolling window, on the plans that have one." },
             { name: "Weekly", body: "Reset once a week." },
             {
                 name: "Per plan",
-                body: "Notchlet shows whatever the endpoint returns for your plan, with the labels and durations it sends. There is no plan table to go stale.",
+                body: "The available windows depend on your plan. Notchlet uses the labels and durations reported by Codex.",
             },
         ],
-        signIn: "Notchlet reads the tokens the Codex CLI stores in ~/.codex/auth.json and calls the endpoint behind /status. It never refreshes them: they last ten days, the CLI renews them on use, and OpenAI rejects a reused refresh token, so a refresh behind the CLI's back could sign it out.",
+        signIn: "Notchlet uses the login saved by the Codex CLI. If the login expires, open Codex to renew it. Notchlet does not refresh Codex tokens itself.",
         faq: [
             {
                 q: "How do I check my Codex usage?",
@@ -101,19 +96,18 @@ export const providers: Provider[] = [
         title: "Check your Cursor usage from the notch",
         description:
             "How to see how much of your Cursor monthly budget is left without opening the dashboard, in your Mac's notch with Notchlet.",
-        heading: "Cursor usage, without the dashboard.",
-        intro: "Cursor's included usage is a monthly budget split in two pools, Cursor's own models and third-party models, both reset with your billing cycle. Past the budget you pay on demand. The only place Cursor shows the numbers is the usage tab of its web dashboard.",
+        heading: "Check your Cursor usage.",
+        intro: "See your remaining Cursor budget from the notch, including the separate pools for Cursor models and other models. Reset times follow your billing cycle.",
         builtIn: {
-            sub: "Open the dashboard.",
             link: { href: "https://cursor.com/dashboard", label: "Open the Cursor dashboard" },
-            body: "The Usage tab shows the blended headline and the two pools. It is a browser tab away from your editor, which is one tab too many to check every hour.",
+            body: "The Usage tab shows your monthly usage and the separate model pools.",
         },
         windows: [
             { name: "Monthly", body: "The blended headline the dashboard shows, reset with the billing cycle." },
             { name: "Cursor models", body: "The pool for Cursor's own models, such as Composer." },
             { name: "Other models", body: "The pool for third-party models." },
         ],
-        signIn: "Notchlet reads the access token Cursor.app keeps in its state database and calls the endpoint behind the dashboard's usage page, the way the dashboard itself does. Cursor.app rotates the token and Notchlet picks up the new one on the next poll. If you use Cursor without the app on this Mac, paste a session token in Notchlet's settings. It lives in Notchlet's own keychain item.",
+        signIn: "Notchlet uses your Cursor app login. If Cursor is not installed on this Mac, add a session token in Notchlet settings. Pasted tokens are stored in the macOS keychain.",
         faq: [
             {
                 q: "How do I check my Cursor usage?",
@@ -121,7 +115,7 @@ export const providers: Provider[] = [
             },
             {
                 q: "Does Notchlet show on-demand spend?",
-                a: "No. Spend past the budget is a bill, not a limit, so it stays out of the ring.",
+                a: "No. The gauges show your included budget. Check the Cursor dashboard for on-demand charges.",
             },
             {
                 q: "Where does Cursor history come from?",
@@ -135,23 +129,22 @@ export const providers: Provider[] = [
         title: "Check your OpenCode usage from the notch",
         description:
             "How to see how much of your OpenCode Go 5 hour, weekly and monthly windows is left, in your Mac's notch with Notchlet.",
-        heading: "OpenCode Go usage, without the dashboard.",
-        intro: "OpenCode Go, the subscription, meters a rolling 5 hour window, a weekly one from Monday to Monday in UTC and a monthly one anchored to the day you subscribed. Zen pay-as-you-go credits are a different thing, and only the web dashboard shows them.",
+        heading: "Check your OpenCode Go usage.",
+        intro: "Track OpenCode Go usage from the notch. Notchlet shows the five-hour, weekly and monthly windows for your subscription. It does not track Zen credits.",
         builtIn: {
-            sub: "Open the dashboard.",
             link: { href: "https://opencode.ai", label: "Open opencode.ai" },
-            body: "The dashboard shows the Go windows and your Zen credits. Nothing in the CLI does.",
+            body: "The dashboard shows Go usage windows and Zen credits.",
         },
         windows: [
             { name: "5h", body: "A rolling window." },
             { name: "Weekly", body: "Monday to Monday, UTC." },
             { name: "Monthly", body: "Anchored to your subscription date." },
         ],
-        signIn: "Notchlet reads the key OpenCode saved after /connect in ~/.local/share/opencode/auth.json and calls the Go usage endpoint with it, the same key the CLI sends. The key never expires, so a rejected key means you rotated it and need to reconnect. If your data directory moved or the CLI is not on this Mac, paste a key from the dashboard in Notchlet's settings.",
+        signIn: "Notchlet uses the key OpenCode saved after /connect. You can also add a key in Notchlet settings, where it is stored in the macOS keychain. Reconnect if you rotate the key.",
         faq: [
             {
                 q: "Does Notchlet show Zen credits?",
-                a: "No. Credits only exist on the web dashboard behind a browser session, and Notchlet does not borrow browser cookies. A workspace without a Go subscription shows nothing for OpenCode.",
+                a: "No. Notchlet tracks OpenCode Go subscriptions. Check the OpenCode dashboard for Zen credits.",
             },
             {
                 q: "How do I check my OpenCode usage?",
