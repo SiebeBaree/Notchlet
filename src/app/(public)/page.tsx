@@ -8,6 +8,7 @@ import {
     History,
     MenuBar,
     Pricing,
+    ProviderLinks,
     Questions,
     Roadmap,
     softwareApplication,
@@ -22,12 +23,15 @@ export default async function HomePage() {
             <JsonLd data={softwareApplication} />
             <MenuBar />
             <DeviceScroll />
-            <History />
-            <Roadmap />
-            <Pricing />
-            <Questions />
-            <Cta />
-            <Footer />
+            <div className="mx-auto max-w-7xl border-x border-line sm:mx-6 xl:mx-auto">
+                <ProviderLinks />
+                <History />
+                <Roadmap />
+                <Pricing />
+                <Questions />
+                <Cta />
+                <Footer />
+            </div>
         </main>
     );
 }

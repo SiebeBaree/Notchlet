@@ -1,56 +1,92 @@
+import {
+    ArrowUpRight,
+    ChartNoAxesColumnIncreasing,
+    Fingerprint,
+    Plug,
+    Users,
+    MessageSquareWarning,
+} from "lucide-react";
+
 import { githubIssuesUrl } from "../links";
 
-// "Local" and "Opt in" answer the question the privacy block raises: anything that reads your chats does it on your
-// Mac, and anything that leaves the device is a choice you make.
 const roadmap = [
-    { title: "Leaked keys in your chats", sub: "a scan of your transcripts for API keys", tag: "Local" },
-    { title: "Alerts when an agent is waiting on you" },
-    { title: "Angry counter", sub: "how often you lose it at the model", tag: "Local" },
-    { title: "Global leaderboard", sub: "anonymous unless you make a profile", tag: "Opt in" },
-    { title: "Your AI personality", sub: "when you work, your most used phrases, who you are in chats", tag: "Opt in" },
-] as const;
+    {
+        title: "Global leaderboard",
+        description: "Compare your usage with other Notchlet users.",
+        icon: ChartNoAxesColumnIncreasing,
+    },
+    {
+        title: "AI personality",
+        description: "Discover your AI personality from how you use your agents.",
+        icon: Fingerprint,
+    },
+    {
+        title: "Team leaderboard",
+        description: "Battle your teammates on the usage leaderboard.",
+        icon: Users,
+    },
+    {
+        title: "Connect more providers",
+        description: "Track more of your AI tools in Notchlet.",
+        icon: Plug,
+    },
+    {
+        title: "Angry counter",
+        description: "Count the times you lose your temper with a model.",
+        icon: MessageSquareWarning,
+    },
+];
 
 export function Roadmap() {
     return (
-        <section className="border-y border-line bg-white px-6 py-28">
-            <div className="mx-auto max-w-6xl">
-                <h2 className="max-w-2xl text-[26px] leading-[1.25] font-semibold tracking-tight text-ink sm:text-[30px]">
-                    What ships next is up to you.
-                </h2>
-                <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-ink-3">
-                    Nothing below is locked in. Tell me which one you actually want.
-                </p>
-                <ul className="mt-14 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                    {roadmap.map((item, index) => (
-                        <li key={item.title} className="flex flex-col bg-white p-6">
-                            <span className="flex items-center justify-between">
-                                <span className="font-mono text-[11px] font-medium text-brand">
-                                    {String(index + 1).padStart(2, "0")}
-                                </span>
-                                {"tag" in item && (
-                                    <span className="rounded-md bg-brand-soft px-2 py-0.5 font-mono text-[10px] font-medium text-brand">
-                                        {item.tag}
-                                    </span>
-                                )}
-                            </span>
-                            <span className="mt-3 text-[15px] font-semibold tracking-tight text-ink">{item.title}</span>
-                            {"sub" in item && (
-                                <span className="mt-1.5 block text-[13px] leading-relaxed text-ink-3">{item.sub}</span>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-                <div className="mt-12 flex flex-wrap items-center gap-x-5 gap-y-4">
-                    <a
-                        href={githubIssuesUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-md bg-ink px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-ink-2"
+        <section
+            id="roadmap"
+            aria-labelledby="roadmap-heading"
+            className="border-b border-line px-5 py-14 sm:px-8 sm:py-16 lg:py-20"
+        >
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
+                <div>
+                    <h2
+                        id="roadmap-heading"
+                        className="text-[26px] font-semibold tracking-tight text-ink sm:text-[30px]"
                     >
-                        Tell me what to build first
-                    </a>
-                    <p className="text-[13px] text-ink-3">Open an issue. I read all of them.</p>
+                        Roadmap
+                    </h2>
+                    <p className="mt-3 text-[15px] text-ink-3">Planned features.</p>
                 </div>
+                <a
+                    href={githubIssuesUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-brand transition-colors hover:text-ink"
+                >
+                    Suggest a feature <ArrowUpRight className="size-3.5" />
+                </a>
+            </div>
+            <ul className="grid grid-cols-2 overflow-hidden rounded-lg border border-line md:grid-cols-5">
+                {roadmap.map(({ title, description, icon: Icon }) => (
+                    <li
+                        key={title}
+                        className="border-r border-b border-line px-4 pt-6 pb-7 last:col-span-2 last:border-0 even:border-r-0 md:border-b-0 md:last:col-span-1 md:even:border-r"
+                    >
+                        <div aria-hidden className="flex h-16 items-center">
+                            <Icon className="size-9 text-[#8965c8]" strokeWidth={1.25} />
+                        </div>
+                        <h3 className="text-[13px] font-semibold tracking-tight text-ink">{title}</h3>
+                        <p className="mt-2 text-xs leading-relaxed text-ink-3">{description}</p>
+                    </li>
+                ))}
+            </ul>
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-5">
+                <p className="text-xs text-ink-3">Have a feature in mind? Add it on GitHub.</p>
+                <a
+                    href={githubIssuesUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-3 rounded-md bg-ink px-4 py-2.5 text-xs font-medium text-white transition-colors hover:bg-ink-2"
+                >
+                    Open an issue <ArrowUpRight className="size-3.5" />
+                </a>
             </div>
         </section>
     );

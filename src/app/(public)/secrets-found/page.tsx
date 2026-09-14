@@ -4,9 +4,9 @@ import { Footer, MenuBar } from "@/features/landing";
 import { SecretsFound } from "@/features/secrets";
 
 export const metadata: Metadata = {
-    title: "One of your secrets got leaked, what now?",
+    title: "Resolve a possible secret found in your chats",
     description:
-        "Notchlet found a leaked key in your Claude Code or Codex chats. Make a new one, swap it in, delete the old one and check for damage, in about ten minutes.",
+        "Review a possible credential found in your chat history, replace active credentials and check account activity.",
 };
 
 // Notchlet opens this with ?rule=<betterleaks rule id>&provider=<claude-code|codex>. Awaiting searchParams is what

@@ -1,29 +1,18 @@
 import { ArrowUpRight } from "lucide-react";
 
-import { Code, Faq, Section } from "@/components/article";
+import { ArticleHeader, Code, Faq, Section } from "@/components/article";
 
 import type { Provider } from "../providers";
 
-// The page for one agent: what its limits are, where it shows them itself, and what Notchlet does instead.
 export function ProviderPage({ provider }: { provider: Provider }) {
     const { builtIn } = provider;
     return (
-        <article className="bg-white">
-            <header className="relative overflow-hidden px-6 pt-40 pb-20">
-                <div
-                    aria-hidden
-                    className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,#efeafd,transparent_70%)]"
-                />
-                <div className="relative mx-auto max-w-3xl">
-                    <p className="font-mono text-[12px] font-medium text-brand">{provider.name}</p>
-                    <h1 className="mt-5 font-display text-[42px] leading-[1.08] tracking-[-0.005em] text-balance text-ink sm:text-[60px]">
-                        {provider.heading}
-                    </h1>
-                    <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-ink-3">{provider.intro}</p>
-                </div>
-            </header>
+        <article className="mx-auto max-w-7xl border-x border-line bg-white sm:mx-6 xl:mx-auto">
+            <ArticleHeader title={provider.heading}>
+                <p>{provider.intro}</p>
+            </ArticleHeader>
 
-            <Section title="The built-in way." sub={builtIn.sub}>
+            <Section title={`Check in ${provider.name}`}>
                 {"command" in builtIn ? (
                     <p>
                         Run <Code>{builtIn.command}</Code> {builtIn.where}.
@@ -42,7 +31,7 @@ export function ProviderPage({ provider }: { provider: Provider }) {
                 <p>{builtIn.body}</p>
             </Section>
 
-            <Section title="What Notchlet shows." sub="One ring per window.">
+            <Section title="Check in Notchlet">
                 <dl className="grid gap-8 sm:grid-cols-3">
                     {provider.windows.map((window) => (
                         <div key={window.name}>
@@ -52,16 +41,16 @@ export function ProviderPage({ provider }: { provider: Provider }) {
                     ))}
                 </dl>
                 <p>
-                    Hover the notch and each window is a ring with the percentage left, the reset time and a verdict on
-                    your burn rate. Click a ring for history: cost and tokens per day, and every model you used.
+                    Hover over the notch to see your remaining usage and reset times. Click a gauge to open usage
+                    history with token counts, estimated API cost and a breakdown by model.
                 </p>
             </Section>
 
-            <Section title="How it signs in." sub="With the login you already have.">
+            <Section title="Sign in">
                 <p>{provider.signIn}</p>
             </Section>
 
-            <Section title="Questions." sub="Short answers.">
+            <Section title="Questions">
                 <Faq items={provider.faq} />
             </Section>
         </article>

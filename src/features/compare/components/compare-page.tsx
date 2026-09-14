@@ -1,34 +1,22 @@
-import { Section } from "@/components/article";
+import { ArticleHeader, Section } from "@/components/article";
 
 import { type Competitor, notchlet, rows } from "../competitors";
 
-// One comparison: the same eight facts side by side, then who should pick which. The other tool gets the honest
-// version, since a reader who catches one stretched claim stops believing the rest.
 export function ComparePage({ competitor }: { competitor: Competitor }) {
     return (
-        <article className="bg-white">
-            <header className="relative overflow-hidden px-6 pt-40 pb-20">
-                <div
-                    aria-hidden
-                    className="absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_0%,#efeafd,transparent_70%)]"
-                />
-                <div className="relative mx-auto max-w-3xl">
-                    <p className="font-mono text-[12px] font-medium text-brand">Compared</p>
-                    <h1 className="mt-5 font-display text-[42px] leading-[1.08] tracking-[-0.005em] text-balance text-ink sm:text-[60px]">
-                        Notchlet vs {competitor.name}
-                    </h1>
-                    <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-ink-3">{competitor.summary}</p>
-                </div>
-            </header>
+        <article className="mx-auto max-w-7xl border-x border-line bg-white sm:mx-6 xl:mx-auto">
+            <ArticleHeader title={`Notchlet vs ${competitor.name}`}>
+                <p>{competitor.summary}</p>
+            </ArticleHeader>
 
-            <Section title="Side by side." sub={`Checked ${competitor.source.checked}.`}>
-                <table className="w-full border-collapse text-left text-sm">
+            <Section title="Feature comparison" sub={`Checked ${competitor.source.checked}.`}>
+                <table className="w-full table-fixed border-collapse text-left text-xs [overflow-wrap:anywhere] sm:text-sm">
                     <thead>
                         <tr className="text-[15px] font-semibold tracking-tight text-ink">
                             <th className="w-[22%] pb-4 font-mono text-[12px] font-medium text-brand" scope="col">
                                 &nbsp;
                             </th>
-                            <th className="w-[39%] pr-6 pb-4" scope="col">
+                            <th className="w-[39%] pr-3 pb-4 sm:pr-6" scope="col">
                                 Notchlet
                             </th>
                             <th className="w-[39%] pb-4" scope="col">
@@ -39,10 +27,13 @@ export function ComparePage({ competitor }: { competitor: Competitor }) {
                     <tbody>
                         {rows.map((row) => (
                             <tr key={row.key} className="border-t border-line align-top">
-                                <th className="py-4 pr-4 font-mono text-[12px] font-medium text-brand" scope="row">
+                                <th
+                                    className="py-4 pr-2 font-mono text-[12px] font-medium text-brand sm:pr-4"
+                                    scope="row"
+                                >
                                     {row.label}
                                 </th>
-                                <td className="py-4 pr-6 leading-relaxed text-ink-2">{notchlet[row.key]}</td>
+                                <td className="py-4 pr-3 leading-relaxed text-ink-2 sm:pr-6">{notchlet[row.key]}</td>
                                 <td className="py-4 leading-relaxed text-ink-3">{competitor.facts[row.key]}</td>
                             </tr>
                         ))}
@@ -58,14 +49,14 @@ export function ComparePage({ competitor }: { competitor: Competitor }) {
                     >
                         {competitor.source.label}
                     </a>
-                    . If one is wrong, open an issue and it gets fixed.
+                    .
                 </p>
             </Section>
 
-            <Section title="Which one." sub="Pick by what you run.">
+            <Section title="Choosing a tool">
                 <div className="grid gap-10 sm:grid-cols-2">
-                    <Picks title={`${competitor.name} if`} items={competitor.pickThem} />
-                    <Picks title="Notchlet if" items={competitor.pickUs} />
+                    <Picks title={`Choose ${competitor.name} if`} items={competitor.pickThem} />
+                    <Picks title="Choose Notchlet if" items={competitor.pickUs} />
                 </div>
             </Section>
         </article>

@@ -10,7 +10,7 @@
 @theme {
     --color-ink: #17151f;
     --color-ink-2: #262233;
-    --color-ink-3: #7b7788;
+    --color-ink-3: #716b7e;
     --color-brand: #7145f5;
     --color-brand-bright: #9f7cff;
     --color-brand-soft: #efeafd;
@@ -133,20 +133,16 @@
         left 0 top 0;
 }
 
-/* Gentle bob for the hero scroll hint. Transform-only so it stays on the compositor. */
-@keyframes hint-bob {
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(7px);
-    }
-}
-
 @layer base {
     * {
         @apply border-border outline-ring/50;
+    }
+    a:focus-visible,
+    button:focus-visible,
+    summary:focus-visible,
+    [tabindex="0"]:focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: 4px;
     }
     body {
         @apply bg-background text-foreground;
