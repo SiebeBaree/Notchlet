@@ -31,9 +31,35 @@ struct ModelPricesTests {
     }
 
     @Test func openAICacheWritesAreOrdinaryInput() throws {
-        let price = try #require(ModelPrices.price(for: "gpt-5.6-sol"))
+        let price = try #require(ModelPrices.price(for: "gpt-5.5"))
         #expect(price.cacheWrite5m == price.input)
         #expect(price.cost(of: TokenCount(input: 2_000_000, cacheRead: 1_000_000, output: 100_000)) == 13.5)
+    }
+
+    @Test(arguments: ["gpt-6-astra", "openai/GPT-6-Astra", "gpt-6-astra-2026-09-01"])
+    func astraIncludesCacheWritePricing(model: String) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(input: 10, output: 50, cacheRead: 1, cacheWrite5m: 12.5, cacheWrite1h: 12.5))
+        #expect(price.cost(of: TokenCount(input: 1_000_000, cacheRead: 2_000_000,
+                                          cacheWrite5m: 1_000_000, output: 100_000)) == 29.5)
+    }
+
+    @Test(arguments: ["claude-fable-5-1", "anthropic/claude-fable-5-1[1m]", "claude-mythos-5-1"])
+    func latestAnthropicModelsHaveDiscountedCacheReads(model: String) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(input: 10, output: 50, cacheRead: 0.25, cacheWrite5m: 12.5, cacheWrite1h: 20))
+        #expect(price.cost(of: TokenCount(input: 1_000_000, cacheRead: 2_000_000,
+                                          cacheWrite5m: 1_000_000, cacheWrite1h: 1_000_000,
+                                          output: 100_000)) == 48)
+        #expect(ModelPrices.price(for: "claude-fable-5")?.cacheRead == 1)
+        #expect(ModelPrices.price(for: "claude-mythos-5")?.cacheRead == 1)
+    }
+
+    @Test func currentSolAndSonnetRates() throws {
+        let sol = try #require(ModelPrices.price(for: "gpt-5.6-sol"))
+        #expect(sol == ModelPrice(input: 4, output: 20, cacheRead: 0.4, cacheWrite5m: 5, cacheWrite1h: 5))
+        let sonnet = try #require(ModelPrices.price(for: "claude-sonnet-5"))
+        #expect(sonnet == ModelPrice(input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4))
     }
 
     @Test func unknownModelsStayUnpriced() {

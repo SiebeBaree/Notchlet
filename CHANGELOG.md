@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add GPT-6 Astra and Claude Mythos pricing. Correct Fable 5.1 cache reads,
+  Sonnet 5 and GPT-5.6 Sol rates and GPT-5.6 cache writes.
+
 - Gauge time markers are off by default. Turn them on in settings, where an
   info icon explains what they mean. The marker is thicker, solid white and
   edged in black so it is easier to see on every gauge color.
