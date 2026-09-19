@@ -68,7 +68,7 @@ struct AgentHookInstallerTests {
 
         let codex = try json(at: installer.configURL(for: .codex))
         let codexHooks = try #require(codex["hooks"] as? [String: Any])
-        #expect(Set(codexHooks.keys) == ["Stop", "PermissionRequest", "UserPromptSubmit", "SessionEnd", "Interrupt"])
+        #expect(Set(codexHooks.keys) == ["Stop", "UserPromptSubmit", "SessionEnd", "Interrupt"])
         let codexEntry = try #require(((codexHooks["Stop"] as? [[String: Any]])?.first?["hooks"] as? [[String: Any]])?
             .first)
         #expect(codexEntry["async"] == nil)
@@ -85,6 +85,36 @@ struct AgentHookInstallerTests {
         installer.remove()
         #expect(!FileManager.default.fileExists(atPath: installer.configURL(for: .opencode).path))
         #expect(try (json(at: installer.configURL(for: .codex))["hooks"] as? [String: Any])?.isEmpty == true)
+    }
+
+    @Test func codexUpgradeRemovesOurPermissionHookAndPreservesOtherHooks() throws {
+        let home = try makeHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let installer = AgentHookInstaller(home: home)
+        let settings = installer.configURL(for: .codex)
+        try FileManager.default.createDirectory(
+            at: settings.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let other: [String: Any] = ["hooks": [["type": "command", "command": "review-command"]]]
+        let ours: [String: Any] = ["hooks": [["type": "command", "command": "\(installer.scriptURL.path) codex"]]]
+        let data = try JSONSerialization.data(withJSONObject: [
+            "hooks": ["PermissionRequest": [other, ours]],
+        ])
+        try data.write(to: settings)
+
+        installer.install([.codex])
+        installer.install([.codex])
+
+        let hooks = try #require(try json(at: settings)["hooks"] as? [String: Any])
+        let permission = try #require(hooks["PermissionRequest"] as? [[String: Any]])
+        #expect(permission.count == 1)
+        #expect((permission.first?["hooks"] as? [[String: Any]])?.first?["command"] as? String == "review-command")
+        #expect((hooks["Stop"] as? [[String: Any]])?.count == 1)
+
+        installer.remove()
+        let remaining = try #require(try json(at: settings)["hooks"] as? [String: Any])
+        #expect(Set(remaining.keys) == ["PermissionRequest"])
     }
 
     @Test func aFileThatDoesNotParseIsLeftAlone() throws {

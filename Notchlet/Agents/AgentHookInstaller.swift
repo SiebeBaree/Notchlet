@@ -103,7 +103,8 @@ struct AgentHookInstaller {
             try edit(
                 url,
                 install: install,
-                events: ["Stop", "PermissionRequest", "UserPromptSubmit", "SessionEnd", "Interrupt"]
+                events: ["Stop", "UserPromptSubmit", "SessionEnd", "Interrupt"],
+                removingEvents: ["PermissionRequest"]
             ) {
                 ["hooks": [["type": "command", "command": command(for: target), "timeout": 5]]]
             }
@@ -117,7 +118,8 @@ struct AgentHookInstaller {
     /// For each event, drops the entries that are Notchlet's and appends a
     /// fresh one when installing. Every other key stays as it was.
     private func edit(
-        _ url: URL, install: Bool, events: [String], version: Int? = nil, entry: () -> [String: Any]
+        _ url: URL, install: Bool, events: [String], removingEvents: [String] = [],
+        version: Int? = nil, entry: () -> [String: Any]
     ) throws {
         var root: [String: Any]
         if let data = try? Data(contentsOf: url) {
@@ -131,10 +133,10 @@ struct AgentHookInstaller {
             return
         }
         var hooks = root["hooks"] as? [String: Any] ?? [:]
-        for event in events {
+        for event in events + removingEvents {
             var entries = (hooks[event] as? [[String: Any]] ?? [])
                 .filter { !Self.isNotchlet($0, script: scriptURL.path) }
-            if install {
+            if install, !removingEvents.contains(event) {
                 entries.append(entry())
             }
             hooks[event] = entries.isEmpty ? nil : entries

@@ -48,7 +48,7 @@ struct AgentWaitRulesTests {
                 .effect
         }
         #expect(effect("Stop") == .wait(.finished))
-        #expect(effect("PermissionRequest") == .wait(.needsInput))
+        #expect(effect("PermissionRequest") == .ignore)
         #expect(effect("UserPromptSubmit") == .clear)
         #expect(effect("Interrupt") == .clear)
         #expect(effect("PreToolUse") == .ignore)
