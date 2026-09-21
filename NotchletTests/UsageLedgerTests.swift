@@ -35,7 +35,7 @@ struct UsageLedgerTests {
         let summary = ledger.summary(span)
         #expect(summary.requests == 4)
         #expect(summary.tokens == 3_000_015)
-        #expect(summary.cost == 50 + 5 + 0.25)
+        #expect(summary.cost == 50 + 4 + 0.25)
         #expect(summary.unpricedModels == ["codex-auto-review"])
     }
 

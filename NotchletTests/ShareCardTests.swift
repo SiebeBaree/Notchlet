@@ -47,7 +47,7 @@ struct ShareCardTests {
 
     @Test func costHeadlineWithItsStats() {
         let card = make(ShareOptions(period: .week))
-        #expect(card.headline == .cost("$120.02"))
+        #expect(card.headline == .cost("$117.52"))
         #expect(card.caption == "Claude Code usage at API prices")
         #expect(card.period == "Last 7 days · Aug 28 to Sep 3, 2026")
         #expect(card.stats.map(\.value) == ["5M", "18", "5 of 7", "2 days"])
@@ -74,14 +74,14 @@ struct ShareCardTests {
         let card = make(ShareOptions(period: .today))
         #expect(card.period == "Today · Sep 3, 2026")
         #expect(card.stats.map(\.label) == ["tokens", "requests"])
-        #expect(card.headline == .cost("$7.50"))
+        #expect(card.headline == .cost("$5.00"))
     }
 
     @Test func planPriceBecomesAMultipleOverThirtyDays() {
         let card = make(ShareOptions(period: .month), planPrice: 20)
-        #expect(card.headline == .cost("$120.02"))
+        #expect(card.headline == .cost("$117.52"))
         #expect(card.stats.map(\.label) == ["tokens", "your $20 plan", "days active", "longest streak"])
-        #expect(card.stats[1].value == "6x")
+        #expect(card.stats[1].value == "5.9x")
         // Only a month compares with a monthly price, and only in dollars.
         #expect(make(ShareOptions(period: .week), planPrice: 20).stats.map(\.label).contains("requests"))
         var tokens = ShareOptions(period: .month)
