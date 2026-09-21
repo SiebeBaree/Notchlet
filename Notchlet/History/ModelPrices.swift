@@ -16,21 +16,26 @@ nonisolated struct ModelPrice: Hashable, Sendable {
             + Double(tokens.output) * output) / 1_000_000
     }
 
-    /// Cache reads at 10% of input, 5-minute writes at 125%, 1-hour writes
-    /// at 200%, the same for every model.
-    static func anthropic(input: Double, output: Double) -> ModelPrice {
+    /// Most models charge 10% for cache reads; Fable and Mythos 5.1 charge less.
+    static func anthropic(input: Double, output: Double, cacheRead: Double? = nil) -> ModelPrice {
         ModelPrice(
             input: input,
             output: output,
-            cacheRead: input / 10,
+            cacheRead: cacheRead ?? input / 10,
             cacheWrite5m: input * 1.25,
             cacheWrite1h: input * 2
         )
     }
 
-    /// Cache writes are ordinary input.
-    static func openAI(input: Double, output: Double, cacheRead: Double) -> ModelPrice {
-        ModelPrice(input: input, output: output, cacheRead: cacheRead, cacheWrite5m: input, cacheWrite1h: input)
+    /// Older models count cache writes as ordinary input.
+    static func openAI(input: Double, output: Double, cacheRead: Double, cacheWrite: Double? = nil) -> ModelPrice {
+        ModelPrice(
+            input: input,
+            output: output,
+            cacheRead: cacheRead,
+            cacheWrite5m: cacheWrite ?? input,
+            cacheWrite1h: cacheWrite ?? input
+        )
     }
 
     static func cursor(input: Double, output: Double, cacheRead: Double, cacheWrite: Double) -> ModelPrice {
@@ -47,8 +52,11 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// Lookup is exact after normalizing, never fuzzy: a guess between
 /// `gpt-5.7` and `gpt-5.7-mini` would be off by a factor of five, so an
 /// unpriced model is named in the pane instead. Kept by hand because the
-/// public catalogs lag new models by weeks. Sources: each vendor's pricing
-/// page, cross-checked against LiteLLM and OpenUsage, September 2026.
+/// public catalogs lag new models by weeks. Standard short-context rates;
+/// daily token totals cannot determine per-request context or service tiers.
+/// OpenAI and Anthropic rates checked September 19, 2026:
+/// https://developers.openai.com/api/docs/pricing
+/// https://platform.claude.com/docs/en/about-claude/pricing
 nonisolated enum ModelPrices {
     static func price(for model: String) -> ModelPrice? {
         table[normalize(model)]
@@ -90,13 +98,15 @@ nonisolated enum ModelPrices {
         "claude-sonnet-4": .anthropic(input: 3, output: 15),
         "claude-sonnet-4-5": .anthropic(input: 3, output: 15),
         "claude-sonnet-4-6": .anthropic(input: 3, output: 15),
-        "claude-sonnet-5": .anthropic(input: 3, output: 15),
+        "claude-sonnet-5": .anthropic(input: 2, output: 10),
         "claude-haiku-4-5": .anthropic(input: 1, output: 5),
         "claude-3-5-haiku": .anthropic(input: 0.8, output: 4),
         "claude-3-5-sonnet": .anthropic(input: 3, output: 15),
         "claude-3-7-sonnet": .anthropic(input: 3, output: 15),
         "claude-fable-5": .anthropic(input: 10, output: 50),
-        "claude-fable-5-1": .anthropic(input: 10, output: 50),
+        "claude-fable-5-1": .anthropic(input: 10, output: 50, cacheRead: 0.25),
+        "claude-mythos-5": .anthropic(input: 10, output: 50),
+        "claude-mythos-5-1": .anthropic(input: 10, output: 50, cacheRead: 0.25),
 
         // OpenAI. Codex logs the bare model id from its config.
         "gpt-4o": .openAI(input: 2.5, output: 10, cacheRead: 1.25),
@@ -125,9 +135,10 @@ nonisolated enum ModelPrices {
         "gpt-5.4-pro": .openAI(input: 30, output: 180, cacheRead: 3),
         "gpt-5.5": .openAI(input: 5, output: 30, cacheRead: 0.5),
         "gpt-5.5-pro": .openAI(input: 30, output: 180, cacheRead: 3),
-        "gpt-5.6-sol": .openAI(input: 5, output: 30, cacheRead: 0.5),
-        "gpt-5.6-terra": .openAI(input: 2, output: 12, cacheRead: 0.2),
-        "gpt-5.6-luna": .openAI(input: 0.2, output: 1.2, cacheRead: 0.02),
+        "gpt-5.6-sol": .openAI(input: 4, output: 20, cacheRead: 0.4, cacheWrite: 5),
+        "gpt-5.6-terra": .openAI(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2.5),
+        "gpt-5.6-luna": .openAI(input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 0.25),
+        "gpt-6-astra": .openAI(input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5),
 
         // Cursor's own models and its router, as the usage export names them.
         "auto": .cursor(input: 1.25, output: 6, cacheRead: 0.25, cacheWrite: 1.25),
