@@ -95,7 +95,9 @@ nonisolated enum AgentWaitRules {
         case .codex:
             switch event {
             case "Stop": return .wait(.finished)
-            case "PermissionRequest": return .wait(.needsInput)
+            // PermissionRequest also runs before auto-review, without telling us
+            // whether a prompt will reach the user. It cannot signal a wait.
+            case "PermissionRequest": return .ignore
             case "UserPromptSubmit", "SessionEnd", "Interrupt": return .clear
             default: return .ignore
             }
