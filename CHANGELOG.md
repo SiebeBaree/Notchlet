@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Codex permission checks no longer trigger a false amber line while the agent
+  is working. Codex completion still shows blue; permission prompts cannot be
+  distinguished from automatic approvals through its current hooks.
+
 - Gauge time markers are off by default. Turn them on in settings, where an
   info icon explains what they mean. The marker is thicker, solid white and
   edged in black so it is easier to see on every gauge color.
