@@ -16,7 +16,7 @@ nonisolated struct ModelPrice: Hashable, Sendable {
             + Double(tokens.output) * output) / 1_000_000
     }
 
-    /// Most models charge 10% for cache reads; Fable and Mythos 5.1 charge less.
+    /// Models with discounted cache reads override the usual 10% rate.
     static func anthropic(input: Double, output: Double, cacheRead: Double? = nil) -> ModelPrice {
         ModelPrice(
             input: input,
@@ -57,6 +57,7 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// OpenAI and Anthropic rates checked September 19, 2026:
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
+/// GPT-6 Sol, GPT-6 Luna and Opus 5.5 checked September 23, 2026.
 nonisolated enum ModelPrices {
     static func price(for model: String) -> ModelPrice? {
         table[normalize(model)]
@@ -95,6 +96,7 @@ nonisolated enum ModelPrices {
         "claude-opus-4-8-fast": .anthropic(input: 10, output: 50),
         "claude-opus-5": .anthropic(input: 5, output: 25),
         "claude-opus-5-fast": .anthropic(input: 10, output: 50),
+        "claude-opus-5-5": .anthropic(input: 4, output: 20, cacheRead: 0.2),
         "claude-sonnet-4": .anthropic(input: 3, output: 15),
         "claude-sonnet-4-5": .anthropic(input: 3, output: 15),
         "claude-sonnet-4-6": .anthropic(input: 3, output: 15),
@@ -139,6 +141,8 @@ nonisolated enum ModelPrices {
         "gpt-5.6-terra": .openAI(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2.5),
         "gpt-5.6-luna": .openAI(input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 0.25),
         "gpt-6-astra": .openAI(input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5),
+        "gpt-6-sol": .openAI(input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5),
+        "gpt-6-luna": .openAI(input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125),
 
         // Cursor's own models and its router, as the usage export names them.
         "auto": .cursor(input: 1.25, output: 6, cacheRead: 0.25, cacheWrite: 1.25),

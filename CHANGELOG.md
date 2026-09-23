@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.2
+
+- Add GPT-6 Sol, GPT-6 Luna and Claude Opus 5.5 pricing, including cache reads
+  and cache writes.
+
 ## 0.4.1
 
 - Add GPT-6 Astra and Claude Mythos pricing. Correct Fable 5.1 cache reads,

@@ -44,6 +44,24 @@ struct ModelPricesTests {
                                           cacheWrite5m: 1_000_000, output: 100_000)) == 29.5)
     }
 
+    @Test(arguments: ["gpt-6-sol", "openai/GPT-6-Sol", "gpt-6-sol-2026-09-22"])
+    func solIncludesCacheWritePricing(model: String) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 2.5))
+    }
+
+    @Test(arguments: ["gpt-6-luna", "openai/GPT-6-Luna", "gpt-6-luna-2026-09-22"])
+    func lunaIncludesCacheWritePricing(model: String) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite5m: 0.125, cacheWrite1h: 0.125))
+    }
+
+    @Test(arguments: ["claude-opus-5-5", "anthropic/claude-opus-5-5[1m]", "claude-opus-5-5-20260922"])
+    func opus55HasDiscountedCacheReads(model: String) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(input: 4, output: 20, cacheRead: 0.2, cacheWrite5m: 5, cacheWrite1h: 8))
+    }
+
     @Test(arguments: ["claude-fable-5-1", "anthropic/claude-fable-5-1[1m]", "claude-mythos-5-1"])
     func latestAnthropicModelsHaveDiscountedCacheReads(model: String) throws {
         let price = try #require(ModelPrices.price(for: model))
