@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.1
+
 - Add GPT-6 Astra and Claude Mythos pricing. Correct Fable 5.1 cache reads,
   Sonnet 5 and GPT-5.6 Sol rates and GPT-5.6 cache writes.
 - Codex permission checks no longer trigger a false amber line while the agent
