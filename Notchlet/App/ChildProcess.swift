@@ -10,7 +10,7 @@ nonisolated enum ChildProcess {
 
     /// `input` goes to stdin. `background` moves the child to the
     /// background tier, what `taskpolicy -b` does: CPU and I/O throttled
-    /// the way Time Machine is. Throws only when the tool could not start.
+    /// the way Time Machine is. Throws on launch or I/O failure and cancellation.
     static func run(
         _ executable: URL,
         _ arguments: [String],
@@ -21,7 +21,7 @@ nonisolated enum ChildProcess {
     ) async throws -> Exit {
         let child = Child()
         return try await withTaskCancellationHandler {
-            try await Task.detached {
+            let result = await Task.detached {
                 let process = child.process
                 process.executableURL = executable
                 process.arguments = arguments
@@ -31,23 +31,39 @@ nonisolated enum ChildProcess {
                 process.standardOutput = stdout
                 process.standardError = FileHandle.nullDevice
                 let stdin = input.map { _ in Pipe() }
+                defer { try? stdin?.fileHandleForWriting.close() }
+                if let stdin {
+                    // A helper can exit during a write, including when cancelled.
+                    // Without this, SIGPIPE terminates the app before Swift can throw.
+                    guard fcntl(stdin.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1) != -1 else {
+                        throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                    }
+                }
                 process.standardInput = stdin ?? FileHandle.nullDevice
                 try child.launch()
                 if background {
                     setpriority(PRIO_DARWIN_PROCESS, id_t(process.processIdentifier), PRIO_DARWIN_BG)
                 }
-                if let stdin, let input {
-                    // Fed to the end before stdout is read: every tool here
-                    // writes only after reading all of its input. The
-                    // throwing write, so a child that exited early does not
-                    // raise through the pipe.
-                    try? stdin.fileHandleForWriting.write(contentsOf: input)
-                    try? stdin.fileHandleForWriting.close()
+                let output: Data
+                do {
+                    if let stdin, let input {
+                        // Every tool here reads all its input before writing output.
+                        try stdin.fileHandleForWriting.write(contentsOf: input)
+                        try stdin.fileHandleForWriting.close()
+                    }
+                    output = try stdout.fileHandleForReading.readToEnd() ?? Data()
+                } catch {
+                    child.cancel()
+                    process.waitUntilExit()
+                    throw error
                 }
-                let output = stdout.fileHandleForReading.readDataToEndOfFile()
                 process.waitUntilExit()
                 return Exit(status: process.terminationStatus, output: output)
-            }.value
+            }.result
+            // Cancellation can break a pending write with EPIPE. Callers need
+            // to distinguish their own cancellation from a helper failure.
+            try Task.checkCancellation()
+            return try result.get()
         } onCancel: {
             child.cancel()
         }
