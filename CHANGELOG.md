@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Prevent an unexpected exit if a helper stops while Notchlet is writing to it,
+  including when a refresh is cancelled.
+
 ## 0.4.2
 
 - Add GPT-6 Sol, GPT-6 Luna and Claude Opus 5.5 pricing, including cache reads
