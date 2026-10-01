@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.3
+
 - Prevent an unexpected exit if a helper stops while Notchlet is writing to it,
   including when a refresh is cancelled.
 
