@@ -43,18 +43,48 @@ nonisolated enum Betterleaks {
         case failed(status: Int32)
     }
 
-    static func scan(_ input: SecretScanInput) async throws -> [SecretMatch] {
+    static func scan(_ input: SecretScanInput, executable: URL? = Self.executable) async throws -> [SecretMatch] {
         guard let executable else { throw ScanError.unavailable }
-        var arguments: [String]
-        var stdin: Data?
         switch input {
         case let .files(urls):
-            arguments = ["dir"] + urls.map(\.path)
+            var results: [SecretMatch] = []
+            for paths in fileBatches(urls) {
+                try Task.checkCancellation()
+                let report = try await run(executable, ["dir"] + paths + options, input: nil)
+                results += try matches(from: report)
+            }
+            return results
         case let .text(data):
-            arguments = ["stdin"]
-            stdin = data
+            let report = try await run(executable, ["stdin"] + options, input: data)
+            return try matches(from: report)
         }
-        arguments += [
+    }
+
+    /// Stay below both Foundation's 4096-argument limit and macOS's
+    /// argument byte limit, leaving room for options and the environment.
+    static func fileBatches(_ urls: [URL]) -> [[String]] {
+        var batches: [[String]] = []
+        var batch: [String] = []
+        var bytes = 0
+        for url in urls {
+            let path = url.path
+            let size = path.utf8.count + 1
+            if !batch.isEmpty, batch.count >= 256 || bytes + size > 128 * 1024 {
+                batches.append(batch)
+                batch = []
+                bytes = 0
+            }
+            batch.append(path)
+            bytes += size
+        }
+        if !batch.isEmpty {
+            batches.append(batch)
+        }
+        return batches
+    }
+
+    private static let options: [String] = {
+        var arguments = [
             "--no-banner", "--exit-code", "0", "--log-level", "error",
             "--report-format", "json", "--report-path", "-",
             "--confidence", confidence,
@@ -64,13 +94,14 @@ nonisolated enum Betterleaks {
         for rule in disabledRules {
             arguments += ["--disable-rule", rule]
         }
-        let report = try await run(executable, arguments, input: stdin)
-        return try matches(from: report)
-    }
+        return arguments
+    }()
 
     /// Line numbers are 1-based; the file is empty for piped input.
     static func matches(from report: Data) throws -> [SecretMatch] {
-        try JSONDecoder().decode([Finding].self, from: report).map { finding in
+        // betterleaks writes null when a scan has no matches.
+        let findings = try JSONDecoder().decode([Finding]?.self, from: report) ?? []
+        return findings.map { finding in
             SecretMatch(
                 ruleID: finding.ruleID,
                 description: finding.description,
