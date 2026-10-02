@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.4
+
 - Prevent a crash when the secret scanner scans thousands of Claude Code or
   Codex transcripts by passing files to the scanner in smaller batches.
 
