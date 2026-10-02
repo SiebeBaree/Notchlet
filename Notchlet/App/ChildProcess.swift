@@ -19,6 +19,9 @@ nonisolated enum ChildProcess {
         environment: [String: String]? = nil,
         currentDirectory: URL? = nil
     ) async throws -> Exit {
+        // Foundation raises an Objective-C exception above this limit,
+        // which Swift's error handling cannot catch.
+        guard arguments.count <= 4096 else { throw POSIXError(.E2BIG) }
         let child = Child()
         return try await withTaskCancellationHandler {
             let result = await Task.detached {

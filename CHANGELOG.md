@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Prevent a crash when the secret scanner scans thousands of Claude Code or
+  Codex transcripts by passing files to the scanner in smaller batches.
+
 ## 0.4.3
 
 - Prevent an unexpected exit if a helper stops while Notchlet is writing to it,

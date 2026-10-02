@@ -16,6 +16,23 @@ nonisolated struct ChildProcessTests {
         #expect(result.status == 7)
     }
 
+    @Test func acceptsFoundationArgumentLimit() async throws {
+        let result = try await ChildProcess.run(
+            URL(filePath: "/usr/bin/true"), Array(repeating: "x", count: 4096)
+        )
+        #expect(result.status == 0)
+    }
+
+    @Test func tooManyArgumentsThrowWithoutTerminatingTheApp() async {
+        await #expect(processExitsWith: .success) {
+            await #expect(throws: POSIXError(.E2BIG)) {
+                try await ChildProcess.run(
+                    URL(filePath: "/usr/bin/true"), Array(repeating: "x", count: 5562)
+                )
+            }
+        }
+    }
+
     @Test func earlyExitDuringInputThrowsWithoutTerminatingTheApp() async {
         await #expect(processExitsWith: .success) {
             // The hook test ignores SIGPIPE globally. Only this isolated
