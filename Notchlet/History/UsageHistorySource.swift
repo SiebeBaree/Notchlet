@@ -53,6 +53,7 @@ actor LogDirectoryReader<Parser: LogLineParser> {
     func events(since: Date?) async throws -> [UsageEvent] {
         try Task.checkCancellation()
         let files = LogFiles.list(under: roots, withExtension: "jsonl", modifiedSince: since)
+        try Task.checkCancellation()
         var kept: [String: Cached] = [:]
         var jobs: [(url: URL, from: Cached)] = []
         for file in files {
@@ -92,6 +93,7 @@ actor LogDirectoryReader<Parser: LogLineParser> {
             }
         }
 
+        try Task.checkCancellation()
         if !jobs.isEmpty || Set(cache.keys) != Set(kept.keys) {
             revision &+= 1
         }

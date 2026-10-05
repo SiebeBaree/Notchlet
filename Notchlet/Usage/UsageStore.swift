@@ -52,6 +52,7 @@ final class UsageStore {
     private var isPanelOpen = false
     private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var cycle: Task<Void, Never>?
+    @ObservationIgnored private var maintenance: Task<Void, Never>?
     private var isSuspended = false
     var nextBackgroundRefresh: (() -> Date?)?
     var backgroundRefresh: (() async -> Void)?
@@ -101,6 +102,7 @@ final class UsageStore {
         defaults.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
         if !enabled {
             cycle?.cancel()
+            maintenance?.cancel()
         }
         reschedule()
     }
@@ -138,7 +140,9 @@ final class UsageStore {
             while !Task.isCancelled {
                 guard let self else { return }
                 await refreshCycle()
-                guard !Task.isCancelled, let delay = timeUntilNextDue() else { return }
+                guard !Task.isCancelled else { return }
+                startMaintenanceIfDue()
+                guard let delay = timeUntilNextDue() else { return }
                 try? await Task.sleep(for: .seconds(delay), tolerance: .seconds(min(delay * 0.1, 30)))
             }
         }
@@ -152,17 +156,31 @@ final class UsageStore {
                 guard let self else { return }
                 defer { cycle = nil }
                 await refreshDueProviders()
-                guard !Task.isCancelled else { return }
-                await backgroundRefresh?()
             }
         }
         await cycle?.value
+    }
+
+    /// History and scanning stay serial, but a slow helper must not hold
+    /// up usage refreshes. Completion updates the same scheduler's deadline.
+    private func startMaintenanceIfDue() {
+        guard maintenance == nil, let due = nextBackgroundRefresh?(), due <= .now,
+              let backgroundRefresh else { return }
+        maintenance = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            defer {
+                maintenance = nil
+                reschedule()
+            }
+            await backgroundRefresh()
+        }
     }
 
     func suspend() {
         isSuspended = true
         refreshTask?.cancel()
         cycle?.cancel()
+        maintenance?.cancel()
     }
 
     func resume() {
@@ -188,7 +206,7 @@ final class UsageStore {
     private func timeUntilNextDue() -> TimeInterval? {
         let interval = pollInterval
         var due = entries.filter { isEnabled($0.id) }.map { $0.schedule.nextDue(interval: interval) }
-        if let background = nextBackgroundRefresh?() {
+        if maintenance == nil, let background = nextBackgroundRefresh?() {
             due.append(background)
         }
         let nextDue = due.min()

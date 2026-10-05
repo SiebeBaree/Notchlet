@@ -22,8 +22,8 @@ struct UsageStoreTests {
             }
         }
 
-        func waitUntilStarted() async {
-            if calls > 0 {
+        func waitUntilStarted(after previousCalls: Int = 0) async {
+            if calls > previousCalls {
                 return
             }
             await withCheckedContinuation { started = $0 }
@@ -60,8 +60,11 @@ struct UsageStoreTests {
         let store = UsageStore(providers: [SlowProvider(gate: gate)], defaults: defaults)
         var maintenanceCalls = 0
         var completed: CheckedContinuation<Void, Never>?
+        var nextMaintenance = Date.distantPast
+        store.nextBackgroundRefresh = { nextMaintenance }
         store.backgroundRefresh = {
             maintenanceCalls += 1
+            nextMaintenance = .distantFuture
             completed?.resume()
             completed = nil
         }
@@ -87,10 +90,14 @@ struct UsageStoreTests {
         let gate = Gate()
         var completed: CheckedContinuation<Void, Never>?
         var calls = 0
+        var nextMaintenance = Date.distantPast
+        store.nextBackgroundRefresh = { nextMaintenance }
         store.backgroundRefresh = {
             calls += 1
             if calls == 1 {
                 try? await gate.fetch()
+            } else {
+                nextMaintenance = .distantFuture
             }
             completed?.resume()
             completed = nil
@@ -108,6 +115,29 @@ struct UsageStoreTests {
         }
         store.suspend()
         #expect(calls == 2)
+    }
+
+    @Test func usageRefreshContinuesWhileMaintenanceIsBlocked() async {
+        let provider = Gate()
+        let maintenance = Gate()
+        let store = UsageStore(providers: [SlowProvider(gate: provider)], defaults: defaults)
+        defer { store.suspend() }
+        var nextMaintenance = Date.distantPast
+        store.nextBackgroundRefresh = { nextMaintenance }
+        store.backgroundRefresh = {
+            try? await maintenance.fetch()
+            nextMaintenance = .distantFuture
+        }
+        store.reschedule()
+        await provider.waitUntilStarted()
+        await provider.finish()
+        await maintenance.waitUntilStarted()
+
+        store.refreshNow("slow")
+        await provider.waitUntilStarted(after: 1)
+        #expect(await provider.calls == 2)
+        #expect(await maintenance.calls == 1)
+        await provider.finish()
     }
 
     private struct StubProvider: UsageProvider {
