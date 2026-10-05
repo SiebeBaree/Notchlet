@@ -1,4 +1,5 @@
 import AppKit
+import Network
 
 /// Builds every service at launch and keeps them alive for the life of the
 /// app.
@@ -15,6 +16,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var services: Services?
+    private let connectivity = NWPathMonitor()
+    private var wasConnected: Bool?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // As the tests' host app, stay away from credentials and the
@@ -22,9 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard NSClassFromString("XCTestCase") == nil else { return }
         let services = Self.makeServices()
         self.services = services
-        services.store.reschedule()
         services.history.start()
-        services.scanner.start()
+        services.store.reschedule()
         services.waits.start()
         services.notchController.showWindow(nil)
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -33,9 +35,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWorkspace.didWakeNotification,
             object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil
+        )
+        connectivity.pathUpdateHandler = { [weak self] path in
+            let connected = path.status == .satisfied
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if wasConnected == false, connected {
+                    services.store.connectionRestored()
+                }
+                wasConnected = connected
+            }
+        }
+        connectivity.start(queue: DispatchQueue(label: "be.baree.Notchlet.connectivity", qos: .utility))
         LoginItem.seedIfNeeded()
         Analytics.bootstrap()
-        Analytics.startDailyHeartbeat()
+        Analytics.beatIfNewDay()
         #if DEBUG
             DebugTrigger.listen(.init(
                 store: services.store, scanner: services.scanner, alerts: services.alerts, waits: services.waits
@@ -53,6 +69,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ])
         let history = UsageHistory(store: store)
         let scanner = SecretScanner(store: store)
+        store.nextBackgroundRefresh = { [weak history, weak scanner] in
+            [history?.nextRefreshAt, scanner?.nextRefreshAt].compactMap(\.self).min()
+        }
+        store.backgroundRefresh = { [weak history, weak scanner] in
+            await history?.ingestIfDue()
+            guard !Task.isCancelled, history?.isIngesting != true else { return }
+            await scanner?.scanIfDue()
+            Analytics.beatIfNewDay()
+        }
         let alerts = UsageAlerts()
         store.snapshotObserver = { [alerts] providerID, previous, current in
             alerts.snapshotDidChange(providerID: providerID, previous: previous, current: current)
@@ -73,8 +98,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func didWake() {
-        services?.store.reschedule()
-        services?.history.reschedule()
-        services?.scanner.reschedule()
+        services?.store.resume()
+    }
+
+    @objc private func willSleep() {
+        services?.store.suspend()
     }
 }

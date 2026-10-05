@@ -323,7 +323,7 @@ struct ShareCardView: View {
 
 /// A rounded rectangle with the notch taken out of its top edge, fillets
 /// curving outward like `NotchShape`'s.
-struct ShareCardShape: Shape {
+nonisolated struct ShareCardShape: Shape {
     static let cornerRadius: CGFloat = 34
     static let notchWidth: CGFloat = 210
     static let notchDepth: CGFloat = 34

@@ -5,6 +5,53 @@ import Testing
 /// The line reader and the per-file cache, through a parser that counts
 /// every non-empty line as one event.
 struct LogDirectoryReaderTests {
+    private nonisolated enum DatedCounter: LogLineParser {
+        struct State: Sendable { var count = 0 }
+        static var initialState: State { State() }
+        static func parse(_ line: Data, state: inout State) -> UsageEvent? {
+            state.count += 1
+            guard let seconds = Double(String(decoding: line, as: UTF8.self)) else { return nil }
+            return UsageEvent(timestamp: Date(timeIntervalSince1970: seconds), tokens: TokenCount(output: state.count))
+        }
+    }
+
+    @Test func sealedEventsAreEvictedWhileAppendParserStateSurvives() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appending(path: "dates.jsonl")
+        try Data("100\n200\n".utf8).write(to: file)
+        let reader = LogDirectoryReader<DatedCounter>(roots: [directory])
+        #expect(try await reader.events(since: nil).count == 2)
+        let revision = await reader.revision
+        await reader.discardEvents(before: Date(timeIntervalSince1970: 150))
+        let live = try await reader.events(since: nil)
+        #expect(live.map(\.tokens.output) == [2])
+        #expect(await reader.revision == revision)
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data("100\n300\n".utf8))
+        try handle.close()
+        let appended = try await reader.events(since: nil)
+        #expect(appended.map(\.tokens.output) == [2, 4])
+        #expect(await reader.revision != revision)
+    }
+
+    @Test func longRecordsRemainIntactAndCancellationStopsBetweenLines() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appending(path: "long.jsonl")
+        let length = 16 * 1024 * 1024
+        try Data((String(repeating: "x", count: length) + "\ntail\n").utf8).write(to: file)
+        var lengths: [Int] = []
+        let offset = try LineReader.forEachLine(in: file, from: 0) { lengths.append($0.count) }
+        #expect(lengths == [length, 4])
+        #expect(offset == UInt64(length + 6))
+        let task = Task {
+            try LineReader.forEachLine(in: file, from: 0) { _ in withUnsafeCurrentTask { $0?.cancel() } }
+        }
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
     private enum LineCounter: LogLineParser {
         struct State: Sendable {
             var lines = 0

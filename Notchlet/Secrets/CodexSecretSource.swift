@@ -9,6 +9,7 @@ nonisolated struct CodexSecretSource: SecretScanSource {
         self.roots = roots
     }
 
+    @concurrent
     func input(since: Date?) async throws -> SecretScanInput {
         .files(SecretScanInput.files(under: roots, withExtension: "jsonl", modifiedSince: since))
     }

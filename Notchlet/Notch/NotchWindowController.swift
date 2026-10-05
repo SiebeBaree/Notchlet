@@ -115,6 +115,7 @@ final class NotchWindowController: NSWindowController {
             // A fresh root view starts collapsed, so the window must too.
             isExpanded = false
             isWaiting = false
+            store.setPanelOpen(false)
             hostingView.rootView = makeRootView()
         }
         window.setFrame(NotchGeometry.panelFrame(screenFrame: screen.frame, panelSize: panelSize), display: true)

@@ -131,4 +131,32 @@ struct HistoryIngestorTests {
         #expect(await ingestor.archive(for: "p") == before.archive)
         #expect(store.load("p") == before.archive)
     }
+
+    @Test func sealingEvictsCodexEventsWithoutLosingItsRunningCounter() async throws {
+        let store = temporaryStore()
+        defer { try? FileManager.default.removeItem(at: store.directory) }
+        let logs = store.directory.appending(path: "logs")
+        try FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+        let file = logs.appending(path: "session.jsonl")
+        func line(_ day: String, _ output: Int) -> String {
+            "{\"timestamp\":\"\(day)T10:00:00Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"total_token_usage\":{\"input_tokens\":0,\"cached_input_tokens\":0,\"output_tokens\":\(output)}}}}\n"
+        }
+        try Data((line("2026-09-01", 100) + line("2026-09-03", 150)).utf8).write(to: file)
+        let source = CodexHistorySource(roots: [logs])
+        let ingestor = HistoryIngestor(archives: store, calendar: utc)
+        let now = date("2026-09-03T15:00:00Z")
+        let first = try await ingestor.ingest("codex", from: source, now: now)
+        #expect(first.archive.rows.first?.tokens.output == 100)
+        #expect(first.live.first?.tokens.output == 50)
+        #expect(try await source.events(since: nil).map(\.tokens.output) == [50])
+        #expect(try await ingestor.ingest("codex", from: source, now: now) == first)
+        let handle = try FileHandle(forWritingTo: file)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(line("2026-09-03", 200).utf8))
+        try handle.close()
+        let updated = try await ingestor.ingest("codex", from: source, now: now)
+        #expect(updated.archive == first.archive)
+        #expect(updated.live.first?.tokens.output == 100)
+        #expect(updated.live.first?.requests == 2)
+    }
 }

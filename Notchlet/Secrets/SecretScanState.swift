@@ -10,6 +10,31 @@ nonisolated struct SecretScanState: Codable, Equatable, Sendable {
     /// Stamped at the start of a scan, so a file that grows while the scan
     /// runs is picked up by the next one.
     var lastScanAt: [String: Date] = [:]
+    var checkpoints: [String: [String: SecretFileCheckpoint]] = [:]
+    var rulesVersion: String?
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case version, findings, lastScanAt, checkpoints, rulesVersion
+    }
+
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        version = try values.decode(Int.self, forKey: .version)
+        findings = try values.decode([SecretFinding].self, forKey: .findings)
+        lastScanAt = try values.decode([String: Date].self, forKey: .lastScanAt)
+        checkpoints = try values
+            .decodeIfPresent([String: [String: SecretFileCheckpoint]].self, forKey: .checkpoints) ?? [:]
+        rulesVersion = try values.decodeIfPresent(String.self, forKey: .rulesVersion)
+    }
+
+    mutating func useRules(_ version: String) {
+        guard rulesVersion != version else { return }
+        checkpoints = [:]
+        lastScanAt = [:]
+        rulesVersion = version
+    }
 }
 
 /// One JSON file under Application Support, written atomically.

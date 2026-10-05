@@ -7,6 +7,7 @@ nonisolated enum SecretScanSchedule {
     static let launchDelay: TimeInterval = 5
     static let tickInterval: TimeInterval = 300
     static let interval: TimeInterval = 3600
+    static let maximumDeferral: TimeInterval = 2 * 3600
     static let idleRequirement: TimeInterval = 120
 
     enum Action: Equatable, Sendable {
@@ -18,13 +19,16 @@ nonisolated enum SecretScanSchedule {
     struct Conditions: Equatable, Sendable {
         var idleSeconds: TimeInterval
         var thermalState: ProcessInfo.ThermalState
+        var isLowPowerMode = false
     }
 
     static func action(lastScanAt: Date?, now: Date, conditions: Conditions) -> Action {
+        guard conditions.thermalState != .critical else { return .wait }
+        let constrained = conditions.isLowPowerMode || conditions.thermalState == .serious
         guard let lastScanAt else {
-            let calm = conditions.thermalState == .nominal || conditions.thermalState == .fair
-            return conditions.idleSeconds >= idleRequirement && calm ? .full : .wait
+            return conditions.idleSeconds >= idleRequirement && !constrained ? .full : .wait
         }
-        return now.timeIntervalSince(lastScanAt) >= interval ? .incremental : .wait
+        let elapsed = now.timeIntervalSince(lastScanAt)
+        return elapsed >= (constrained ? maximumDeferral : interval) ? .incremental : .wait
     }
 }

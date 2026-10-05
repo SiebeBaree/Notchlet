@@ -7,6 +7,13 @@ nonisolated protocol UsageHistorySource: Sendable {
     /// asks for everything. Older events may come along, the ingestor
     /// ignores what it has sealed.
     func events(since: Date?) async throws -> [UsageEvent]
+    var revision: UInt64? { get async }
+    func discardEvents(before date: Date) async
+}
+
+nonisolated extension UsageHistorySource {
+    var revision: UInt64? { get async { nil } }
+    func discardEvents(before date: Date) async {}
 }
 
 /// One line of a JSONL log, with a per-file state carried between lines.
@@ -36,12 +43,15 @@ actor LogDirectoryReader<Parser: LogLineParser> {
 
     private let roots: [URL]
     private var cache: [String: Cached] = [:]
+    private(set) var revision: UInt64 = 0
+    private var retainedSince: Date?
 
     init(roots: [URL]) {
         self.roots = roots
     }
 
     func events(since: Date?) async throws -> [UsageEvent] {
+        try Task.checkCancellation()
         let files = LogFiles.list(under: roots, withExtension: "jsonl", modifiedSince: since)
         var kept: [String: Cached] = [:]
         var jobs: [(url: URL, from: Cached)] = []
@@ -54,7 +64,7 @@ actor LogDirectoryReader<Parser: LogLineParser> {
             var from = Cached(
                 size: file.size, modified: file.modified, offset: 0, state: Parser.initialState, events: []
             )
-            if let cached, file.size >= cached.offset {
+            if let cached, file.size > cached.size, file.size >= cached.offset {
                 from.offset = cached.offset
                 from.state = cached.state
                 from.events = cached.events
@@ -66,7 +76,11 @@ actor LogDirectoryReader<Parser: LogLineParser> {
             var pending = jobs[...]
             func startNext() {
                 guard let job = pending.popFirst() else { return }
-                group.addTask { try (job.url.path, Self.parse(job.url, from: job.from)) }
+                let cutoff = retainedSince
+                group.addTask(priority: .utility) { try (
+                    job.url.path,
+                    Self.parse(job.url, from: job.from, since: cutoff)
+                ) }
             }
             for _ in 0 ..< Self.parallelism {
                 startNext()
@@ -78,14 +92,24 @@ actor LogDirectoryReader<Parser: LogLineParser> {
             }
         }
 
+        if !jobs.isEmpty || Set(cache.keys) != Set(kept.keys) {
+            revision &+= 1
+        }
         cache = kept
         return kept.values.flatMap(\.events)
     }
 
-    private nonisolated static func parse(_ url: URL, from: Cached) throws -> Cached {
+    func discardEvents(before date: Date) {
+        retainedSince = max(retainedSince ?? date, date)
+        for path in cache.keys {
+            cache[path]?.events.removeAll { $0.timestamp < date }
+        }
+    }
+
+    private nonisolated static func parse(_ url: URL, from: Cached, since: Date?) throws -> Cached {
         var cached = from
         cached.offset = try LineReader.forEachLine(in: url, from: from.offset) { line in
-            if let event = Parser.parse(line, state: &cached.state) {
+            if let event = Parser.parse(line, state: &cached.state), since.map({ event.timestamp >= $0 }) ?? true {
                 cached.events.append(event)
             }
         }
@@ -107,13 +131,18 @@ nonisolated enum LineReader {
 
         var consumed = offset
         var buffer = Data()
+        var searchedUntil = 0
         while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
+            try Task.checkCancellation()
             buffer.append(chunk)
             var lineStart = 0
-            while let newline = buffer.indexOfNewline(from: lineStart) {
+            while let newline = buffer.indexOfNewline(from: searchedUntil) {
+                try Task.checkCancellation()
                 body(buffer.subdata(in: lineStart ..< newline))
                 lineStart = newline + 1
+                searchedUntil = lineStart
             }
+            searchedUntil = buffer.count - lineStart
             buffer.removeSubrange(0 ..< lineStart)
             consumed += UInt64(lineStart)
         }
@@ -121,7 +150,7 @@ nonisolated enum LineReader {
     }
 }
 
-private nonisolated extension Data {
+nonisolated extension Data {
     /// `memchr` rather than `firstIndex(of:)`: this runs over every byte of
     /// every log, and the generic search is many times slower.
     func indexOfNewline(from start: Int) -> Int? {

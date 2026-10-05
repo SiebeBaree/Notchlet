@@ -3,7 +3,7 @@ import SwiftUI
 /// The real notch meets the menu bar with a small outward fillet instead
 /// of a 90° corner, so the top corners curve out to the rect's edges while
 /// the straight sides sit `topRadius` in from them.
-struct NotchShape: Shape {
+nonisolated struct NotchShape: Shape {
     var topRadius: CGFloat
     var bottomRadius: CGFloat
 

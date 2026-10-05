@@ -20,7 +20,6 @@ enum Analytics {
 
     private static let launchedAt = Date()
     private static var isBootstrapped = false
-    private static var heartbeatTimer: Timer?
     private static var providerContext: NSDictionary = [:]
 
     static var isEnabled: Bool {
@@ -87,18 +86,8 @@ enum Analytics {
         PostHogSDK.shared.register(context)
     }
 
-    /// Once per calendar day while the app runs.
-    static func startDailyHeartbeat() {
-        beatIfNewDay()
-        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { _ in
-            MainActor.assumeIsolated {
-                beatIfNewDay()
-            }
-        }
-        heartbeatTimer?.tolerance = 5 * 60
-    }
-
-    private static func beatIfNewDay() {
+    /// Carried by the existing refresh cycle instead of a separate timer.
+    static func beatIfNewDay() {
         guard isBootstrapped else { return }
         let today = Date.now.formatted(.iso8601.year().month().day())
         guard UserDefaults.standard.string(forKey: lastHeartbeatDayKey) != today else { return }

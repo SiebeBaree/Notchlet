@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.4.5
+
+- Scan new transcript records in small batches and remember progress across
+  restarts. Defer scanning in Low Power Mode or when the Mac is hot.
+- Read long transcript records faster and release archived history from memory.
+- Share one background refresh schedule, pause work during sleep and retry
+  persistent failures less often.
+
 ## 0.4.4
 
 - Prevent a crash when the secret scanner scans thousands of Claude Code or

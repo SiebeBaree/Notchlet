@@ -160,7 +160,7 @@ final class UsageHistory {
     private(set) var lastIngestAt: Date?
     private(set) var isIngesting = false
     private(set) var failedProviderIDs: Set<String> = []
-    private var loop: Task<Void, Never>?
+    private(set) var nextRefreshAt = Date.now.addingTimeInterval(launchDelay)
 
     init(store: UsageStore, archives: HistoryArchiveStore = .default, calendar: Calendar = .localGregorian) {
         self.store = store
@@ -182,43 +182,41 @@ final class UsageHistory {
                 }
             }
         }
-        reschedule(after: Self.launchDelay)
+        nextRefreshAt = Date.now.addingTimeInterval(Self.launchDelay)
     }
 
-    /// What the pane calls on open; the hourly cadence is not disturbed.
+    /// Opening the historic view brings its next read forward without
+    /// interrupting a scan already in progress.
     func ingestIfStale(now: Date = .now) {
         guard let lastIngestAt else {
             return
         }
         if now.timeIntervalSince(lastIngestAt) > Self.staleAge {
-            Task { await ingestAll() }
+            nextRefreshAt = now
+            store.reschedule()
         }
     }
 
-    /// What a wake from sleep calls: fetches right away when the data is
-    /// old enough.
-    func reschedule(after delay: TimeInterval = 0) {
-        loop?.cancel()
-        loop = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(delay))
-            while !Task.isCancelled {
-                guard let self else { return }
-                if lastIngestAt.map({ Date.now.timeIntervalSince($0) >= Self.staleAge }) ?? true {
-                    await ingestAll()
-                }
-                try? await Task.sleep(for: .seconds(Self.ingestInterval))
-            }
-        }
+    func ingestIfDue() async {
+        guard Date.now >= nextRefreshAt else { return }
+        await ingestAll()
     }
 
     private func ingestAll() async {
         guard !isIngesting else { return }
         isIngesting = true
-        defer { isIngesting = false }
+        defer {
+            isIngesting = false
+            nextRefreshAt = Task.isCancelled ? .now : Date.now.addingTimeInterval(Self.ingestInterval)
+        }
         for provider in providersWithHistory {
+            guard !Task.isCancelled else { return }
             guard let source = provider.history else { continue }
             do {
-                histories[provider.id] = try await ingestor.ingest(provider.id, from: source)
+                let history = try await ingestor.ingest(provider.id, from: source)
+                if histories[provider.id] != history {
+                    histories[provider.id] = history
+                }
                 failedProviderIDs.remove(provider.id)
             } catch is CancellationError {
                 return

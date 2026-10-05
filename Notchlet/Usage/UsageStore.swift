@@ -51,6 +51,10 @@ final class UsageStore {
     private var providerEnabled: [String: Bool]
     private var isPanelOpen = false
     private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var cycle: Task<Void, Never>?
+    private var isSuspended = false
+    var nextBackgroundRefresh: (() -> Date?)?
+    var backgroundRefresh: (() async -> Void)?
     /// Every successful fetch with the snapshot it replaced; the alerts
     /// hang off this.
     var snapshotObserver: ((_ providerID: String, _ previous: UsageSnapshot?, _ current: UsageSnapshot) -> Void)?
@@ -95,6 +99,9 @@ final class UsageStore {
         }
         providerEnabled[providerID] = enabled
         defaults.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
+        if !enabled {
+            cycle?.cancel()
+        }
         reschedule()
     }
 
@@ -126,14 +133,48 @@ final class UsageStore {
     /// sleep) takes effect now.
     func reschedule() {
         refreshTask?.cancel()
+        guard !isSuspended else { return }
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                await refreshDueProviders()
+                await refreshCycle()
                 guard !Task.isCancelled, let delay = timeUntilNextDue() else { return }
-                try? await Task.sleep(for: .seconds(delay))
+                try? await Task.sleep(for: .seconds(delay), tolerance: .seconds(min(delay * 0.1, 30)))
             }
         }
+    }
+
+    /// Rescheduling changes the next wakeup, not the ownership of work
+    /// already in flight. Sleep and disabling a provider cancel that work.
+    private func refreshCycle() async {
+        if cycle == nil {
+            cycle = Task(priority: .utility) { [weak self] in
+                guard let self else { return }
+                defer { cycle = nil }
+                await refreshDueProviders()
+                guard !Task.isCancelled else { return }
+                await backgroundRefresh?()
+            }
+        }
+        await cycle?.value
+    }
+
+    func suspend() {
+        isSuspended = true
+        refreshTask?.cancel()
+        cycle?.cancel()
+    }
+
+    func resume() {
+        isSuspended = false
+        reschedule()
+    }
+
+    func connectionRestored() {
+        for index in entries.indices {
+            entries[index].schedule.connectionRestored()
+        }
+        reschedule()
     }
 
     private var pollInterval: TimeInterval {
@@ -146,8 +187,11 @@ final class UsageStore {
 
     private func timeUntilNextDue() -> TimeInterval? {
         let interval = pollInterval
-        let nextDue = entries.filter { isEnabled($0.id) }
-            .map { $0.schedule.nextDue(interval: interval) }.min()
+        var due = entries.filter { isEnabled($0.id) }.map { $0.schedule.nextDue(interval: interval) }
+        if let background = nextBackgroundRefresh?() {
+            due.append(background)
+        }
+        let nextDue = due.min()
         return nextDue.map { max($0.timeIntervalSinceNow, 1) }
     }
 
@@ -198,7 +242,7 @@ final class UsageStore {
         case notAvailable(AuthProblem)
         case rateLimited(retryAfter: TimeInterval?)
         case failed
-        /// Our own reschedule, not a provider fault.
+        /// Sleep or a disabled provider, not a provider fault.
         case cancelled
     }
 

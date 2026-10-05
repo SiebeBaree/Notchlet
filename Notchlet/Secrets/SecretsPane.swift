@@ -106,7 +106,7 @@ struct SecretsPane: View {
         case .scanning:
             "Scanning your chats for leaked secrets, results in a few minutes"
         case .failed:
-            "Last scan failed, retrying within five minutes"
+            "Last scan failed, retrying automatically"
         case let .scanned(date):
             "Last scan \(Self.relative.localizedString(for: date, relativeTo: now))"
         }

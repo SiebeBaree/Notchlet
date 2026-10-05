@@ -1,7 +1,7 @@
 import Foundation
 
 /// One provider's fetch timing: minimum spacing, escalating backoff after
-/// rate limits, a flat retry after other failures. The ambient poll
+/// rate limits and other failures. The ambient poll
 /// interval comes from `UsageStore`; shrinking it when the panel opens is
 /// what pulls stale providers forward.
 struct RefreshSchedule {
@@ -14,6 +14,7 @@ struct RefreshSchedule {
     /// Overrides the regular cadence.
     private(set) var retryAt: Date?
     private(set) var rateLimitStreak = 0
+    private(set) var errorStreak = 0
 
     var isRateLimited: Bool { rateLimitStreak > 0 }
 
@@ -30,11 +31,13 @@ struct RefreshSchedule {
     mutating func recordSuccess() {
         retryAt = nil
         rateLimitStreak = 0
+        errorStreak = 0
     }
 
     /// Retry-After is honored within 30s...1h; without it the delay
     /// escalates per consecutive 429, with jitter so providers don't sync up.
     mutating func recordRateLimit(retryAfter: TimeInterval?, now: Date = .now) {
+        errorStreak = 0
         let delay: TimeInterval = if let retryAfter {
             min(max(retryAfter, Self.minSpacing), 3600)
         } else {
@@ -47,6 +50,13 @@ struct RefreshSchedule {
 
     mutating func recordError(now: Date = .now) {
         rateLimitStreak = 0
-        retryAt = now.addingTimeInterval(Self.errorRetryDelay)
+        errorStreak = min(errorStreak + 1, 5)
+        retryAt = now.addingTimeInterval(min(Self.errorRetryDelay * pow(2, Double(errorStreak - 1)), 1800))
+    }
+
+    mutating func connectionRestored() {
+        guard errorStreak > 0 else { return }
+        errorStreak = 0
+        retryAt = .distantPast
     }
 }
