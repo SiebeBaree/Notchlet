@@ -35,6 +35,7 @@ nonisolated enum Betterleaks {
 
     /// Lower confidence rules matched test fixtures far more than keys.
     private static let confidence = "high"
+    static var rulesVersion: String { "1.8.1/\(confidence)/\(disabledRules.joined(separator: ","))" }
     private static let maxFileMegabytes = 256
     private static let timeoutSeconds = 600
 
@@ -137,7 +138,7 @@ nonisolated enum Betterleaks {
             arguments,
             input: input,
             background: true,
-            environment: ["HOME": FileManager.default.homeDirectoryForCurrentUser.path],
+            environment: ["HOME": FileManager.default.homeDirectoryForCurrentUser.path, "GOMAXPROCS": "2"],
             currentDirectory: FileManager.default.temporaryDirectory
         )
         guard exit.status == 0 else { throw ScanError.failed(status: exit.status) }

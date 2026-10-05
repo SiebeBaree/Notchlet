@@ -13,6 +13,12 @@ nonisolated struct ClaudeCodeHistorySource: UsageHistorySource {
         reader = LogDirectoryReader(roots: [projectsDirectory])
     }
 
+    var revision: UInt64? { get async { await reader.revision } }
+
+    func discardEvents(before date: Date) async {
+        await reader.discardEvents(before: date)
+    }
+
     func events(since: Date?) async throws -> [UsageEvent] {
         try await reader.events(since: since)
     }

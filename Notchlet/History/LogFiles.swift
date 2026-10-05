@@ -22,6 +22,9 @@ nonisolated enum LogFiles {
             ) else { continue }
             var names: Set<String> = []
             for case let url as URL in enumerator where url.pathExtension == ext {
+                if Task.isCancelled {
+                    return []
+                }
                 guard !seenNames.contains(url.lastPathComponent),
                       let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
                       let size = values.fileSize, let modified = values.contentModificationDate

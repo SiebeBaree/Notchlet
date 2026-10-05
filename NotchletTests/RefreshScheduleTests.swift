@@ -59,12 +59,24 @@ struct RefreshScheduleTests {
         #expect(schedule.nextDue(interval: 600) == start.addingTimeInterval(600))
     }
 
-    @Test func networkErrorRetriesQuicklyWithoutEscalating() {
+    @Test func networkErrorsBackOffAndReconnectRecoversWithoutIgnoringRateLimits() {
         var schedule = RefreshSchedule()
         schedule.recordAttempt(now: start)
         schedule.recordError(now: start)
         // The 2 minute retry beats even a long ambient interval.
         #expect(schedule.nextDue(interval: 600) == start.addingTimeInterval(120))
         #expect(!schedule.isRateLimited)
+        for delay in [240.0, 480, 960, 1800, 1800] {
+            schedule.recordError(now: start)
+            #expect(schedule.nextDue(interval: 600) == start.addingTimeInterval(delay))
+        }
+        schedule.connectionRestored()
+        #expect(schedule.nextDue(interval: 600) == start.addingTimeInterval(30))
+        schedule.recordRateLimit(retryAfter: 900, now: start)
+        schedule.connectionRestored()
+        #expect(schedule.nextDue(interval: 600) == start.addingTimeInterval(900))
+        schedule.recordSuccess()
+        schedule.recordError(now: start)
+        #expect(schedule.nextDue(interval: 600) == start.addingTimeInterval(120))
     }
 }

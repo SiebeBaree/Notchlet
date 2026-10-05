@@ -19,7 +19,7 @@ struct SecretScanScheduleTests {
             .action(lastScanAt: nil, now: now, conditions: conditions(thermal: .serious)) == .wait)
     }
 
-    @Test func laterScansAreHourlyWhateverTheUserIsDoing() {
+    @Test func laterScansRespectPowerAndThermalConditionsWithoutIndefiniteDeferral() {
         let recent = now.addingTimeInterval(-600)
         let old = now.addingTimeInterval(-3600)
         #expect(SecretScanSchedule.action(lastScanAt: recent, now: now, conditions: conditions(idle: 0)) == .wait)
@@ -27,6 +27,14 @@ struct SecretScanScheduleTests {
             lastScanAt: old,
             now: now,
             conditions: conditions(idle: 0, thermal: .critical)
-        ) == .incremental)
+        ) == .wait)
+        #expect(SecretScanSchedule.action(lastScanAt: old, now: now, conditions: conditions(idle: 0)) == .incremental)
+        let lowPower = SecretScanSchedule.Conditions(idleSeconds: 600, thermalState: .nominal, isLowPowerMode: true)
+        #expect(SecretScanSchedule.action(lastScanAt: nil, now: now, conditions: lowPower) == .wait)
+        #expect(SecretScanSchedule.action(lastScanAt: old, now: now, conditions: lowPower) == .wait)
+        #expect(SecretScanSchedule
+            .action(lastScanAt: now.addingTimeInterval(-7200), now: now, conditions: lowPower) == .incremental)
+        #expect(SecretScanSchedule.action(lastScanAt: now.addingTimeInterval(-7200), now: now,
+                                          conditions: conditions(thermal: .critical)) == .wait)
     }
 }

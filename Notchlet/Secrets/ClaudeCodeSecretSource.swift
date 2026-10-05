@@ -9,6 +9,7 @@ nonisolated struct ClaudeCodeSecretSource: SecretScanSource {
         self.projectsDirectory = projectsDirectory
     }
 
+    @concurrent
     func input(since: Date?) async throws -> SecretScanInput {
         .files(SecretScanInput.files(under: [projectsDirectory], withExtension: "jsonl", modifiedSince: since))
     }

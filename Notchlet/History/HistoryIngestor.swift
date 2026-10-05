@@ -1,6 +1,6 @@
 import Foundation
 
-/// The sealed archive plus the live days, recomputed on every ingest.
+/// The sealed archive plus the live days, reused while the source is unchanged.
 nonisolated struct ProviderHistory: Equatable, Sendable {
     var archive: ProviderArchive
     var live: [DailyUsage]
@@ -18,6 +18,7 @@ actor HistoryIngestor {
     private let calendar: Calendar
     private var loaded: [String: ProviderArchive] = [:]
     private var running: [String: Task<ProviderHistory, any Error>] = [:]
+    private var previous: [String: (revision: UInt64, history: ProviderHistory)] = [:]
 
     init(archives: HistoryArchiveStore = .default, calendar: Calendar = .localGregorian) {
         self.archives = archives
@@ -40,10 +41,14 @@ actor HistoryIngestor {
         if let running = running[providerID] {
             return try await running.value
         }
-        let task = Task { try await run(providerID, from: source, now: now) }
+        let task = Task(priority: .utility) { try await run(providerID, from: source, now: now) }
         running[providerID] = task
         defer { running[providerID] = nil }
-        return try await task.value
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     private func run(_ providerID: String, from source: any UsageHistorySource,
@@ -52,6 +57,13 @@ actor HistoryIngestor {
         var archive = archive(for: providerID) ?? ProviderArchive(providerID: providerID)
         let plan = SealPlan(sealedThrough: archive.sealedThrough, now: now, calendar: calendar)
         let events = try await source.events(since: plan.readSince)
+        try Task.checkCancellation()
+        let revision = await source.revision
+        if let revision, let previous = previous[providerID], previous.revision == revision,
+           previous.history.archive.sealedThrough == plan.sealThrough
+        {
+            return previous.history
+        }
         let rows = UsageRollup.daily(UsageRollup.deduplicated(events), providerID: providerID, calendar: calendar)
 
         let today = DayKey(now, calendar: calendar)
@@ -76,6 +88,11 @@ actor HistoryIngestor {
             loaded[providerID] = archive
         }
 
-        return ProviderHistory(archive: archive, live: rows.filter { $0.day > plan.sealThrough })
+        await source.discardEvents(before: plan.sealThrough.advanced(by: 1, calendar: calendar).start(in: calendar))
+        let history = ProviderHistory(archive: archive, live: rows.filter { $0.day > plan.sealThrough })
+        if let revision {
+            previous[providerID] = (revision, history)
+        }
+        return history
     }
 }

@@ -51,6 +51,11 @@ final class UsageStore {
     private var providerEnabled: [String: Bool]
     private var isPanelOpen = false
     private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var cycle: Task<Void, Never>?
+    @ObservationIgnored private var maintenance: Task<Void, Never>?
+    private var isSuspended = false
+    var nextBackgroundRefresh: (() -> Date?)?
+    var backgroundRefresh: (() async -> Void)?
     /// Every successful fetch with the snapshot it replaced; the alerts
     /// hang off this.
     var snapshotObserver: ((_ providerID: String, _ previous: UsageSnapshot?, _ current: UsageSnapshot) -> Void)?
@@ -95,6 +100,10 @@ final class UsageStore {
         }
         providerEnabled[providerID] = enabled
         defaults.set(enabled, forKey: Self.enabledDefaultsKey(providerID))
+        if !enabled {
+            cycle?.cancel()
+            maintenance?.cancel()
+        }
         reschedule()
     }
 
@@ -126,14 +135,64 @@ final class UsageStore {
     /// sleep) takes effect now.
     func reschedule() {
         refreshTask?.cancel()
+        guard !isSuspended else { return }
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                await refreshDueProviders()
-                guard !Task.isCancelled, let delay = timeUntilNextDue() else { return }
-                try? await Task.sleep(for: .seconds(delay))
+                await refreshCycle()
+                guard !Task.isCancelled else { return }
+                startMaintenanceIfDue()
+                guard let delay = timeUntilNextDue() else { return }
+                try? await Task.sleep(for: .seconds(delay), tolerance: .seconds(min(delay * 0.1, 30)))
             }
         }
+    }
+
+    /// Rescheduling changes the next wakeup, not the ownership of work
+    /// already in flight. Sleep and disabling a provider cancel that work.
+    private func refreshCycle() async {
+        if cycle == nil {
+            cycle = Task(priority: .utility) { [weak self] in
+                guard let self else { return }
+                defer { cycle = nil }
+                await refreshDueProviders()
+            }
+        }
+        await cycle?.value
+    }
+
+    /// History and scanning stay serial, but a slow helper must not hold
+    /// up usage refreshes. Completion updates the same scheduler's deadline.
+    private func startMaintenanceIfDue() {
+        guard maintenance == nil, let due = nextBackgroundRefresh?(), due <= .now,
+              let backgroundRefresh else { return }
+        maintenance = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            defer {
+                maintenance = nil
+                reschedule()
+            }
+            await backgroundRefresh()
+        }
+    }
+
+    func suspend() {
+        isSuspended = true
+        refreshTask?.cancel()
+        cycle?.cancel()
+        maintenance?.cancel()
+    }
+
+    func resume() {
+        isSuspended = false
+        reschedule()
+    }
+
+    func connectionRestored() {
+        for index in entries.indices {
+            entries[index].schedule.connectionRestored()
+        }
+        reschedule()
     }
 
     private var pollInterval: TimeInterval {
@@ -146,8 +205,11 @@ final class UsageStore {
 
     private func timeUntilNextDue() -> TimeInterval? {
         let interval = pollInterval
-        let nextDue = entries.filter { isEnabled($0.id) }
-            .map { $0.schedule.nextDue(interval: interval) }.min()
+        var due = entries.filter { isEnabled($0.id) }.map { $0.schedule.nextDue(interval: interval) }
+        if maintenance == nil, let background = nextBackgroundRefresh?() {
+            due.append(background)
+        }
+        let nextDue = due.min()
         return nextDue.map { max($0.timeIntervalSinceNow, 1) }
     }
 
@@ -198,7 +260,7 @@ final class UsageStore {
         case notAvailable(AuthProblem)
         case rateLimited(retryAfter: TimeInterval?)
         case failed
-        /// Our own reschedule, not a provider fault.
+        /// Sleep or a disabled provider, not a provider fault.
         case cancelled
     }
 
