@@ -3,7 +3,7 @@ import Foundation
 /// The subscription a provider reports, with its list price in dollars a
 /// month when the name maps to one. Team, enterprise and free tiers have a
 /// name but no price, so the share image never guesses what they cost.
-nonisolated struct UsagePlan: Equatable, Sendable {
+nonisolated struct UsagePlan: Codable, Equatable, Sendable {
     let name: String
     let monthlyPrice: Double?
 

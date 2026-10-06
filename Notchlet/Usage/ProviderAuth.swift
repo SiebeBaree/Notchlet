@@ -83,7 +83,7 @@ enum ProviderAuthSettings {
 }
 
 /// Why a provider had no usable credential, least to most specific.
-nonisolated enum AuthProblem: Int, Comparable, Sendable {
+nonisolated enum AuthProblem: Int, Codable, Comparable, Sendable {
     case signedOut
     /// Past its expiry and could not be renewed.
     case expired

@@ -49,4 +49,35 @@ struct ClaudeCodeUsageProviderTests {
         """.utf8)
         #expect(try ClaudeCodeUsageProvider().parseWindows(from: data).isEmpty)
     }
+
+    private func config(savedAccount: String) -> Data {
+        Data("""
+        {
+          "projects": { "/tmp": { "allowedTools": [] } },
+          "oauthAccount": {
+            "accountUuid": "a1", "organizationType": "claude_max",
+            "organizationRateLimitTier": "default_claude_max_5x"
+          },
+          "cachedUsageUtilization": {
+            "fetchedAtMs": 1791296411298, "accountUuid": "\(savedAccount)",
+            "utilization": \(String(decoding: fixture, as: UTF8.self))
+          }
+        }
+        """.utf8)
+    }
+
+    @Test func readsTheUsageClaudeCodeSaved() throws {
+        let snapshot = try #require(
+            ClaudeCodeUsageProvider.savedUsage(fromConfig: config(savedAccount: "a1"), authOptionID: "keychain")
+        )
+        #expect(snapshot.windows.map(\.id) == ["session", "weekly", "weekly-fable"])
+        #expect(snapshot.fetchedAt == Date(timeIntervalSince1970: 1_791_296_411.298))
+        #expect(snapshot.plan?.name == "Claude Max 5x")
+        #expect(snapshot.authOptionID == "keychain")
+    }
+
+    @Test func ignoresUsageSavedForAnotherAccount() {
+        #expect(ClaudeCodeUsageProvider
+            .savedUsage(fromConfig: config(savedAccount: "b2"), authOptionID: "keychain") == nil)
+    }
 }

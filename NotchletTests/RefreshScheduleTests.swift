@@ -25,18 +25,33 @@ struct RefreshScheduleTests {
         #expect(schedule.nextDue(interval: 5) == start.addingTimeInterval(30))
     }
 
-    @Test func retryAfterIsHonoredAndClamped() {
+    @Test func retryAfterOnlyLengthensTheBackoff() {
         var schedule = RefreshSchedule()
         schedule.recordAttempt(now: start)
-        schedule.recordRateLimit(retryAfter: 90, now: start)
-        #expect(schedule.nextDue(interval: 60) == start.addingTimeInterval(90))
+        // Anthropic's `retry-after: 0` must not mean "retry in 30s".
+        schedule.recordRateLimit(retryAfter: 0, now: start)
+        let first = schedule.nextDue(interval: 60).timeIntervalSince(start)
+        #expect(first >= 300 && first <= 330)
         #expect(schedule.isRateLimited)
 
-        schedule.recordRateLimit(retryAfter: 5, now: start)
-        #expect(schedule.nextDue(interval: 60) == start.addingTimeInterval(30))
+        schedule.recordRateLimit(retryAfter: 2400, now: start)
+        #expect(schedule.nextDue(interval: 60) == start.addingTimeInterval(2400))
 
         schedule.recordRateLimit(retryAfter: 100_000, now: start)
         #expect(schedule.nextDue(interval: 60) == start.addingTimeInterval(3600))
+    }
+
+    @Test func retryNowKeepsARateLimit() {
+        var schedule = RefreshSchedule()
+        schedule.recordAttempt(now: start)
+        schedule.recordError(now: start)
+        schedule.retryNow()
+        #expect(schedule.nextDue(interval: 600) == .distantPast)
+
+        schedule.recordAttempt(now: start)
+        schedule.recordRateLimit(retryAfter: nil, now: start)
+        schedule.retryNow()
+        #expect(schedule.nextDue(interval: 600) > start.addingTimeInterval(299))
     }
 
     @Test func rateLimitBackoffEscalatesThenCaps() {
