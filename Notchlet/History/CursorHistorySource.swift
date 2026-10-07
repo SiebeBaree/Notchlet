@@ -105,10 +105,23 @@ nonisolated struct CursorHistorySource: UsageHistorySource {
 /// `gpt-5.6-sol-high`) into the vendors' ids so the price table finds
 /// them. Fast stays, it is priced apart.
 nonisolated enum CursorModelNames {
-    private static let effortTags = ["none", "low", "medium", "high", "xhigh", "extra-high", "max", "ultra", "thinking"]
+    private static let effortTags = [
+        "extra-high",
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra",
+        "thinking",
+    ]
 
     static func canonical(_ label: String) -> String {
         var name = label.lowercased().trimmingCharacters(in: .whitespaces)
+        // Fast labels carry a different price, even when written in parentheses.
+        name = name.replacingOccurrences(of: #"\s*\(fast(?: mode)?\)$"#, with: "-fast", options: .regularExpression)
         // "Claude Opus 4.5 (Max)" style labels from the router.
         name = name.replacingOccurrences(of: #"\s*\(.*\)$"#, with: "", options: .regularExpression)
             .replacingOccurrences(of: " ", with: "-")
@@ -116,11 +129,9 @@ nonisolated enum CursorModelNames {
         if fast {
             name.removeLast("-fast".count)
         }
-        var parts = name.split(separator: "-").map(String.init)
-        while let last = parts.last, parts.count > 1, effortTags.contains(last) {
-            parts.removeLast()
+        while let tag = effortTags.first(where: { name.hasSuffix("-" + $0) }) {
+            name.removeLast(tag.count + 1)
         }
-        name = parts.joined(separator: "-")
         if name.hasPrefix("claude-") {
             // "claude-4.5-sonnet" is Anthropic's "claude-sonnet-4-5".
             name = name.replacingOccurrences(

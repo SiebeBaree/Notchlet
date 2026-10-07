@@ -56,6 +56,106 @@ struct ModelPricesTests {
         #expect(price == ModelPrice(input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite5m: 0.125, cacheWrite1h: 0.125))
     }
 
+    @Test(arguments: ["gpt-6.1-sol", "openai/GPT-6.1-Sol", "gpt-6.1-sol-2026-10-01"])
+    func sol61HasItsOwnCacheDiscount(model: String) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2.5, cacheWrite1h: 2.5))
+        #expect(price.cost(of: TokenCount(input: 1_000_000, cacheRead: 2_000_000,
+                                          cacheWrite5m: 1_000_000, output: 100_000)) == 5.7)
+        #expect(ModelPrices.price(for: "gpt-6-sol")?.cacheRead == 0.2)
+    }
+
+    @Test(arguments: ["claude-sonnet-5-5", "anthropic/claude-sonnet-5-5[1m]", "claude-sonnet-5-5-20260928"])
+    func sonnet55IncludesBothCacheDurations(model: String) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4))
+    }
+
+    @Test(arguments: [
+        ("gpt-5.6-sol-fast", 8.0, 40.0, 0.8, 10.0, 10.0),
+        ("gpt-5.6-terra-fast", 4.0, 24.0, 0.4, 5.0, 5.0),
+        ("gpt-5.6-luna-fast", 0.4, 2.4, 0.04, 0.5, 0.5),
+        ("gpt-6-astra-fast", 20.0, 100.0, 2.0, 25.0, 25.0),
+        ("gpt-6-sol-fast", 4.0, 20.0, 0.4, 5.0, 5.0),
+        ("gpt-6.1-sol-fast", 4.0, 20.0, 0.2, 5.0, 5.0),
+        ("gpt-6-luna-fast", 0.2, 1.0, 0.02, 0.25, 0.25),
+        ("claude-opus-5-5-fast", 8.0, 40.0, 0.4, 10.0, 16.0),
+        ("gemini-3.5-flash", 1.5, 9.0, 0.15, 1.5, 1.5),
+        ("gemini-3.6-flash", 0.75, 3.75, 0.075, 0.75, 0.75),
+        ("gemini-3.7-flash", 0.75, 3.75, 0.075, 0.75, 0.75),
+        ("google/gemini-3.8-flash", 0.75, 3.75, 0.075, 0.75, 0.75),
+        ("gemini-3.5-flash-lite", 0.3, 2.5, 0.03, 0.3, 0.3),
+        ("gemini-3.1-flash-lite", 0.25, 1.5, 0.025, 0.25, 0.25),
+    ])
+    func recentVendorRates(
+        model: String,
+        input: Double,
+        output: Double,
+        read: Double,
+        write5m: Double,
+        write1h: Double
+    ) throws {
+        let price = try #require(ModelPrices.price(for: model))
+        #expect(price == ModelPrice(
+            input: input,
+            output: output,
+            cacheRead: read,
+            cacheWrite5m: write5m,
+            cacheWrite1h: write1h
+        ))
+    }
+
+    @Test(arguments: [
+        ("Grok 4.5", 2.0, 6.0, 0.5),
+        ("Grok 4.5 (Fast)", 4.0, 18.0, 1.0),
+        ("Grok 4.6", 2.0, 6.0, 0.5),
+        ("Grok 4.6 (Fast)", 4.0, 12.0, 1.0),
+        ("grok-4.7-high", 2.0, 6.0, 0.5),
+        ("grok-4.7-xhigh-fast", 4.0, 12.0, 1.0),
+        ("Grok 4.7 500k", 4.0, 12.0, 1.0),
+        ("Grok 4.7 500k (Fast)", 6.0, 18.0, 1.5),
+        ("Gemini 2.5 Flash", 0.3, 2.5, 0.03),
+        ("Gemini 3 Flash", 0.5, 3.0, 0.05),
+        ("Gemini 3 Pro", 2.0, 12.0, 0.2),
+        ("Gemini 3.1 Pro", 2.0, 12.0, 0.2),
+        ("Gemini 3.6 Flash", 1.5, 7.5, 0.15),
+        ("Gemini 3.7 Flash", 0.75, 3.5, 0.075),
+        ("gemini-3.8-flash-high", 0.75, 3.5, 0.075),
+        ("GLM 5.2", 1.4, 4.4, 0.26),
+        ("GLM 5.3", 1.4, 4.4, 0.26),
+        ("GLM 5.3 Flash", 0.15, 0.5, 0.029),
+        ("Kimi K2.7 Code", 0.95, 4.0, 0.19),
+        ("Kimi K3", 3.0, 15.0, 0.3),
+        ("muse-spark-1.3-minimal", 1.25, 4.25, 0.15),
+        ("Muse Spark 1.3 Extra High", 1.25, 4.25, 0.15),
+    ])
+    func cursorRatesMatchItsPublishedTable(label: String, input: Double, output: Double, read: Double) throws {
+        let model = CursorModelNames.canonical(label)
+        let price = try #require(ModelPrices.price(for: model, providerID: "cursor"))
+        #expect(price == ModelPrice(
+            input: input,
+            output: output,
+            cacheRead: read,
+            cacheWrite5m: input,
+            cacheWrite1h: input
+        ))
+    }
+
+    @Test func cursorPricesDoNotLeakIntoOtherProviders() throws {
+        let day = try #require(DayKey("2026-10-07"))
+        let cursor = DailyUsage(day: day, providerID: "cursor", model: "gemini-3.8-flash",
+                                requests: 1, tokens: TokenCount(output: 1_000_000))
+        let openCode = DailyUsage(day: day, providerID: "opencode", model: "google/gemini-3.8-flash",
+                                  requests: 1, tokens: TokenCount(output: 1_000_000))
+        var reported = cursor
+        reported.reportedCost = 1.25
+
+        #expect(ModelPrices.cost(of: cursor) == 3.5)
+        #expect(ModelPrices.cost(of: openCode) == 3.75)
+        #expect(ModelPrices.cost(of: reported) == 1.25)
+        #expect(ModelPrices.price(for: "muse-spark-1.3", providerID: "opencode") == nil)
+    }
+
     @Test(arguments: ["claude-opus-5-5", "anthropic/claude-opus-5-5[1m]", "claude-opus-5-5-20260922"])
     func opus55HasDiscountedCacheReads(model: String) throws {
         let price = try #require(ModelPrices.price(for: model))
@@ -83,6 +183,9 @@ struct ModelPricesTests {
     @Test func unknownModelsStayUnpriced() {
         #expect(ModelPrices.price(for: "codex-auto-review") == nil)
         #expect(ModelPrices.price(for: "gpt-5.7-mini") == nil)
+        #expect(ModelPrices.price(for: "gpt-6.1-mini") == nil)
+        #expect(ModelPrices.price(for: "claude-haiku-5-5") == nil)
+        #expect(ModelPrices.price(for: "grok-4.8", providerID: "cursor") == nil)
         #expect(ModelPrices.price(for: "") == nil)
     }
 
