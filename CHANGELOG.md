@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Stop Claude from getting stuck rate limited. Notchlet now asks Claude for
+  usage at most every 5 minutes, uses the numbers Claude Code already saved
+  when they are recent and backs off properly when Claude says to wait.
+- Keep the last usage numbers across restarts and updates, so the notch is
+  never empty after a relaunch and does not fetch again right away.
+
 ## 0.4.5
 
 - Scan new transcript records in small batches and remember progress across

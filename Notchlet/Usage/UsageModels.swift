@@ -41,7 +41,7 @@ nonisolated struct UsageWindow: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-struct UsageSnapshot: Equatable {
+struct UsageSnapshot: Codable, Equatable {
     var windows: [UsageWindow]
     var fetchedAt: Date
     /// Which auth option produced this snapshot, for the settings status

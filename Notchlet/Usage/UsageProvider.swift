@@ -15,6 +15,10 @@ protocol UsageProvider: Sendable {
     var authOptions: [AuthOption] { get }
     /// "Run claude to sign in", no trailing period.
     var signInHint: String { get }
+    /// The least time between automatic fetches, for an endpoint that locks
+    /// out callers who ask often. Holds while the notch is open and over
+    /// error retries; a change in settings still fetches right away.
+    var minimumInterval: TimeInterval { get }
     var history: (any UsageHistorySource)? { get }
     var secrets: (any SecretScanSource)? { get }
 
@@ -24,6 +28,7 @@ protocol UsageProvider: Sendable {
 }
 
 extension UsageProvider {
+    var minimumInterval: TimeInterval { 0 }
     func retryCredentialAccess() {}
     var history: (any UsageHistorySource)? { nil }
     var secrets: (any SecretScanSource)? { nil }
@@ -55,6 +60,10 @@ extension HTTPUsageProvider {
     }
 
     func fetchUsage() async throws -> UsageSnapshot {
+        try await fetchFromEndpoint()
+    }
+
+    func fetchFromEndpoint() async throws -> UsageSnapshot {
         try await ProviderAuthSettings.selection(for: id, options: authOptions)
             .firstUsable(authOptions, fetch(via:))
     }
@@ -86,6 +95,7 @@ extension HTTPUsageProvider {
         if http.statusCode == 429 {
             // Retry-After can also be an HTTP-date; the scheduler's own
             // backoff covers that case, so only the seconds form is parsed.
+            // The scheduler never lets it shorten the wait.
             let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
             throw ProviderError.rateLimited(retryAfter: retryAfter)
         }

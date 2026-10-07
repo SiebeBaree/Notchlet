@@ -140,6 +140,37 @@ struct UsageStoreTests {
         await provider.finish()
     }
 
+    private struct InstantProvider: UsageProvider {
+        let id = "instant"
+        let name = "Instant"
+        let isInstalled = true
+        let logoAssetName = "ClaudeLogo"
+        let authOptions: [AuthOption] = []
+        let signInHint = ""
+        let snapshot: UsageSnapshot
+
+        func fetchUsage() async throws -> UsageSnapshot {
+            snapshot
+        }
+    }
+
+    @Test func aRelaunchKeepsTheNumbersAndDoesNotRefetch() async {
+        let window = UsageWindow(id: "session", label: "5h", duration: 5 * 3600, usedFraction: 0.4, resetsAt: nil)
+        let snapshot = UsageSnapshot(windows: [window], fetchedAt: Date(timeIntervalSince1970: 1_791_296_411))
+        let first = UsageStore(providers: [InstantProvider(snapshot: snapshot)], defaults: defaults)
+        await withCheckedContinuation { continuation in
+            first.snapshotObserver = { _, _, _ in continuation.resume() }
+            first.reschedule()
+        }
+        first.suspend()
+
+        let relaunched = UsageStore(providers: [InstantProvider(snapshot: snapshot)], defaults: defaults)
+        let entry = relaunched.entries[0]
+        #expect(entry.snapshot == snapshot)
+        #expect(entry.state == .ok)
+        #expect(entry.schedule.nextDue(interval: 600) > .now)
+    }
+
     private struct StubProvider: UsageProvider {
         let id: String
         let isInstalled: Bool

@@ -3,10 +3,12 @@ import Observation
 
 /// The latest snapshot per provider and the refresh loop: slow while the
 /// panel is closed, every 60s while open, per-provider backoff on a rate
-/// limit. A failing provider keeps its previous snapshot.
+/// limit. A failing provider keeps its previous snapshot. Snapshots and
+/// schedules are saved, so a relaunch or an update shows the last numbers
+/// at once and does not fetch before they are due.
 @Observable
 final class UsageStore {
-    enum ProviderState: Equatable {
+    enum ProviderState: Codable, Equatable {
         case ok
         case notAvailable(AuthProblem)
         case rateLimited
@@ -62,7 +64,16 @@ final class UsageStore {
 
     init(providers: [any UsageProvider], defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        entries = providers.map { Entry(provider: $0, snapshot: nil) }
+        entries = providers.map { provider in
+            let saved = defaults.data(forKey: Self.savedDefaultsKey(provider.id))
+                .flatMap { try? JSONDecoder().decode(Saved.self, from: $0) }
+            return Entry(
+                provider: provider,
+                snapshot: saved?.snapshot,
+                state: saved?.state,
+                schedule: saved?.schedule ?? RefreshSchedule()
+            )
+        }
         // Stored choices first, then installed CLIs fill the remaining slots
         // in registration order.
         var enabled: [String: Bool] = [:]
@@ -82,6 +93,22 @@ final class UsageStore {
 
     static func enabledDefaultsKey(_ providerID: String) -> String {
         "providerEnabled.\(providerID)"
+    }
+
+    static func savedDefaultsKey(_ providerID: String) -> String {
+        "usageSnapshot.\(providerID)"
+    }
+
+    private struct Saved: Codable {
+        var snapshot: UsageSnapshot?
+        var state: ProviderState?
+        var schedule: RefreshSchedule
+    }
+
+    private func save(at index: Int) {
+        let entry = entries[index]
+        let saved = Saved(snapshot: entry.snapshot, state: entry.state, schedule: entry.schedule)
+        defaults.set(try? JSONEncoder().encode(saved), forKey: Self.savedDefaultsKey(entry.id))
     }
 
     func isEnabled(_ providerID: String) -> Bool {
@@ -107,16 +134,17 @@ final class UsageStore {
         reschedule()
     }
 
-    /// Cooldowns included: the user just changed how the provider signs in.
-    /// A provider that is off is fetched once anyway, so its settings page
-    /// can say whether the login works.
+    /// Error backoff included, not a rate limit: the user just changed how
+    /// the provider signs in, but retrying into a rate limit only extends
+    /// it. A provider that is off is fetched once anyway, outside a rate
+    /// limit, so its settings page can say whether the login works.
     func refreshNow(_ providerID: String) {
         guard let index = entries.firstIndex(where: { $0.id == providerID }) else { return }
         entries[index].provider.retryCredentialAccess()
-        entries[index].schedule = RefreshSchedule()
+        entries[index].schedule.retryNow()
         if isEnabled(providerID) {
             reschedule()
-        } else {
+        } else if nextDue(entries[index]) <= .now {
             Task { [weak self] in
                 await self?.fetch([index], now: .now)
             }
@@ -203,22 +231,22 @@ final class UsageStore {
         return TimeInterval(Self.intervalChoicesMinutes.contains(minutes) ? minutes : 10) * 60
     }
 
+    private func nextDue(_ entry: Entry) -> Date {
+        entry.schedule.nextDue(interval: pollInterval, floor: entry.provider.minimumInterval)
+    }
+
     private func timeUntilNextDue() -> TimeInterval? {
-        let interval = pollInterval
-        var due = entries.filter { isEnabled($0.id) }.map { $0.schedule.nextDue(interval: interval) }
+        var due = entries.filter { isEnabled($0.id) }.map(nextDue)
         if maintenance == nil, let background = nextBackgroundRefresh?() {
             due.append(background)
         }
-        let nextDue = due.min()
-        return nextDue.map { max($0.timeIntervalSinceNow, 1) }
+        let soonest = due.min()
+        return soonest.map { max($0.timeIntervalSinceNow, 1) }
     }
 
     private func refreshDueProviders() async {
-        let interval = pollInterval
         let now = Date.now
-        let due = entries.indices.filter {
-            isEnabled(entries[$0].id) && entries[$0].schedule.nextDue(interval: interval) <= now
-        }
+        let due = entries.indices.filter { isEnabled(entries[$0].id) && nextDue(entries[$0]) <= now }
         guard !due.isEmpty else { return }
         await fetch(due, now: now)
     }
@@ -287,6 +315,7 @@ final class UsageStore {
             // holds the 30s spacing.
             break
         }
+        save(at: index)
     }
 
     /// Only transitions are analytics events, never every refresh.
