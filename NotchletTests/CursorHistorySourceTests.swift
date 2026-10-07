@@ -43,6 +43,23 @@ struct CursorHistorySourceTests {
         #expect(CursorModelNames.canonical("max") == "max")
     }
 
+    @Test func recentModelsKeepTheirPricingVariantInTheExport() throws {
+        let csv = """
+        Date,Model,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens
+        2026-10-07T10:00:00Z,Grok 4.7 500k (Fast),0,0,0,1000000
+        2026-10-07T10:00:00Z,claude-5.5-sonnet-thinking,0,0,0,1000000
+        2026-10-07T10:00:00Z,gpt-6.1-sol-high,0,0,2000000,0
+        2026-10-07T10:00:00Z,Muse Spark 1.3 Extra High,0,0,0,1000000
+        """
+        let events = try CursorHistorySource.events(fromCSV: csv)
+        #expect(events.map(\.model) == ["grok-4.7-500k-fast", "claude-sonnet-5-5", "gpt-6.1-sol", "muse-spark-1.3"])
+        let costs = events.map { event in
+            ModelPrices.price(for: event.model!, providerID: "cursor")?.cost(of: event.tokens)
+        }
+        #expect(costs == [18, 10, 0.2, 4.25])
+        #expect(CursorModelNames.canonical("Claude Opus 5.5 (fast mode)") == "claude-opus-5-5-fast")
+    }
+
     @Test func csvHandlesQuotesAndLineEndings() {
         let rows = CSV.rows("a,\"b, c\",\"say \"\"hi\"\"\"\r\n1,,3\n")
         #expect(rows == [["a", "b, c", "say \"hi\""], ["1", "", "3"]])

@@ -54,13 +54,16 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// unpriced model is named in the pane instead. Kept by hand because the
 /// public catalogs lag new models by weeks. Standard short-context rates;
 /// daily token totals cannot determine per-request context or service tiers.
-/// OpenAI and Anthropic rates checked September 19, 2026:
+/// Latest OpenAI and Anthropic model rates checked October 7, 2026:
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
-/// GPT-6 Sol, GPT-6 Luna and Opus 5.5 checked September 23, 2026.
 nonisolated enum ModelPrices {
-    static func price(for model: String) -> ModelPrice? {
-        table[normalize(model)]
+    static func price(for model: String, providerID: String? = nil) -> ModelPrice? {
+        let name = normalize(model)
+        if providerID == "cursor", let price = cursorTable[name] {
+            return price
+        }
+        return table[name]
     }
 
     /// What the CLI reported, else the table.
@@ -68,7 +71,7 @@ nonisolated enum ModelPrices {
         if let reported = row.reportedCost {
             return reported
         }
-        guard let model = row.model, let price = price(for: model) else { return nil }
+        guard let model = row.model, let price = price(for: model, providerID: row.providerID) else { return nil }
         return price.cost(of: row.tokens)
     }
 
@@ -76,7 +79,7 @@ nonisolated enum ModelPrices {
     /// `claude-sonnet-4-5`.
     static func normalize(_ model: String) -> String {
         var name = model.lowercased().trimmingCharacters(in: .whitespaces)
-        for prefix in ["anthropic/", "openai/", "anthropic."] where name.hasPrefix(prefix) {
+        for prefix in ["anthropic/", "openai/", "google/", "anthropic."] where name.hasPrefix(prefix) {
             name.removeFirst(prefix.count)
         }
         name = name.replacingOccurrences(of: "[1m]", with: "")
@@ -97,10 +100,12 @@ nonisolated enum ModelPrices {
         "claude-opus-5": .anthropic(input: 5, output: 25),
         "claude-opus-5-fast": .anthropic(input: 10, output: 50),
         "claude-opus-5-5": .anthropic(input: 4, output: 20, cacheRead: 0.2),
+        "claude-opus-5-5-fast": .anthropic(input: 8, output: 40, cacheRead: 0.4),
         "claude-sonnet-4": .anthropic(input: 3, output: 15),
         "claude-sonnet-4-5": .anthropic(input: 3, output: 15),
         "claude-sonnet-4-6": .anthropic(input: 3, output: 15),
         "claude-sonnet-5": .anthropic(input: 2, output: 10),
+        "claude-sonnet-5-5": .anthropic(input: 2, output: 10),
         "claude-haiku-4-5": .anthropic(input: 1, output: 5),
         "claude-3-5-haiku": .anthropic(input: 0.8, output: 4),
         "claude-3-5-sonnet": .anthropic(input: 3, output: 15),
@@ -138,11 +143,59 @@ nonisolated enum ModelPrices {
         "gpt-5.5": .openAI(input: 5, output: 30, cacheRead: 0.5),
         "gpt-5.5-pro": .openAI(input: 30, output: 180, cacheRead: 3),
         "gpt-5.6-sol": .openAI(input: 4, output: 20, cacheRead: 0.4, cacheWrite: 5),
+        "gpt-5.6-sol-fast": .openAI(input: 8, output: 40, cacheRead: 0.8, cacheWrite: 10),
         "gpt-5.6-terra": .openAI(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2.5),
+        "gpt-5.6-terra-fast": .openAI(input: 4, output: 24, cacheRead: 0.4, cacheWrite: 5),
         "gpt-5.6-luna": .openAI(input: 0.2, output: 1.2, cacheRead: 0.02, cacheWrite: 0.25),
+        "gpt-5.6-luna-fast": .openAI(input: 0.4, output: 2.4, cacheRead: 0.04, cacheWrite: 0.5),
         "gpt-6-astra": .openAI(input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5),
+        "gpt-6-astra-fast": .openAI(input: 20, output: 100, cacheRead: 2, cacheWrite: 25),
         "gpt-6-sol": .openAI(input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5),
+        "gpt-6-sol-fast": .openAI(input: 4, output: 20, cacheRead: 0.4, cacheWrite: 5),
+        "gpt-6.1-sol": .openAI(input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5),
+        "gpt-6.1-sol-fast": .openAI(input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5),
         "gpt-6-luna": .openAI(input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125),
+        "gpt-6-luna-fast": .openAI(input: 0.2, output: 1, cacheRead: 0.02, cacheWrite: 0.25),
+
+        // Google text rates checked October 7, 2026. Storage time is absent from the logs.
+        // https://ai.google.dev/gemini-api/docs/pricing
+        // Flash 3.6 through 3.8 promotional rates run through December 31, 2026.
+        "gemini-3.5-flash": ModelPrice(input: 1.5, output: 9, cacheRead: 0.15, cacheWrite5m: 1.5, cacheWrite1h: 1.5),
+        "gemini-3.6-flash": ModelPrice(
+            input: 0.75,
+            output: 3.75,
+            cacheRead: 0.075,
+            cacheWrite5m: 0.75,
+            cacheWrite1h: 0.75
+        ),
+        "gemini-3.7-flash": ModelPrice(
+            input: 0.75,
+            output: 3.75,
+            cacheRead: 0.075,
+            cacheWrite5m: 0.75,
+            cacheWrite1h: 0.75
+        ),
+        "gemini-3.8-flash": ModelPrice(
+            input: 0.75,
+            output: 3.75,
+            cacheRead: 0.075,
+            cacheWrite5m: 0.75,
+            cacheWrite1h: 0.75
+        ),
+        "gemini-3.5-flash-lite": ModelPrice(
+            input: 0.3,
+            output: 2.5,
+            cacheRead: 0.03,
+            cacheWrite5m: 0.3,
+            cacheWrite1h: 0.3
+        ),
+        "gemini-3.1-flash-lite": ModelPrice(
+            input: 0.25,
+            output: 1.5,
+            cacheRead: 0.025,
+            cacheWrite5m: 0.25,
+            cacheWrite1h: 0.25
+        ),
 
         // Cursor's own models and its router, as the usage export names them.
         "auto": .cursor(input: 1.25, output: 6, cacheRead: 0.25, cacheWrite: 1.25),
@@ -152,5 +205,32 @@ nonisolated enum ModelPrices {
         "composer-2-fast": .cursor(input: 1.5, output: 7.5, cacheRead: 0.35, cacheWrite: 1.5),
         "composer-2.5": .cursor(input: 0.5, output: 2.5, cacheRead: 0.2, cacheWrite: 0.5),
         "composer-2.5-fast": .cursor(input: 3, output: 15, cacheRead: 0.5, cacheWrite: 3),
+    ]
+
+    /// Cursor rates can differ from the vendor's API. Scope these to Cursor history.
+    /// Checked October 7, 2026: https://cursor.com/docs/models-and-pricing.md
+    /// A dash in the cache-write column means ordinary input, with no separate write fee.
+    private static let cursorTable: [String: ModelPrice] = [
+        "grok-4.5": .cursor(input: 2, output: 6, cacheRead: 0.5, cacheWrite: 2),
+        "grok-4.5-fast": .cursor(input: 4, output: 18, cacheRead: 1, cacheWrite: 4),
+        "grok-4.6": .cursor(input: 2, output: 6, cacheRead: 0.5, cacheWrite: 2),
+        "grok-4.6-fast": .cursor(input: 4, output: 12, cacheRead: 1, cacheWrite: 4),
+        "grok-4.7": .cursor(input: 2, output: 6, cacheRead: 0.5, cacheWrite: 2),
+        "grok-4.7-fast": .cursor(input: 4, output: 12, cacheRead: 1, cacheWrite: 4),
+        "grok-4.7-500k": .cursor(input: 4, output: 12, cacheRead: 1, cacheWrite: 4),
+        "grok-4.7-500k-fast": .cursor(input: 6, output: 18, cacheRead: 1.5, cacheWrite: 6),
+        "gemini-2.5-flash": .cursor(input: 0.3, output: 2.5, cacheRead: 0.03, cacheWrite: 0.3),
+        "gemini-3-flash": .cursor(input: 0.5, output: 3, cacheRead: 0.05, cacheWrite: 0.5),
+        "gemini-3-pro": .cursor(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2),
+        "gemini-3.1-pro": .cursor(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2),
+        "gemini-3.6-flash": .cursor(input: 1.5, output: 7.5, cacheRead: 0.15, cacheWrite: 1.5),
+        "gemini-3.7-flash": .cursor(input: 0.75, output: 3.5, cacheRead: 0.075, cacheWrite: 0.75),
+        "gemini-3.8-flash": .cursor(input: 0.75, output: 3.5, cacheRead: 0.075, cacheWrite: 0.75),
+        "glm-5.2": .cursor(input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 1.4),
+        "glm-5.3": .cursor(input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 1.4),
+        "glm-5.3-flash": .cursor(input: 0.15, output: 0.5, cacheRead: 0.029, cacheWrite: 0.15),
+        "kimi-k2.7-code": .cursor(input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0.95),
+        "kimi-k3": .cursor(input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3),
+        "muse-spark-1.3": .cursor(input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 1.25),
     ]
 }

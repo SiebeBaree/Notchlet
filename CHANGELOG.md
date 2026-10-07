@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add GPT-6.1 Sol, Claude Sonnet 5.5 and recent Gemini pricing, plus missing
+  Grok, GLM, Kimi and Muse models in Cursor. Include verified cache and Fast
+  rates, keeping Cursor prices separate where they differ from the vendor.
 - Stop Claude from getting stuck rate limited. Notchlet now asks Claude for
   usage at most every 5 minutes, uses the numbers Claude Code already saved
   when they are recent and backs off properly when Claude says to wait.
