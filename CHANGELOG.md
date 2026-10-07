@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.6
+
 - Add GPT-6.1 Sol, Claude Sonnet 5.5 and recent Gemini pricing, plus missing
   Grok, GLM, Kimi and Muse models in Cursor. Include verified cache and Fast
   rates, keeping Cursor prices separate where they differ from the vendor.
