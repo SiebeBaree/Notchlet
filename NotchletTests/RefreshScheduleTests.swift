@@ -41,6 +41,15 @@ struct RefreshScheduleTests {
         #expect(schedule.nextDue(interval: 60) == start.addingTimeInterval(3600))
     }
 
+    @Test func theProviderFloorHoldsOverErrorRetries() {
+        var schedule = RefreshSchedule()
+        schedule.recordAttempt(now: start)
+        schedule.recordError(now: start)
+        #expect(schedule.nextDue(interval: 60, floor: 300) == start.addingTimeInterval(300))
+        schedule.connectionRestored()
+        #expect(schedule.nextDue(interval: 60, floor: 300) == start.addingTimeInterval(300))
+    }
+
     @Test func retryNowKeepsARateLimit() {
         var schedule = RefreshSchedule()
         schedule.recordAttempt(now: start)

@@ -136,15 +136,15 @@ final class UsageStore {
 
     /// Error backoff included, not a rate limit: the user just changed how
     /// the provider signs in, but retrying into a rate limit only extends
-    /// it. A provider that is off is fetched once anyway, so its settings
-    /// page can say whether the login works.
+    /// it. A provider that is off is fetched once anyway, outside a rate
+    /// limit, so its settings page can say whether the login works.
     func refreshNow(_ providerID: String) {
         guard let index = entries.firstIndex(where: { $0.id == providerID }) else { return }
         entries[index].provider.retryCredentialAccess()
         entries[index].schedule.retryNow()
         if isEnabled(providerID) {
             reschedule()
-        } else {
+        } else if nextDue(entries[index]) <= .now {
             Task { [weak self] in
                 await self?.fetch([index], now: .now)
             }
@@ -232,7 +232,7 @@ final class UsageStore {
     }
 
     private func nextDue(_ entry: Entry) -> Date {
-        entry.schedule.nextDue(interval: max(pollInterval, entry.provider.minimumInterval))
+        entry.schedule.nextDue(interval: pollInterval, floor: entry.provider.minimumInterval)
     }
 
     private func timeUntilNextDue() -> TimeInterval? {

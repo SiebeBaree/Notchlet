@@ -15,8 +15,9 @@ protocol UsageProvider: Sendable {
     var authOptions: [AuthOption] { get }
     /// "Run claude to sign in", no trailing period.
     var signInHint: String { get }
-    /// A floor under the poll interval, for an endpoint that locks out
-    /// callers who ask often. Also holds while the notch is open.
+    /// The least time between automatic fetches, for an endpoint that locks
+    /// out callers who ask often. Holds while the notch is open and over
+    /// error retries; a change in settings still fetches right away.
     var minimumInterval: TimeInterval { get }
     var history: (any UsageHistorySource)? { get }
     var secrets: (any SecretScanSource)? { get }

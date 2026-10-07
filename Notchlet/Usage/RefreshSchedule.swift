@@ -19,10 +19,12 @@ struct RefreshSchedule: Codable {
 
     var isRateLimited: Bool { rateLimitStreak > 0 }
 
-    func nextDue(interval: TimeInterval) -> Date {
+    /// `floor` is the provider's minimum spacing, held over error retries
+    /// and a restored connection too.
+    func nextDue(interval: TimeInterval, floor: TimeInterval = 0) -> Date {
         guard let lastAttemptAt else { return .distantPast }
         let scheduled = retryAt ?? lastAttemptAt.addingTimeInterval(interval)
-        return max(scheduled, lastAttemptAt.addingTimeInterval(Self.minSpacing))
+        return max(scheduled, lastAttemptAt.addingTimeInterval(max(Self.minSpacing, floor)))
     }
 
     mutating func recordAttempt(now: Date = .now) {
