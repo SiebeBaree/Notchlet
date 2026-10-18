@@ -28,7 +28,7 @@ PostHog answers "what are users doing" (add custom events to the typed catalog i
 
 ## Testing: when and what
 
-Test the things that can be wrong in interesting ways. Zod schema edges, real logic in lib and dumb components with behavior worth pinning get colocated Vitest tests. Server components and server actions have no honest unit-test story, so the user journey in `e2e/` is where they get verified against a production build and a real database. Do not write smoke tests that assert a page renders, regression tests for deleted features or tests that mock half the app; if a unit test needs heavy infrastructure mocking, the seam is wrong, move the logic or rely on e2e. A fixed bug earns a regression test only when the bug was real logic, not glue.
+Test the things that can be wrong in interesting ways. Zod schema edges, real logic in lib and dumb components with behavior worth pinning get colocated Vitest tests. Server components and server actions have no honest unit-test story, so they go untested; keep logic out of them. Do not write smoke tests that assert a page renders, regression tests for deleted features or tests that mock half the app; if a unit test needs heavy infrastructure mocking, the seam is wrong, move the logic. A fixed bug earns a regression test only when the bug was real logic, not glue.
 
 ## Things you need to know
 
@@ -39,7 +39,6 @@ Test the things that can be wrong in interesting ways. Zod schema edges, real lo
 - Formatting is oxfmt's job, including import order and Tailwind class order. Never hand-format or reorder imports.
 - shadcn components under `components/ui` are generated. Add or update them with the shadcn CLI, do not hand-edit beyond what a change genuinely requires.
 - There is no auth by design (the provider choice varies per project). The `(app)` route group marks where it slots in.
-- E2e suites need `DATABASE_URL`, must skip themselves without it and must delete their own `e2e %` rows. None exist right now; the harness stays for the login work.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

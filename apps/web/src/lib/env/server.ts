@@ -29,6 +29,6 @@ export const env = createEnv({
     },
     experimental__runtimeEnv: {},
     emptyStringAsUndefined: true,
-    // For builds that have no environment, e.g. CI and the e2e security suite: SKIP_ENV_VALIDATION=1 pnpm build
+    // For builds that have no environment, e.g. CI: SKIP_ENV_VALIDATION=1 pnpm build
     skipValidation: Boolean(process.env.SKIP_ENV_VALIDATION),
 });

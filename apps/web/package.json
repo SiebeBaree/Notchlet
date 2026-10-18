@@ -13,7 +13,6 @@
         "format:check": "oxfmt --check",
         "test": "vitest run",
         "test:watch": "vitest",
-        "e2e": "playwright test --config e2e/playwright.config.ts",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
         "db:push": "drizzle-kit push",
@@ -49,7 +48,6 @@
         "zod": "^4.4.3"
     },
     "devDependencies": {
-        "@playwright/test": "^1.62.1",
         "@tailwindcss/postcss": "^4.3.3",
         "@testing-library/jest-dom": "^7.0.1",
         "@testing-library/react": "^16.3.2",
