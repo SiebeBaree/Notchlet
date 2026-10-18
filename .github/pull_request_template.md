@@ -8,6 +8,6 @@
 
 ## Checklist
 
-- [ ] `xcodebuild test -scheme Notchlet -destination 'platform=macOS'` passes
-- [ ] `swiftformat --lint .` passes
+- [ ] App: `xcodebuild test -scheme Notchlet -destination 'platform=macOS'` and `swiftformat --lint .` pass in `apps/macos`
+- [ ] Website: `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test` pass in `apps/web`
 - [ ] Title follows conventional commit style, e.g. `feat(usage): codex provider`

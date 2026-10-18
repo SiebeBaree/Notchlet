@@ -1,0 +1,21 @@
+# Xcode
+xcuserdata/
+DerivedData/
+build/
+*.xcresult
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Code coverage artifacts
+*.profraw
+
+# Local build secrets
+Config/Secrets.xcconfig
+
+# Vendored betterleaks binary, fetched by Scripts/fetch-betterleaks.sh
+Vendor/
+
+# Release artifacts, produced by the release workflow
+releases/

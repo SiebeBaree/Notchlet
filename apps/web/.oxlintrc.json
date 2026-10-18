@@ -1,0 +1,25 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["typescript", "unicorn", "oxc", "react", "nextjs", "jsx-a11y", "import", "promise", "vitest"],
+    "categories": {
+        "correctness": "error",
+        "suspicious": "warn",
+        "perf": "warn"
+    },
+    "env": {
+        "browser": true,
+        "node": true
+    },
+    "rules": {
+        "react/react-in-jsx-scope": "off",
+        "import/no-unassigned-import": "off",
+        "import/no-named-as-default": "off",
+        "typescript/no-explicit-any": "error",
+        "typescript/consistent-type-imports": "error",
+        "no-console": "error",
+        "import/no-cycle": "error",
+        "react/rules-of-hooks": "error",
+        "react/exhaustive-deps": "error"
+    },
+    "ignorePatterns": ["src/lib/db/migrations"]
+}

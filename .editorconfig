@@ -13,3 +13,7 @@ indent_size = 4
 [*.{yml,yaml,json,md}]
 indent_style = space
 indent_size = 2
+
+# oxfmt owns the website's formatting and indents everything with 4 spaces.
+[apps/web/**]
+indent_size = 4

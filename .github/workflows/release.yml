@@ -23,6 +23,9 @@ jobs:
   build:
     name: Build, notarize and publish
     runs-on: macos-26
+    defaults:
+      run:
+        working-directory: apps/macos
     permissions:
       contents: write
     outputs:
@@ -196,7 +199,7 @@ jobs:
       - name: Upload the appcast for Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: apps/macos/site
 
   deploy:
     name: Publish the appcast

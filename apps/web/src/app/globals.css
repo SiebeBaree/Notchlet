@@ -1,0 +1,153 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Single light theme. This variant keeps dark: utilities in generated shadcn components inert; without it Tailwind
+   falls back to the OS media query and they activate on their own. */
+@custom-variant dark (&:is(.dark *));
+
+/* Landing palette: ink text scale, violet brand, hairline borders. */
+@theme {
+    --color-ink: #17151f;
+    --color-ink-2: #262233;
+    --color-ink-3: #716b7e;
+    --color-brand: #7145f5;
+    --color-brand-bright: #9f7cff;
+    --color-brand-soft: #efeafd;
+    --color-line: #eceaf2;
+}
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: var(--font-sans);
+    --font-display: var(--font-display);
+    --font-mono: var(--font-mono);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* The menu bar tabs. Each tab is a single element and the silhouette is carved with a mask rather than an extra
+   span, because a span sitting outside the tab gets no backdrop-filter and that unblurred patch was the visible
+   seam. Two mask layers: the flat body, then the swoop as an SVG image pinned to the inner edge.
+
+   The swoop is one cubic with horizontal tangents at both ends and both control points at the midpoint, so it
+   leaves the tab's bottom edge flat, runs diagonally through the middle and lands flat against the screen edge.
+   Two arcs meeting tangentially cannot do this: they meet vertically, which is why the earlier version read as a
+   rounded rectangle rather than an angle. Width is fixed at 80px so the diagonal never stretches with the tab. */
+.menu-tab {
+    --swoop: 80px;
+    mask-repeat: no-repeat;
+    mask-size:
+        calc(100% - var(--swoop)) 100%,
+        var(--swoop) 100%;
+}
+
+.menu-tab-start {
+    mask-image:
+        linear-gradient(#000, #000),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 46' preserveAspectRatio='none'%3E%3Cpath d='M0,0 H80 C40,0 40,46 0,46 Z'/%3E%3C/svg%3E");
+    /* Four value form on purpose: mask-position rejects the three value shorthand and silently drops the whole
+       declaration, which stacks every layer in the top left corner. */
+    mask-position:
+        left 0 top 0,
+        right 0 top 0;
+}
+
+.menu-tab-end {
+    mask-image:
+        linear-gradient(#000, #000),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 46' preserveAspectRatio='none'%3E%3Cpath d='M80,0 H0 C40,0 40,46 80,46 Z'/%3E%3C/svg%3E");
+    mask-position:
+        right 0 top 0,
+        left 0 top 0;
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+    a:focus-visible,
+    button:focus-visible,
+    summary:focus-visible,
+    [tabindex="0"]:focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: 4px;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+    html {
+        @apply font-sans;
+    }
+}

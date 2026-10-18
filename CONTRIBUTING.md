@@ -6,7 +6,7 @@ You need Xcode 26 or newer and a Mac. Clone, fetch the secret scanner's binary, 
 
 ```sh
 git clone https://github.com/SiebeBaree/Notchlet.git
-cd Notchlet
+cd Notchlet/apps/macos
 ./Scripts/fetch-betterleaks.sh
 open Notchlet.xcodeproj
 ```
@@ -17,7 +17,7 @@ Analytics need a PostHog key in `Config/Secrets.xcconfig`, which is gitignored. 
 
 The app is an `LSUIElement` agent: no dock icon, no main window. After launching, hover over the notch (or the top center of an external display) to see it. Quit it from the settings behind the gear, there is no menu.
 
-`AGENTS.md` at the repo root describes the project, its vocabulary and its rules. Read it before changing how a feature is put together.
+`AGENTS.md` at the repo root describes the project and its vocabulary, and `apps/macos/AGENTS.md` has the app's rules. Read both before changing how a feature is put together. Paths below are relative to `apps/macos`.
 
 ## Adding a provider
 
