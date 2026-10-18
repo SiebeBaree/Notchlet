@@ -29,7 +29,7 @@ Or build it yourself:
 
 ```sh
 git clone https://github.com/SiebeBaree/Notchlet.git
-cd Notchlet
+cd Notchlet/apps/macos
 ./Scripts/fetch-betterleaks.sh
 open Notchlet.xcodeproj
 ```

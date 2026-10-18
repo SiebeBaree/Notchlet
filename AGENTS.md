@@ -2,7 +2,13 @@
 
 Notchlet is a native macOS app that lives in the notch and shows how much of your AI coding agent limits is left. It supports Claude Code, Codex, Cursor and OpenCode. Hover the notch and it opens into a view with a gauge per limit, a pace verdict, a historic view of tokens and cost read from the CLIs' own logs, and a share view that turns those numbers into a PNG. It also opens by itself when a limit passes a mark you set or when the secret scanner finds a key in a chat, and draws a line around the notch while an agent is waiting on you.
 
-Swift 6, SwiftUI for the views, AppKit for the window. One target, one test target with Swift Testing, no third-party Swift code except Sparkle for updates and the betterleaks binary for the scanner. The product is one person's daily driver first, so every change is judged on what it does to the notch while the user is working: what it costs while idle, what it shows without asking, and whether it ever touches the agent's login.
+## Layout
+
+- `apps/macos` is the app: Swift, the Xcode project, its tests and scripts. Read `apps/macos/AGENTS.md` before changing it.
+- `apps/web` is the website. Next.js on pnpm. Read `apps/web/AGENTS.md` before changing it.
+- `docs/` holds the README's images.
+
+The two apps share no code or tooling, so the root has no workspace setup. Each has its own CI workflow that only runs when its folder changes.
 
 ## What makes it different
 
@@ -36,37 +42,18 @@ Siebe's words, which are the words for user-facing text, plans and PR descriptio
 | notification (a limit passed a mark) | `UsageAlerts` | alert in prose |
 | the line (around the notch while an agent waits) | `AgentWaits`, `WaitOutline` | agent alert, outline, border |
 | host app (the terminal or editor that launched the agent) | `HostApp` | |
-| the website, the homepage (notchlet.com, a separate repo) | | |
+| the website, the homepage (notchlet.com, `apps/web`) | | |
 | CodexBar, OpenUsage (reference apps), Claude Code, T3 Code (harnesses), CodeRabbit (review bot) | | |
 | release (a tag) | | |
 
-## Commands
-
-```sh
-./Scripts/fetch-betterleaks.sh                                   # once after cloning, the build fails without it
-xcodebuild build -scheme Notchlet -destination 'platform=macOS'
-xcodebuild test -scheme Notchlet -destination 'platform=macOS'   # Swift Testing
-swiftformat .                                                    # CI lints with swiftformat --lint .
-```
-
 ## Rules
 
-- Never consume usage to measure it. Never talk to anything except a CLI's own local state and its own usage endpoint. The scanner never validates a key.
-- Keychain reads and writes go through `/usr/bin/security`, never the Security framework.
-- Nothing polls on its own timer when an existing refresh can carry it.
-- Pure logic (geometry, parsing, timing, pricing) stays out of AppKit types so it has tests. UI plumbing mostly does not need tests.
-- Every feature folder under `Notchlet/` owns its logic and its view. A new provider is one file plus a logo imageset, a line in `AppDelegate` and a parsing test over a real response.
-- The Xcode project uses file-system-synced groups: a new file under `Notchlet/` or `NotchletTests/` is in the target. Never hand-edit the pbxproj for source files.
-- Swift 6 language mode, main-actor default isolation. Static members of an actor default to main-actor isolation here, so parsing helpers are `nonisolated`.
-- macOS 14 deployment target.
 - Comments say why, never what. No comment restates a name or narrates a past change.
 - No Co-Authored-By trailer on commits. PR titles are conventional commits, PRs are real, not drafts, rebased on `main`.
-- Never edit `MARKETING_VERSION` or `CURRENT_PROJECT_VERSION`. CI injects both.
-- Do not launch a second Notchlet or drive the cursor on Siebe's Mac without asking. To eyeball a view, render it from a temporary test with `ImageRenderer` or an off-screen `NSWindow`.
 
 ## Releasing
 
-Tagging is the release. CI archives, signs, notarizes, publishes the GitHub release with the DMG and deploys the Sparkle appcast. Nothing is built on a laptop.
+Tagging releases the macOS app. CI archives, signs, notarizes, publishes the GitHub release with the DMG and deploys the Sparkle appcast. Nothing is built on a laptop.
 
 1. Move the `Unreleased` entries in `CHANGELOG.md` under the new version and make sure everything shipped is in them.
 2. Merge to `main` and wait for CI to be green.
