@@ -54,7 +54,7 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// unpriced model is named in the pane instead. Kept by hand because the
 /// public catalogs lag new models by weeks. Standard short-context rates;
 /// daily token totals cannot determine per-request context or service tiers.
-/// Latest OpenAI and Anthropic model rates checked October 7, 2026:
+/// Latest OpenAI and Anthropic model rates checked October 20, 2026:
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
 nonisolated enum ModelPrices {
@@ -105,8 +105,10 @@ nonisolated enum ModelPrices {
         "claude-sonnet-4-5": .anthropic(input: 3, output: 15),
         "claude-sonnet-4-6": .anthropic(input: 3, output: 15),
         "claude-sonnet-5": .anthropic(input: 2, output: 10),
-        "claude-sonnet-5-5": .anthropic(input: 2, output: 10),
+        "claude-sonnet-5-5": .anthropic(input: 2, output: 10, cacheRead: 0.1),
         "claude-haiku-4-5": .anthropic(input: 1, output: 5),
+        // Prompts over 100k tokens pay five times this.
+        "claude-haiku-5-5": .anthropic(input: 0.1, output: 0.5),
         "claude-3-5-haiku": .anthropic(input: 0.8, output: 4),
         "claude-3-5-sonnet": .anthropic(input: 3, output: 15),
         "claude-3-7-sonnet": .anthropic(input: 3, output: 15),
@@ -157,9 +159,11 @@ nonisolated enum ModelPrices {
         "gpt-6-luna": .openAI(input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125),
         "gpt-6-luna-fast": .openAI(input: 0.2, output: 1, cacheRead: 0.02, cacheWrite: 0.25),
 
-        // Google text rates checked October 7, 2026. Storage time is absent from the logs.
+        // Google text rates checked October 20, 2026. Storage time is absent from the logs.
         // https://ai.google.dev/gemini-api/docs/pricing
-        // Flash 3.6 through 3.8 promotional rates run through December 31, 2026.
+        // Flash 3.6 through 3.8 promotional rates run through December 31, 2026,
+        // Argon's through November 30, 2026. Both double after.
+        "gemini-4-argon": ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2, cacheWrite1h: 2),
         "gemini-3.5-flash": ModelPrice(input: 1.5, output: 9, cacheRead: 0.15, cacheWrite5m: 1.5, cacheWrite1h: 1.5),
         "gemini-3.6-flash": ModelPrice(
             input: 0.75,
@@ -208,7 +212,7 @@ nonisolated enum ModelPrices {
     ]
 
     /// Cursor rates can differ from the vendor's API. Scope these to Cursor history.
-    /// Checked October 7, 2026: https://cursor.com/docs/models-and-pricing.md
+    /// Checked October 20, 2026: https://cursor.com/docs/models-and-pricing
     /// A dash in the cache-write column means ordinary input, with no separate write fee.
     private static let cursorTable: [String: ModelPrice] = [
         "grok-4.5": .cursor(input: 2, output: 6, cacheRead: 0.5, cacheWrite: 2),
@@ -224,13 +228,12 @@ nonisolated enum ModelPrices {
         "gemini-3-pro": .cursor(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2),
         "gemini-3.1-pro": .cursor(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2),
         "gemini-3.6-flash": .cursor(input: 1.5, output: 7.5, cacheRead: 0.15, cacheWrite: 1.5),
-        "gemini-3.7-flash": .cursor(input: 0.75, output: 3.5, cacheRead: 0.075, cacheWrite: 0.75),
-        "gemini-3.8-flash": .cursor(input: 0.75, output: 3.5, cacheRead: 0.075, cacheWrite: 0.75),
         "glm-5.2": .cursor(input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 1.4),
         "glm-5.3": .cursor(input: 1.4, output: 4.4, cacheRead: 0.26, cacheWrite: 1.4),
         "glm-5.3-flash": .cursor(input: 0.15, output: 0.5, cacheRead: 0.029, cacheWrite: 0.15),
         "kimi-k2.7-code": .cursor(input: 0.95, output: 4, cacheRead: 0.19, cacheWrite: 0.95),
         "kimi-k3": .cursor(input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3),
         "muse-spark-1.3": .cursor(input: 1.25, output: 4.25, cacheRead: 0.15, cacheWrite: 1.25),
+        "muse-wonder": .cursor(input: 4, output: 20, cacheRead: 0.2, cacheWrite: 4),
     ]
 }

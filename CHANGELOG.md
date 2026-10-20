@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add Claude Haiku 5.5 and Gemini 4 Argon pricing, plus Muse Wonder in Cursor.
+  Price Sonnet 5.5 cache reads at their new discounted rate.
+
 ## 0.4.6
 
 - Add GPT-6.1 Sol, Claude Sonnet 5.5 and recent Gemini pricing, plus missing
