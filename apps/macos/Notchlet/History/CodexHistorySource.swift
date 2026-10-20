@@ -35,9 +35,15 @@ nonisolated struct CodexHistorySource: UsageHistorySource {
 /// with fresh timestamps. Those events only seed the running total and
 /// are dropped until the thread's first `task_started` at or after its own
 /// creation. OpenUsage documents a 20x inflation from counting the replay.
+///
+/// Fast and Ultrafast bill at a multiple of the model's rate, but only
+/// `thread_settings_applied` records the tier, so it is carried in the
+/// state and appended to the model as `-fast` or `-ultrafast`.
 nonisolated enum CodexLogParser: LogLineParser {
     struct State: Sendable {
         var model: String?
+        /// `-fast`, `-ultrafast` or empty, from the latest settings snapshot.
+        var tierSuffix = ""
         var previousTotal: Totals?
         /// False while a child thread is still replaying its parent.
         var isLive = true
@@ -72,6 +78,7 @@ nonisolated enum CodexLogParser: LogLineParser {
         Data(#""type":"turn_context""#.utf8),
         Data(#""type":"session_meta""#.utf8),
         Data(#""type":"task_started""#.utf8),
+        Data(#""type":"thread_settings_applied""#.utf8),
     ]
 
     static func parse(_ line: Data, state: inout State) -> UsageEvent? {
@@ -91,6 +98,8 @@ nonisolated enum CodexLogParser: LogLineParser {
             {
                 state.isLive = true
             }
+        case "event_msg" where record.payload?.type == "thread_settings_applied":
+            state.tierSuffix = tierSuffix(record.payload?.threadSettings?.serviceTier)
         case "event_msg" where record.payload?.type == "token_count":
             return tokenCount(record, state: &state)
         default:
@@ -107,7 +116,17 @@ nonisolated enum CodexLogParser: LogLineParser {
         let cached = min(delta.cachedInputTokens, delta.inputTokens)
         let tokens = TokenCount(input: delta.inputTokens - cached, cacheRead: cached, output: delta.outputTokens)
         guard tokens.total > 0, let timestamp = UsageDate.parse(record.timestamp) else { return nil }
-        return UsageEvent(model: state.model, timestamp: timestamp, tokens: tokens)
+        return UsageEvent(model: state.model.map { $0 + state.tierSuffix }, timestamp: timestamp, tokens: tokens)
+    }
+
+    /// Codex writes Fast as `priority` (older builds `fast`). Flex and
+    /// `default` stay at the standard rate.
+    static func tierSuffix(_ serviceTier: String?) -> String {
+        switch serviceTier {
+        case "priority", "fast": "-fast"
+        case "ultrafast": "-ultrafast"
+        default: ""
+        }
     }
 
     /// Large (it carries the system prompt) and shaped differently per
@@ -142,16 +161,26 @@ nonisolated enum CodexLogParser: LogLineParser {
                 }
             }
 
+            struct ThreadSettings: Decodable {
+                var serviceTier: String?
+
+                enum CodingKeys: String, CodingKey {
+                    case serviceTier = "service_tier"
+                }
+            }
+
             var type: String?
             var model: String?
             var modelName: String?
             var info: Info?
             var startedAt: TimeInterval?
+            var threadSettings: ThreadSettings?
 
             enum CodingKeys: String, CodingKey {
                 case type, model, info
                 case modelName = "model_name"
                 case startedAt = "started_at"
+                case threadSettings = "thread_settings"
             }
         }
 

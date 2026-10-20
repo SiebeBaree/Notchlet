@@ -19,6 +19,10 @@ struct CodexHistorySourceTests {
     private static let secondCall = """
     {"timestamp":"2026-08-06T05:32:26.043Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":55230,"cached_input_tokens":30208,"cache_write_input_tokens":0,"output_tokens":1689,"reasoning_output_tokens":567,"total_tokens":56919},"last_token_usage":{"input_tokens":34553,"cached_input_tokens":20224,"cache_write_input_tokens":0,"output_tokens":715,"reasoning_output_tokens":172,"total_tokens":35268},"model_context_window":258400},"rate_limits":null}}
     """
+    /// Shape from Codex's `ThreadSettingsAppliedEvent`, other settings removed.
+    private static let settingsApplied = """
+    {"timestamp":"2026-08-06T05:31:52.000Z","type":"event_msg","payload":{"type":"thread_settings_applied","thread_id":"019fd58e-71a4-76d0-96e5-b0331fdcec26","thread_settings":{"model":"gpt-5.6-luna","model_provider_id":"openai","service_tier":"priority","cwd":"/Users/me/project"}}}
+    """
     private static let reasoning = """
     {"timestamp":"2026-08-06T05:32:00.000Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"token_count is a word here"}]}}
     """
@@ -44,6 +48,15 @@ struct CodexHistorySourceTests {
         #expect(events[1].tokens == TokenCount(input: 34553 - 20224, cacheRead: 20224, output: 715))
         #expect(events[1].timestamp == ISO8601DateFormatter().date(from: "2026-08-06T05:32:26Z"))
         #expect(events.allSatisfy { $0.id == nil })
+    }
+
+    @Test(arguments: [("priority", "gpt-5.6-luna-fast"), ("ultrafast", "gpt-5.6-luna-ultrafast"),
+                      ("flex", "gpt-5.6-luna"), ("default", "gpt-5.6-luna")])
+    func theServiceTierNamesTheModel(tier: String, model: String) {
+        let tiered = Self.settingsApplied.replacingOccurrences(of: "priority", with: tier)
+        let untiered = Self.settingsApplied.replacingOccurrences(of: #""service_tier":"priority","#, with: "")
+        let events = events([tiered, Self.turnContext, Self.firstCall, untiered, Self.secondCall])
+        #expect(events.map(\.model) == [model, "gpt-5.6-luna"])
     }
 
     @Test func aRepeatedTotalIsNotASecondCall() {
