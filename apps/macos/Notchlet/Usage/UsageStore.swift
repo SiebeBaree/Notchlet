@@ -164,8 +164,14 @@ final class UsageStore {
                 && entry.schedule.allowsManualRefresh(now: now)
         }
         guard !due.isEmpty else { return }
+        // Taken now, not when the task starts, so a second click in between
+        // cannot pick the same providers.
+        fetchingIDs.formUnion(due.map { entries[$0].id })
         Task { [weak self] in
-            await self?.fetch(due, now: now)
+            guard let self else { return }
+            await fetch(due, now: now)
+            // The fetch moved these providers' next due dates.
+            reschedule()
         }
     }
 

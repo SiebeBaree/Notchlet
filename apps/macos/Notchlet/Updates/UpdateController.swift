@@ -10,6 +10,8 @@ import Sparkle
 final class UpdateController: NSObject {
     /// How long the Mac sits untouched before a downloaded update installs.
     static let idleRequirement: TimeInterval = 120
+    /// The wait before looking again at an install the notch blocked.
+    static let blockedRetry: TimeInterval = 60
 
     /// Nil once the update got attention.
     private(set) var availableUpdateVersion: String?
@@ -17,6 +19,7 @@ final class UpdateController: NSObject {
     @ObservationIgnored private var updaterController: SPUStandardUpdaterController!
     /// Sparkle's handle to install the downloaded update and relaunch.
     @ObservationIgnored private var installDownloaded: (() -> Void)?
+    @ObservationIgnored private var lastInstallCheck = Date.distantPast
     /// Wakes the usage loop, which may be sleeping for minutes, so it starts
     /// watching for the idle moment.
     @ObservationIgnored var installBecameReady: (() -> Void)?
@@ -49,17 +52,22 @@ final class UpdateController: NSObject {
     }
 
     /// When the usage loop should look again at a downloaded update: once
-    /// the Mac could have been idle long enough.
+    /// the Mac could have been idle long enough, and never sooner than a
+    /// minute after the last look, or an idle Mac with the notch open would
+    /// keep the loop turning.
     var nextInstallAt: Date? {
         guard installDownloaded != nil else { return nil }
-        return .now.addingTimeInterval(max(0, Self.idleRequirement - UserPresence.idleSeconds))
+        let idle = Date.now.addingTimeInterval(max(0, Self.idleRequirement - UserPresence.idleSeconds))
+        return max(idle, lastInstallCheck.addingTimeInterval(Self.blockedRetry))
     }
 
     /// Relaunches into the downloaded update unless someone could notice:
     /// the Mac in use, the notch open, or a line around it that a relaunch
     /// would drop.
     func installIfIdle(notchInUse: Bool) {
-        guard let installDownloaded, !notchInUse, UserPresence.idleSeconds >= Self.idleRequirement else { return }
+        guard let installDownloaded else { return }
+        lastInstallCheck = .now
+        guard !notchInUse, UserPresence.idleSeconds >= Self.idleRequirement else { return }
         installDownloaded()
     }
 

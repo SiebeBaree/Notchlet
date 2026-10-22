@@ -55,6 +55,22 @@ struct UsageStoreTests {
         }
     }
 
+    @Test func twoQuickRefreshClicksFetchOnce() async {
+        let gate = Gate()
+        let store = UsageStore(providers: [SlowProvider(gate: gate)], defaults: defaults)
+        store.refreshShownNow()
+        store.refreshShownNow()
+        await gate.waitUntilStarted()
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await gate.calls == 1)
+
+        await gate.finish()
+        while !store.fetchingIDs.isEmpty {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        store.suspend()
+    }
+
     @Test func hoverReschedulingJoinsTheCurrentFetchAndMaintenanceRunsOnce() async {
         let gate = Gate()
         let store = UsageStore(providers: [SlowProvider(gate: gate)], defaults: defaults)
