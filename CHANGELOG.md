@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Install updates without asking. Notchlet downloads a new version in the
+  background and relaunches into it once the Mac has sat idle for two minutes
+  with the notch closed. It used to wait for a quit that never came.
+- Replace the "Updated 5m ago" line under the gauges with a refresh button
+  beside the other icons. It spins while usage loads, fetches again when
+  clicked and turns amber when a provider shows numbers it could not refresh.
+  Its tooltip says how old the numbers are.
+
 ## 0.4.7
 
 - Add Claude Haiku 5.5 and Gemini 4 Argon pricing, plus Muse Wonder in Cursor.
