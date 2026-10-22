@@ -96,13 +96,15 @@ struct UsagePane: View {
 }
 
 /// Fetches every shown provider, and turns into a spinner while any of
-/// them fetches, whoever started it. The age sits in the tooltip so it
-/// never grows the notch; amber means a provider shows numbers it could
-/// not refresh, so stale numbers never pass as live.
+/// them fetches, whoever started it. Amber means a provider shows numbers
+/// it could not refresh, so stale numbers never pass as live. `showsAge`
+/// adds how old the oldest numbers are, for the ear beside the cutout.
 struct UsageRefreshButton: View {
     let store: UsageStore
+    var showsAge = false
 
     @State private var isSpinning = false
+    @State private var isHovering = false
 
     private var shown: [UsageStore.Entry] {
         UsagePane.shownEntries(in: store)
@@ -115,27 +117,32 @@ struct UsageRefreshButton: View {
     var body: some View {
         let withNumbers = shown.filter { $0.snapshot != nil }
         let isStale = withNumbers.contains { $0.state != .ok }
-        Group {
-            if isSpinning {
-                ProgressView()
-                    .controlSize(.mini)
-                    .colorScheme(.dark)
-                    .frame(width: 18, height: 18)
-            } else {
-                NotchIconButton(systemName: "arrow.clockwise", tint: isStale ? NotchPalette.amber : .white) {
-                    isSpinning = true
-                    store.refreshShownNow()
-                    // A click with nothing due still shows it was heard.
-                    Task {
-                        try? await Task.sleep(for: .milliseconds(500))
-                        if !isFetching {
-                            isSpinning = false
-                        }
+        // `NotchIconButton`'s opacities, so it reads as one of the icons.
+        let tint = isStale ? NotchPalette.amber : .white
+        Button(action: refresh) {
+            HStack(spacing: 4) {
+                Group {
+                    if isSpinning {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .colorScheme(.dark)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(tint.opacity(isHovering ? 0.85 : isStale ? 0.7 : 0.35))
                     }
                 }
+                .frame(width: 18, height: 18)
+                if showsAge, let oldest = withNumbers.compactMap(\.snapshot?.fetchedAt).min() {
+                    FetchAge(fetchedAt: oldest)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.white.opacity(isHovering ? 0.85 : 0.4))
+                }
             }
+            .contentShape(.rect)
         }
-        .help(UsageCopy.freshnessText(fetchedAt: withNumbers.compactMap(\.snapshot?.fetchedAt).min()) ?? "Refresh")
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
         // Held a moment past the fetch, so a quick one reads as a spin
         // rather than a flicker.
         .task(id: isFetching) {
@@ -147,6 +154,30 @@ struct UsageRefreshButton: View {
             if !Task.isCancelled {
                 isSpinning = false
             }
+        }
+    }
+
+    private func refresh() {
+        isSpinning = true
+        store.refreshShownNow()
+        // A click with nothing due still shows it was heard.
+        Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            if !isFetching {
+                isSpinning = false
+            }
+        }
+    }
+}
+
+/// "4m ago", kept current while the notch is open; the view only exists
+/// then, so the timeline costs nothing while closed.
+struct FetchAge: View {
+    let fetchedAt: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            Text(UsageCopy.fetchAgeText(fetchedAt: fetchedAt, now: context.date))
         }
     }
 }

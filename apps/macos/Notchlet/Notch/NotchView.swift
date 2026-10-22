@@ -256,29 +256,47 @@ struct NotchView: View {
         .overlay(alignment: .topTrailing) { cornerIcons }
     }
 
-    /// A lone provider's name sits beside the cutout, in the strip that
-    /// would otherwise be empty. A name too long for the strip wraps to a
-    /// second line, then shrinks.
+    /// The strip left of the cutout says how old the numbers are. A lone
+    /// provider's name sits there with its age under it, since the pane
+    /// leaves the name out; several providers get the refresh button and
+    /// the oldest age, which the full icon row on the right has no room for.
     @ViewBuilder
     private var cornerHeader: some View {
-        if pane == .usage, let entry = UsagePane.soloEntry(in: store) {
-            BrandRow(provider: entry.provider)
-                .lineLimit(2)
-                .minimumScaleFactor(0.6)
-                .frame(
-                    maxWidth: (expandedWidth - notchSize.width) / 2 + NotchGeometry.notchTopCornerRadius - 26,
-                    alignment: .leading
-                )
-                .frame(height: notchSize.height)
-                .padding(.leading, 20)
-                .contentShape(.rect)
-                .onTapGesture { showHistory(for: entry.id) }
+        if pane == .usage {
+            let shown = UsagePane.shownEntries(in: store)
+            Group {
+                if shown.count == 1, let entry = shown.first {
+                    VStack(alignment: .leading, spacing: 0) {
+                        BrandRow(provider: entry.provider)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        if let fetchedAt = entry.snapshot?.fetchedAt {
+                            FetchAge(fetchedAt: fetchedAt)
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.4))
+                                // Under the name, past the logo and its gap.
+                                .padding(.leading, 20)
+                        }
+                    }
+                    .contentShape(.rect)
+                    .onTapGesture { showHistory(for: entry.id) }
+                } else if shown.count > 1 {
+                    UsageRefreshButton(store: store, showsAge: true)
+                }
+            }
+            .frame(
+                maxWidth: (expandedWidth - notchSize.width) / 2 + NotchGeometry.notchTopCornerRadius - 26,
+                alignment: .leading
+            )
+            .frame(height: notchSize.height)
+            .padding(.leading, 20)
         }
     }
 
     /// The key's slot holds a spinner while a scan runs and the key only
     /// while a leaked secret waits; the update icon only exists while an
-    /// update does, and the refresh button only beside the numbers.
+    /// update does, and the refresh button only beside a lone provider's
+    /// numbers; with several it moves to the left strip.
     private var cornerIcons: some View {
         HStack(spacing: 6) {
             if scanner.isScanning {
@@ -304,7 +322,7 @@ struct NotchView: View {
                 }
                 .help("Update to \(version)")
             }
-            if pane == .usage, !UsagePane.shownEntries(in: store).isEmpty {
+            if pane == .usage, UsagePane.soloEntry(in: store) != nil {
                 UsageRefreshButton(store: store)
             }
             NotchIconButton(systemName: "square.and.arrow.up") {
