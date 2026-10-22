@@ -63,6 +63,19 @@ struct RefreshScheduleTests {
         #expect(schedule.nextDue(interval: 600) > start.addingTimeInterval(299))
     }
 
+    @Test func theRefreshButtonSkipsBackoffButNotTheSpacingOrARateLimit() {
+        var schedule = RefreshSchedule()
+        #expect(schedule.allowsManualRefresh(now: start))
+
+        schedule.recordAttempt(now: start)
+        schedule.recordError(now: start)
+        #expect(!schedule.allowsManualRefresh(now: start.addingTimeInterval(10)))
+        #expect(schedule.allowsManualRefresh(now: start.addingTimeInterval(30)))
+
+        schedule.recordRateLimit(retryAfter: nil, now: start)
+        #expect(!schedule.allowsManualRefresh(now: start.addingTimeInterval(60)))
+    }
+
     @Test func rateLimitBackoffEscalatesThenCaps() {
         var schedule = RefreshSchedule()
         schedule.recordAttempt(now: start)

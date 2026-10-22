@@ -41,12 +41,11 @@ enum UsageCopy {
         percent >= 100 ? "\(windowLabel) limit used up" : "\(windowLabel) limit past \(percent)%"
     }
 
-    /// "Updated 5m ago"; nil under 2 minutes.
+    /// "Updated 5m ago", or "Updated just now" under a minute.
     static func freshnessText(fetchedAt: Date?, now: Date = .now) -> String? {
         guard let fetchedAt else { return nil }
         let age = now.timeIntervalSince(fetchedAt)
-        guard age > 120 else { return nil }
-        return "Updated \(shortDuration(age)) ago"
+        return age < 60 ? "Updated just now" : "Updated \(shortDuration(age)) ago"
     }
 
     /// "Codex rate limited, retrying in 4m".

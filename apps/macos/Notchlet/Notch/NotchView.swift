@@ -278,7 +278,7 @@ struct NotchView: View {
 
     /// The key's slot holds a spinner while a scan runs and the key only
     /// while a leaked secret waits; the update icon only exists while an
-    /// update does.
+    /// update does, and the refresh button only beside the numbers.
     private var cornerIcons: some View {
         HStack(spacing: 6) {
             if scanner.isScanning {
@@ -298,10 +298,14 @@ struct NotchView: View {
                     toggle(.secrets)
                 }
             }
-            if updater.availableUpdateVersion != nil {
-                NotchIconButton(systemName: "arrow.down.circle.fill") {
+            if let version = updater.availableUpdateVersion {
+                NotchIconButton(systemName: "arrow.down.circle.fill", tint: NotchPalette.blue) {
                     updater.installAvailableUpdate()
                 }
+                .help("Update to \(version)")
+            }
+            if pane == .usage, !UsagePane.shownEntries(in: store).isEmpty {
+                UsageRefreshButton(store: store)
             }
             NotchIconButton(systemName: "square.and.arrow.up") {
                 share(pane == .history ? resolvedScope : .all)
