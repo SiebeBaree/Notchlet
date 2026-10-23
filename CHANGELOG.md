@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.0
+
 - Install updates without asking. Notchlet downloads a new version in the
   background and relaunches into it once the Mac has sat idle for two minutes
   with the notch closed. It used to wait for a quit that never came.
@@ -10,9 +12,6 @@
   provider the age sits under its name. The button spins while usage loads,
   fetches again when clicked and turns amber when a provider shows numbers it
   could not refresh.
-
-## 0.4.7
-
 - Add Claude Haiku 5.5 and Gemini 4 Argon pricing, plus Muse Wonder in Cursor.
   Price Sonnet 5.5 cache reads at their new discounted rate.
 - Price Codex usage on Fast and Ultrafast at those rates instead of the
