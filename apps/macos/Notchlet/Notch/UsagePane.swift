@@ -78,25 +78,106 @@ struct UsagePane: View {
         }
     }
 
-    /// Nothing while the data is fresh, so stale numbers never pass as live.
-    /// A provider without numbers says so in its own column.
+    /// Only a rate limit earns a line under numbers it has frozen; the
+    /// refresh button carries everything else. A provider without numbers
+    /// says so in its own column.
     @ViewBuilder
     private var footer: some View {
-        let shown = Self.shownEntries(in: store).filter { $0.snapshot != nil }
-        let limited = shown
-            .filter { $0.state == .rateLimited }
+        let limited = Self.shownEntries(in: store)
+            .filter { $0.snapshot != nil && $0.state == .rateLimited }
             .compactMap { entry in entry.schedule.retryAt.map { (name: entry.provider.name, retryAt: $0) } }
             .min { $0.retryAt < $1.retryAt }
         if let limited {
             Text(UsageCopy.rateLimitText(providerName: limited.name, retryAt: limited.retryAt))
                 .font(.system(size: 10))
                 .foregroundStyle(NotchPalette.amber)
-        } else if let oldest = shown.compactMap(\.snapshot?.fetchedAt).min(),
-                  let text = UsageCopy.freshnessText(fetchedAt: oldest)
-        {
-            Text(text)
-                .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.4))
+        }
+    }
+}
+
+/// Fetches every shown provider, and turns into a spinner while any of
+/// them fetches, whoever started it. Amber means a provider shows numbers
+/// it could not refresh, so stale numbers never pass as live. `showsAge`
+/// adds how old the oldest numbers are, for the ear beside the cutout.
+struct UsageRefreshButton: View {
+    let store: UsageStore
+    var showsAge = false
+
+    @State private var isSpinning = false
+    @State private var isHovering = false
+
+    private var shown: [UsageStore.Entry] {
+        UsagePane.shownEntries(in: store)
+    }
+
+    private var isFetching: Bool {
+        shown.contains { store.fetchingIDs.contains($0.id) }
+    }
+
+    var body: some View {
+        let withNumbers = shown.filter { $0.snapshot != nil }
+        let isStale = withNumbers.contains { $0.state != .ok }
+        // `NotchIconButton`'s opacities, so it reads as one of the icons.
+        let tint = isStale ? NotchPalette.amber : .white
+        Button(action: refresh) {
+            HStack(spacing: 4) {
+                Group {
+                    if isSpinning {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .colorScheme(.dark)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(tint.opacity(isHovering ? 0.85 : isStale ? 0.7 : 0.35))
+                    }
+                }
+                .frame(width: 18, height: 18)
+                if showsAge, let oldest = withNumbers.compactMap(\.snapshot?.fetchedAt).min() {
+                    FetchAge(fetchedAt: oldest)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.white.opacity(isHovering ? 0.85 : 0.4))
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        // Held a moment past the fetch, so a quick one reads as a spin
+        // rather than a flicker.
+        .task(id: isFetching) {
+            if isFetching {
+                isSpinning = true
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled {
+                isSpinning = false
+            }
+        }
+    }
+
+    private func refresh() {
+        isSpinning = true
+        store.refreshShownNow()
+        // A click with nothing due still shows it was heard.
+        Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            if !isFetching {
+                isSpinning = false
+            }
+        }
+    }
+}
+
+/// "4m ago", kept current while the notch is open; the view only exists
+/// then, so the timeline costs nothing while closed.
+struct FetchAge: View {
+    let fetchedAt: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            Text(UsageCopy.fetchAgeText(fetchedAt: fetchedAt, now: context.date))
         }
     }
 }

@@ -69,10 +69,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ])
         let history = UsageHistory(store: store)
         let scanner = SecretScanner(store: store)
+        let updater = UpdateController()
+        let waits = AgentWaits { store.entries.filter(\.provider.isInstalled).map(\.id) }
+        updater.installBecameReady = { [weak store] in store?.reschedule() }
         store.nextBackgroundRefresh = { [weak history, weak scanner] in
-            [history?.nextRefreshAt, scanner?.nextRefreshAt].compactMap(\.self).min()
+            [history?.nextRefreshAt, scanner?.nextRefreshAt, updater.nextInstallAt].compactMap(\.self).min()
         }
-        store.backgroundRefresh = { [weak history, weak scanner] in
+        store.backgroundRefresh = { [weak store, weak history, weak scanner] in
+            updater.installIfIdle(notchInUse: store?.isPanelOpen ?? true || waits.isWaiting)
             await history?.ingestIfDue()
             guard !Task.isCancelled, history?.isIngesting != true else { return }
             await scanner?.scanIfDue()
@@ -82,8 +86,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.snapshotObserver = { [alerts] providerID, previous, current in
             alerts.snapshotDidChange(providerID: providerID, previous: previous, current: current)
         }
-        let waits = AgentWaits { store.entries.filter(\.provider.isInstalled).map(\.id) }
-        let updater = UpdateController()
         let shareController = ShareEditorWindowController(history: history, store: store)
         let notchController = NotchWindowController(
             store: store, history: history, updater: updater, scanner: scanner, alerts: alerts, waits: waits

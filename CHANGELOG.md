@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Install updates without asking. Notchlet downloads a new version in the
+  background and relaunches into it once the Mac has sat idle for two minutes
+  with the notch closed. It used to wait for a quit that never came.
+- Move "Updated 5m ago" from under the gauges to beside the camera cutout,
+  next to a new refresh button, so the notch no longer grows. With one
+  provider the age sits under its name. The button spins while usage loads,
+  fetches again when clicked and turns amber when a provider shows numbers it
+  could not refresh.
+
 ## 0.4.7
 
 - Add Claude Haiku 5.5 and Gemini 4 Argon pricing, plus Muse Wonder in Cursor.

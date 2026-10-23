@@ -51,7 +51,10 @@ final class UsageStore {
     /// choice always wins. Disabled providers keep their entry but are
     /// neither polled nor shown.
     private var providerEnabled: [String: Bool]
-    private var isPanelOpen = false
+    /// Whether the user has the notch open, not a notification holding it.
+    private(set) var isPanelOpen = false
+    /// Providers with a request in flight, for the refresh button.
+    private(set) var fetchingIDs: Set<String> = []
     private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var cycle: Task<Void, Never>?
     @ObservationIgnored private var maintenance: Task<Void, Never>?
@@ -151,6 +154,27 @@ final class UsageStore {
         }
     }
 
+    /// The refresh button: every shown provider whose schedule allows it,
+    /// outside the loop so it never waits on the next wakeup.
+    func refreshShownNow() {
+        let now = Date.now
+        let due = entries.indices.filter { index in
+            let entry = entries[index]
+            return isEnabled(entry.id) && !fetchingIDs.contains(entry.id)
+                && entry.schedule.allowsManualRefresh(now: now)
+        }
+        guard !due.isEmpty else { return }
+        // Taken now, not when the task starts, so a second click in between
+        // cannot pick the same providers.
+        fetchingIDs.formUnion(due.map { entries[$0].id })
+        Task { [weak self] in
+            guard let self else { return }
+            await fetch(due, now: now)
+            // The fetch moved these providers' next due dates.
+            reschedule()
+        }
+    }
+
     /// Opening shrinks the interval to `openInterval`, which makes anything
     /// older than that due now. Backoff still holds.
     func setPanelOpen(_ open: Bool) {
@@ -246,7 +270,10 @@ final class UsageStore {
 
     private func refreshDueProviders() async {
         let now = Date.now
-        let due = entries.indices.filter { isEnabled(entries[$0].id) && nextDue(entries[$0]) <= now }
+        let due = entries.indices.filter { index in
+            let entry = entries[index]
+            return isEnabled(entry.id) && !fetchingIDs.contains(entry.id) && nextDue(entry) <= now
+        }
         guard !due.isEmpty else { return }
         await fetch(due, now: now)
     }
@@ -254,6 +281,7 @@ final class UsageStore {
     private func fetch(_ indices: [Int], now: Date) async {
         for index in indices {
             entries[index].schedule.recordAttempt(now: now)
+            fetchingIDs.insert(entries[index].id)
         }
         await withTaskGroup(of: (Int, FetchOutcome).self) { group in
             for index in indices {
@@ -293,6 +321,7 @@ final class UsageStore {
     }
 
     private func apply(_ outcome: FetchOutcome, at index: Int) {
+        fetchingIDs.remove(entries[index].id)
         switch outcome {
         case let .success(snapshot):
             let previous = entries[index].snapshot

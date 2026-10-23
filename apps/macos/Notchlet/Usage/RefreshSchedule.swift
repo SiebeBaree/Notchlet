@@ -56,6 +56,15 @@ struct RefreshSchedule: Codable {
         retryAt = now.addingTimeInterval(min(Self.errorRetryDelay * pow(2, Double(errorStreak - 1)), 1800))
     }
 
+    /// The refresh button gets past the poll interval, a provider's floor
+    /// and error backoff, but not a rate limit or the 30s spacing, so
+    /// clicking it again and again never hammers an endpoint.
+    func allowsManualRefresh(now: Date = .now) -> Bool {
+        guard !isRateLimited else { return false }
+        guard let lastAttemptAt else { return true }
+        return now.timeIntervalSince(lastAttemptAt) >= Self.minSpacing
+    }
+
     /// The user asked for fresh numbers. A running rate limit stays,
     /// since retrying into it only extends it.
     mutating func retryNow() {
