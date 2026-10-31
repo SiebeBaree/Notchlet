@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.0
+
 - Add GPT-6.1 Terra pricing, including Fast, plus DeepSeek V4.1 Flash 1017
   in Cursor.
 
