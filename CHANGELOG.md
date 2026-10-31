@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add GPT-6.1 Terra pricing, including Fast, plus DeepSeek V4.1 Flash 1017
+  in Cursor.
+
 ## 0.5.0
 
 - Install updates without asking. Notchlet downloads a new version in the
