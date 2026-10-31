@@ -170,9 +170,9 @@ final class SecretScanner {
                     let reader = SecretScanReader(urls: urls, checkpoints: state.checkpoints[provider.id] ?? [:])
                     while let batch = try await reader.next() {
                         try Task.checkCancellation()
-                        guard generation == self.generation, store.isEnabled(provider.id) else { return }
-                        guard SecretScanSchedule
-                            .action(lastScanAt: lastScanAt, now: .now, conditions: conditions) != .wait
+                        guard generation == self.generation, store.isEnabled(provider.id),
+                              SecretScanSchedule
+                                  .action(lastScanAt: lastScanAt, now: .now, conditions: conditions) != .wait
                         else { return }
                         let matches = try await batch.locate(runScan(.text(batch.data)))
                         try Task.checkCancellation()
