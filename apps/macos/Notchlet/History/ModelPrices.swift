@@ -54,7 +54,7 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// unpriced model is named in the pane instead. Kept by hand because the
 /// public catalogs lag new models by weeks. Standard short-context rates;
 /// daily token totals cannot determine per-request context or service tiers.
-/// Latest OpenAI and Anthropic model rates checked October 20, 2026:
+/// Latest OpenAI and Anthropic model rates checked October 31, 2026:
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
 nonisolated enum ModelPrices {
@@ -167,6 +167,8 @@ nonisolated enum ModelPrices {
         "gpt-6.1-sol": .openAI(input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5),
         "gpt-6.1-sol-fast": .openAI(input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5),
         "gpt-6.1-sol-ultrafast": .openAI(input: 12, output: 60, cacheRead: 0.6, cacheWrite: 15),
+        "gpt-6.1-terra": .openAI(input: 1, output: 5, cacheRead: 0.05, cacheWrite: 1.25),
+        "gpt-6.1-terra-fast": .openAI(input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5),
         "gpt-6-luna": .openAI(input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125),
         "gpt-6-luna-fast": .openAI(input: 0.2, output: 1, cacheRead: 0.02, cacheWrite: 0.25),
 
@@ -223,7 +225,7 @@ nonisolated enum ModelPrices {
     ]
 
     /// Cursor rates can differ from the vendor's API. Scope these to Cursor history.
-    /// Checked October 20, 2026: https://cursor.com/docs/models-and-pricing
+    /// Checked October 31, 2026: https://cursor.com/docs/models-and-pricing
     /// A dash in the cache-write column means ordinary input, with no separate write fee.
     private static let cursorTable: [String: ModelPrice] = [
         "grok-4.5": .cursor(input: 2, output: 6, cacheRead: 0.5, cacheWrite: 2),
@@ -234,6 +236,7 @@ nonisolated enum ModelPrices {
         "grok-4.7-fast": .cursor(input: 4, output: 12, cacheRead: 1, cacheWrite: 4),
         "grok-4.7-500k": .cursor(input: 4, output: 12, cacheRead: 1, cacheWrite: 4),
         "grok-4.7-500k-fast": .cursor(input: 6, output: 18, cacheRead: 1.5, cacheWrite: 6),
+        "deepseek-v4.1-flash-1017": .cursor(input: 0.3, output: 1.2, cacheRead: 0.006, cacheWrite: 0.3),
         "gemini-2.5-flash": .cursor(input: 0.3, output: 2.5, cacheRead: 0.03, cacheWrite: 0.3),
         "gemini-3-flash": .cursor(input: 0.5, output: 3, cacheRead: 0.05, cacheWrite: 0.5),
         "gemini-3-pro": .cursor(input: 2, output: 12, cacheRead: 0.2, cacheWrite: 2),
