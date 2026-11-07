@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add GPT-6 Cyber pricing, plus GPT-5.6 Cyber and GPT-5.5 Cyber.
+
 ## 0.6.0
 
 - Add GPT-6.1 Terra pricing, including Fast, plus DeepSeek V4.1 Flash 1017

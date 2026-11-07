@@ -54,7 +54,7 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// unpriced model is named in the pane instead. Kept by hand because the
 /// public catalogs lag new models by weeks. Standard short-context rates;
 /// daily token totals cannot determine per-request context or service tiers.
-/// Latest OpenAI and Anthropic model rates checked October 31, 2026:
+/// Latest OpenAI and Anthropic model rates checked November 7, 2026:
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
 nonisolated enum ModelPrices {
@@ -171,6 +171,10 @@ nonisolated enum ModelPrices {
         "gpt-6.1-terra-fast": .openAI(input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5),
         "gpt-6-luna": .openAI(input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125),
         "gpt-6-luna-fast": .openAI(input: 0.2, output: 1, cacheRead: 0.02, cacheWrite: 0.25),
+        // Daybreak's cyber models, which Codex runs once the toggle is on. No Fast tier.
+        "gpt-5.5-cyber": .openAI(input: 12.5, output: 75, cacheRead: 1.25),
+        "gpt-5.6-cyber": .openAI(input: 12.5, output: 75, cacheRead: 1.25, cacheWrite: 15.625),
+        "gpt-6-cyber": .openAI(input: 20, output: 100, cacheRead: 2, cacheWrite: 25),
 
         // Google text rates checked October 20, 2026. Storage time is absent from the logs.
         // https://ai.google.dev/gemini-api/docs/pricing
