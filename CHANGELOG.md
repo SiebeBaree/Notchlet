@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add GPT-6 Cyber pricing, plus GPT-5.6 Cyber and GPT-5.5 Cyber.
+- Price Codex cache writes at the cache-write rate instead of as input.
 
 ## 0.6.0
 
