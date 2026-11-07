@@ -28,8 +28,10 @@ nonisolated struct CodexHistorySource: UsageHistorySource {
 
 /// `token_count` carries the call's delta and the running total; the total
 /// is the fallback for older rollouts and how a re-emitted snapshot (same
-/// total twice) is told from a real call. Cached tokens are subtracted out
-/// of Codex's input count.
+/// total twice) is told from a real call. Cache reads and writes are both
+/// part of Codex's input count, so they are subtracted out of it. Codex does
+/// not say which cache duration a write went to; OpenAI's 30-minute rate sits
+/// in `cacheWrite5m`.
 ///
 /// A subagent or forked thread starts by replaying its parent's history
 /// with fresh timestamps. Those events only seed the running total and
@@ -54,11 +56,14 @@ nonisolated enum CodexLogParser: LogLineParser {
     struct Totals: Decodable, Equatable, Sendable {
         var inputTokens = 0
         var cachedInputTokens = 0
+        /// Absent from older rollouts.
+        var cacheWriteInputTokens: Int?
         var outputTokens = 0
 
         enum CodingKeys: String, CodingKey {
             case inputTokens = "input_tokens"
             case cachedInputTokens = "cached_input_tokens"
+            case cacheWriteInputTokens = "cache_write_input_tokens"
             case outputTokens = "output_tokens"
         }
 
@@ -66,6 +71,7 @@ nonisolated enum CodexLogParser: LogLineParser {
             Totals(
                 inputTokens: max(lhs.inputTokens - rhs.inputTokens, 0),
                 cachedInputTokens: max(lhs.cachedInputTokens - rhs.cachedInputTokens, 0),
+                cacheWriteInputTokens: max((lhs.cacheWriteInputTokens ?? 0) - (rhs.cacheWriteInputTokens ?? 0), 0),
                 outputTokens: max(lhs.outputTokens - rhs.outputTokens, 0)
             )
         }
@@ -114,7 +120,13 @@ nonisolated enum CodexLogParser: LogLineParser {
         guard state.isLive, total != state.previousTotal else { return nil }
         let delta = info.lastTokenUsage ?? state.previousTotal.map { total - $0 } ?? total
         let cached = min(delta.cachedInputTokens, delta.inputTokens)
-        let tokens = TokenCount(input: delta.inputTokens - cached, cacheRead: cached, output: delta.outputTokens)
+        let written = min(delta.cacheWriteInputTokens ?? 0, delta.inputTokens - cached)
+        let tokens = TokenCount(
+            input: delta.inputTokens - cached - written,
+            cacheRead: cached,
+            cacheWrite5m: written,
+            output: delta.outputTokens
+        )
         guard tokens.total > 0, let timestamp = UsageDate.parse(record.timestamp) else { return nil }
         return UsageEvent(model: state.model.map { $0 + state.tierSuffix }, timestamp: timestamp, tokens: tokens)
     }
