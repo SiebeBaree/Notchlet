@@ -59,6 +59,19 @@ struct CodexHistorySourceTests {
         #expect(events.map(\.model) == [model, "gpt-5.6-luna"])
     }
 
+    @Test func cacheWritesAreSplitOutOfInput() {
+        let written = Self.firstCall.replacingOccurrences(
+            of: #""cache_write_input_tokens":0"#,
+            with: #""cache_write_input_tokens":4000"#
+        )
+        let older = Self.firstCall.replacingOccurrences(of: #""cache_write_input_tokens":0,"#, with: "")
+
+        #expect(events([Self.turnContext, written])[0].tokens
+            == TokenCount(input: 20677 - 9984 - 4000, cacheRead: 9984, cacheWrite5m: 4000, output: 974))
+        #expect(events([Self.turnContext, older])[0].tokens
+            == TokenCount(input: 20677 - 9984, cacheRead: 9984, output: 974))
+    }
+
     @Test func aRepeatedTotalIsNotASecondCall() {
         let events = events([Self.turnContext, Self.firstCall, Self.firstCall, Self.secondCall])
         #expect(events.count == 2)
