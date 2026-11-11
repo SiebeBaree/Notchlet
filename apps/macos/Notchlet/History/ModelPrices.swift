@@ -54,7 +54,7 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// unpriced model is named in the pane instead. Kept by hand because the
 /// public catalogs lag new models by weeks. Standard short-context rates;
 /// daily token totals cannot determine per-request context or service tiers.
-/// Latest OpenAI and Anthropic model rates checked November 7, 2026:
+/// Latest OpenAI and Anthropic model rates checked November 11, 2026:
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
 nonisolated enum ModelPrices {
@@ -114,8 +114,12 @@ nonisolated enum ModelPrices {
         "claude-3-7-sonnet": .anthropic(input: 3, output: 15),
         "claude-fable-5": .anthropic(input: 10, output: 50),
         "claude-fable-5-1": .anthropic(input: 10, output: 50, cacheRead: 0.25),
+        "claude-fable-5-2": .anthropic(input: 8, output: 40, cacheRead: 0.2),
+        "claude-fable-5-2-fast": .anthropic(input: 16, output: 80, cacheRead: 0.4),
         "claude-mythos-5": .anthropic(input: 10, output: 50),
         "claude-mythos-5-1": .anthropic(input: 10, output: 50, cacheRead: 0.25),
+        "claude-mythos-5-2": .anthropic(input: 8, output: 40, cacheRead: 0.2),
+        "claude-mythos-5-2-fast": .anthropic(input: 16, output: 80, cacheRead: 0.4),
 
         // OpenAI. Codex logs the bare model id from its config, plus `-fast`
         // or `-ultrafast` for those tiers.
@@ -176,11 +180,12 @@ nonisolated enum ModelPrices {
         "gpt-5.6-cyber": .openAI(input: 12.5, output: 75, cacheRead: 1.25, cacheWrite: 15.625),
         "gpt-6-cyber": .openAI(input: 20, output: 100, cacheRead: 2, cacheWrite: 25),
 
-        // Google text rates checked October 20, 2026. Storage time is absent from the logs.
+        // Google text rates checked November 11, 2026. Storage time is absent from the logs.
         // https://ai.google.dev/gemini-api/docs/pricing
         // Flash 3.6 through 3.8 promotional rates run through December 31, 2026,
-        // Argon's through November 30, 2026. Both double after.
+        // Argon's and Carbon's through November 30, 2026. All double after.
         "gemini-4-argon": ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2, cacheWrite1h: 2),
+        "gemini-4-carbon": ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2, cacheWrite1h: 2),
         "gemini-3.5-flash": ModelPrice(input: 1.5, output: 9, cacheRead: 0.15, cacheWrite5m: 1.5, cacheWrite1h: 1.5),
         "gemini-3.6-flash": ModelPrice(
             input: 0.75,

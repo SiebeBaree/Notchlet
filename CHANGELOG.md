@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add Claude Fable 5.2 and Claude Mythos 5.2 pricing, including fast mode,
+  plus Gemini 4 Carbon.
+
 ## 0.7.0
 
 - Add GPT-6 Cyber pricing, plus GPT-5.6 Cyber and GPT-5.5 Cyber.
