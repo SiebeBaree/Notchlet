@@ -58,6 +58,7 @@ struct CursorHistorySourceTests {
         }
         #expect(costs == [18, 10, 0.2, 4.25])
         #expect(CursorModelNames.canonical("Claude Opus 5.5 (fast mode)") == "claude-opus-5-5-fast")
+        #expect(CursorModelNames.canonical("Claude Fable 5.2") == "claude-fable-5-2")
     }
 
     @Test func csvHandlesQuotesAndLineEndings() {
