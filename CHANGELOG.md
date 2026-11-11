@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.7.1
+
 - Add Claude Fable 5.2 and Claude Mythos 5.2 pricing, including fast mode,
   plus Gemini 4 Carbon.
 
