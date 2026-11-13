@@ -161,8 +161,12 @@ nonisolated enum UsageRollup {
                 unkeyed.append(event)
                 continue
             }
-            if let existing = keyed[id], existing.tokens.total >= event.tokens.total {
-                continue
+            if let existing = keyed[id] {
+                // Fullest first: a priced recording outranks an unpriced one,
+                // then token total; a tie between equals keeps the first.
+                let costFulness = (event.reportedCost != nil) == (existing.reportedCost != nil)
+                guard costFulness ? event.tokens.total > existing.tokens.total
+                    : event.reportedCost != nil else { continue }
             }
             keyed[id] = event
         }
