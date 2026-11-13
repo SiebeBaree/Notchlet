@@ -16,7 +16,7 @@ nonisolated enum HistoryCopy {
         }
         let kRounded = (value / 1000).rounded()
         if kRounded < 1000 {
-            return value < 10_000 ? scaled(value / 1000, "K") : "\(Int(kRounded))K"
+            return value < 10000 ? scaled(value / 1000, "K") : "\(Int(kRounded))K"
         }
         let mRounded = (value / 1_000_000).rounded()
         if mRounded < 1000 {
