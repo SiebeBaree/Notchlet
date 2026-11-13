@@ -113,8 +113,10 @@ enum CredentialSupport {
         return output
     }
 
-    /// Bytes from a hex string as `hex()` prints it; empty when malformed.
+    /// Bytes from a hex string as `hex()` prints it; empty when malformed
+    /// (non-hex digits or an odd digit count).
     static func data(fromHex hex: String) -> Data {
+        guard hex.count % 2 == 0 else { return Data() }
         var data = Data(capacity: hex.count / 2)
         var index = hex.startIndex
         while let next = hex.index(index, offsetBy: 2, limitedBy: hex.endIndex) {
