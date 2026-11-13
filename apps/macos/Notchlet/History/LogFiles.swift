@@ -29,10 +29,12 @@ nonisolated enum LogFiles {
                       let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true,
                       let size = values.fileSize, let modified = values.contentModificationDate
                 else { continue }
-                names.insert(url.lastPathComponent)
                 if let since, modified < since {
                     continue
                 }
+                // Only a file that actually qualifies shadows the same name
+                // in a later root; a date-filtered file is not a copy.
+                names.insert(url.lastPathComponent)
                 files.append(LogFile(url: url, size: UInt64(size), modified: modified))
             }
             seenNames.formUnion(names)
