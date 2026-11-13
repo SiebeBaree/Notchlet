@@ -49,6 +49,8 @@ struct LogFilesTests {
     }
 
     private func makeTemporaryDirectory() throws -> URL {
-        URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        let url = URL(filePath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 }
