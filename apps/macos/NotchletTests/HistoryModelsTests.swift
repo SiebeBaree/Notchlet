@@ -79,6 +79,56 @@ struct HistoryModelsTests {
         #expect(kept.map(\.tokens.output).sorted() == [1, 1, 9])
     }
 
+    @Test func deduplicationPrefersTheCostedVariantOnATokenTie() {
+        let stamp = date("2026-09-03T10:00:00Z")
+        let events = [
+            UsageEvent(id: "msg_1", model: "m", timestamp: stamp, tokens: TokenCount(output: 9)),
+            UsageEvent(
+                id: "msg_1",
+                model: "m",
+                timestamp: stamp,
+                tokens: TokenCount(output: 9),
+                reportedCost: 0.25
+            ),
+        ]
+        let kept = UsageRollup.deduplicated(events)
+        #expect(kept.count == 1)
+        #expect(kept[0].reportedCost == 0.25)
+    }
+
+    @Test func deduplicationKeepsUnkeyedEventsAsTheyAre() {
+        let stamp = date("2026-09-03T10:00:00Z")
+        let events = [
+            UsageEvent(model: "m", timestamp: stamp, tokens: TokenCount(output: 1)),
+            UsageEvent(model: "m", timestamp: stamp, tokens: TokenCount(output: 1)),
+        ]
+        let kept = UsageRollup.deduplicated(events)
+        #expect(kept.count == 2)
+    }
+
+    @Test func deduplicationKeepsTheFirstOfEquallyCostfulTies() {
+        let stamp = date("2026-09-03T10:00:00Z")
+        let events = [
+            UsageEvent(
+                id: "msg_1",
+                model: "m",
+                timestamp: stamp,
+                tokens: TokenCount(output: 9),
+                reportedCost: 0.25
+            ),
+            UsageEvent(
+                id: "msg_1",
+                model: "m",
+                timestamp: stamp,
+                tokens: TokenCount(output: 9),
+                reportedCost: 0.30
+            ),
+        ]
+        let kept = UsageRollup.deduplicated(events)
+        #expect(kept.count == 1)
+        #expect(kept[0].reportedCost == 0.25)
+    }
+
     @Test func rollupBucketsByDayAndModel() {
         let events = [
             UsageEvent(model: "opus", timestamp: date("2026-09-03T01:00:00Z"), tokens: TokenCount(input: 1, output: 2)),
