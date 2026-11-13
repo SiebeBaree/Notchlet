@@ -24,7 +24,8 @@ struct LogFilesTests {
         let files = LogFiles.list(under: [older, newer], withExtension: "log", modifiedSince: since)
 
         #expect(files.count == 1)
-        #expect(files.first?.url == newer.appending(path: "session.log"))
+        let expected = newer.appending(path: "session.log").resolvingSymlinksInPath()
+        #expect(files.first?.url.resolvingSymlinksInPath() == expected)
     }
 
     /// A file that does qualify under an earlier root is still a copy and
@@ -45,7 +46,8 @@ struct LogFilesTests {
         let files = LogFiles.list(under: [first, second], withExtension: "log", modifiedSince: since)
 
         #expect(files.count == 1)
-        #expect(files.first?.url == first.appending(path: "session.log"))
+        let expected = first.appending(path: "session.log").resolvingSymlinksInPath()
+        #expect(files.first?.url.resolvingSymlinksInPath() == expected)
     }
 
     private func makeTemporaryDirectory() throws -> URL {
