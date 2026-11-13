@@ -74,6 +74,8 @@ struct CredentialSupportTests {
         #expect(CredentialSupport.data(fromHex: "650079004A002E00").filter { $0 != 0 } == Data("eyJ.".utf8))
         #expect(CredentialSupport.data(fromHex: "zz").isEmpty)
         #expect(CredentialSupport.data(fromHex: "").isEmpty)
+        // Odd digit counts are malformed too; nothing is silently truncated.
+        #expect(CredentialSupport.data(fromHex: "65794A2E0").isEmpty)
     }
 
     @Test func keychainNamesThatWouldBreakTheQuotingAreRefused() {
