@@ -21,6 +21,17 @@ struct HistoryCopyTests {
         #expect(HistoryCopy.tokens(1_200_000_000) == "1.2B")
     }
 
+    @Test func tokensPromoteUnitsAtRoundingBoundaries() {
+        // 999,500–999,999 round to 1000K and must read "1M", not "1000K".
+        #expect(HistoryCopy.tokens(999_499) == "999K")
+        #expect(HistoryCopy.tokens(999_500) == "1M")
+        #expect(HistoryCopy.tokens(999_999) == "1M")
+        // 999.5M–999,999,999 round to 1000M and must read "1B", not "1000M".
+        #expect(HistoryCopy.tokens(999_499_999) == "999M")
+        #expect(HistoryCopy.tokens(999_500_000) == "1B")
+        #expect(HistoryCopy.tokens(999_999_999) == "1B")
+    }
+
     @Test func costKeepsCentsBelowAThousandDollars() {
         #expect(HistoryCopy.cost(0) == "$0.00")
         #expect(HistoryCopy.cost(0.004) == "<$0.01")

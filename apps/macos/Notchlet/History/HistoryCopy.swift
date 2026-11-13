@@ -6,22 +6,23 @@ nonisolated enum HistoryCopy {
     private static let locale = Locale(identifier: "en_US")
 
     /// "412", "9.8K", "412K", "41.3M", "120M", "1.2B".
+    ///
+    /// Rounding happens at K precision first and the unit promotes whenever the
+    /// rounded count reaches 1000, so no value can ever read "1000K" or "1000M".
     static func tokens(_ count: Int) -> String {
         let value = Double(count)
-        switch value {
-        case ..<1000:
+        if value < 1000 {
             return String(count)
-        case ..<10000:
-            return scaled(value / 1000, "K")
-        case ..<1_000_000:
-            return "\(Int((value / 1000).rounded()))K"
-        case ..<100_000_000:
-            return scaled(value / 1_000_000, "M")
-        case ..<1_000_000_000:
-            return "\(Int((value / 1_000_000).rounded()))M"
-        default:
-            return scaled(value / 1_000_000_000, "B")
         }
+        let kRounded = (value / 1000).rounded()
+        if kRounded < 1000 {
+            return value < 10000 ? scaled(value / 1000, "K") : "\(Int(kRounded))K"
+        }
+        let mRounded = (value / 1_000_000).rounded()
+        if mRounded < 1000 {
+            return value < 100_000_000 ? scaled(value / 1_000_000, "M") : "\(Int(mRounded))M"
+        }
+        return scaled(value / 1_000_000_000, "B")
     }
 
     /// One decimal, dropped when it is zero: "9.8K", "10K".
