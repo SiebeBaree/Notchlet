@@ -12,12 +12,12 @@ struct LogFilesTests {
 
         try Data("old".utf8).write(to: older.appending(path: "session.log"))
         try FileManager.default.setAttributes(
-            [.modificationDate: since.addingTimeInterval(-3_600)],
+            [.modificationDate: since.addingTimeInterval(-3600)],
             ofItemAtPath: older.appending(path: "session.log").path
         )
         try Data("new".utf8).write(to: newer.appending(path: "session.log"))
         try FileManager.default.setAttributes(
-            [.modificationDate: since.addingTimeInterval(3_600)],
+            [.modificationDate: since.addingTimeInterval(3600)],
             ofItemAtPath: newer.appending(path: "session.log").path
         )
 
@@ -37,7 +37,7 @@ struct LogFilesTests {
         for root in [first, second] {
             try Data("x".utf8).write(to: root.appending(path: "session.log"))
             try FileManager.default.setAttributes(
-                [.modificationDate: since.addingTimeInterval(3_600)],
+                [.modificationDate: since.addingTimeInterval(3600)],
                 ofItemAtPath: root.appending(path: "session.log").path
             )
         }
