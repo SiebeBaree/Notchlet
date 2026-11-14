@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.7.2
+
+- Add Gemini 4 Hydrogen pricing.
+- Token counts just under a million or a billion now read 1M or 1B instead
+  of 1000K or 1000M.
+- Keep the copy of a duplicated usage event that carries a cost, so spend is
+  no longer dropped from the historic view.
+- Treat odd-length hex in saved credentials as malformed.
+
 ## 0.7.1
 
 - Add Claude Fable 5.2 and Claude Mythos 5.2 pricing, including fast mode,
