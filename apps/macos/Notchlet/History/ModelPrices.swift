@@ -54,7 +54,7 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// unpriced model is named in the pane instead. Kept by hand because the
 /// public catalogs lag new models by weeks. Standard short-context rates;
 /// daily token totals cannot determine per-request context or service tiers.
-/// Latest OpenAI and Anthropic model rates checked November 11, 2026:
+/// Latest OpenAI and Anthropic model rates checked November 14, 2026:
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
 nonisolated enum ModelPrices {
@@ -180,12 +180,19 @@ nonisolated enum ModelPrices {
         "gpt-5.6-cyber": .openAI(input: 12.5, output: 75, cacheRead: 1.25, cacheWrite: 15.625),
         "gpt-6-cyber": .openAI(input: 20, output: 100, cacheRead: 2, cacheWrite: 25),
 
-        // Google text rates checked November 11, 2026. Storage time is absent from the logs.
+        // Google text rates checked November 14, 2026. Storage time is absent from the logs.
         // https://ai.google.dev/gemini-api/docs/pricing
         // Flash 3.6 through 3.8 promotional rates run through December 31, 2026,
         // Argon's and Carbon's through November 30, 2026. All double after.
         "gemini-4-argon": ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2, cacheWrite1h: 2),
         "gemini-4-carbon": ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2, cacheWrite1h: 2),
+        "gemini-4-hydrogen": ModelPrice(
+            input: 1.5,
+            output: 7.5,
+            cacheRead: 0.075,
+            cacheWrite5m: 1.5,
+            cacheWrite1h: 1.5
+        ),
         "gemini-3.5-flash": ModelPrice(input: 1.5, output: 9, cacheRead: 0.15, cacheWrite5m: 1.5, cacheWrite1h: 1.5),
         "gemini-3.6-flash": ModelPrice(
             input: 0.75,
@@ -234,7 +241,7 @@ nonisolated enum ModelPrices {
     ]
 
     /// Cursor rates can differ from the vendor's API. Scope these to Cursor history.
-    /// Checked October 31, 2026: https://cursor.com/docs/models-and-pricing
+    /// Checked November 14, 2026: https://cursor.com/docs/models-and-pricing
     /// A dash in the cache-write column means ordinary input, with no separate write fee.
     private static let cursorTable: [String: ModelPrice] = [
         "grok-4.5": .cursor(input: 2, output: 6, cacheRead: 0.5, cacheWrite: 2),
