@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add GPT-6.2 Astra and GPT-6.2 Sol pricing, including Fast and Ultrafast,
+  plus Gemini 4 Neon.
+
 ## 0.7.2
 
 - Add Gemini 4 Hydrogen pricing.
