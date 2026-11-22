@@ -84,6 +84,13 @@ struct ModelPricesTests {
         ("gpt-6.1-terra", 1.0, 5.0, 0.05, 1.25, 1.25),
         ("openai/gpt-6.1-terra-2026-10-26", 1.0, 5.0, 0.05, 1.25, 1.25),
         ("gpt-6.1-terra-fast", 2.0, 10.0, 0.1, 2.5, 2.5),
+        ("gpt-6.2-astra", 8.0, 40.0, 0.4, 10.0, 10.0),
+        ("openai/gpt-6.2-astra-2026-11-17", 8.0, 40.0, 0.4, 10.0, 10.0),
+        ("gpt-6.2-astra-fast", 16.0, 80.0, 0.8, 20.0, 20.0),
+        ("gpt-6.2-astra-ultrafast", 24.0, 120.0, 1.2, 30.0, 30.0),
+        ("gpt-6.2-sol", 2.0, 10.0, 0.1, 2.5, 2.5),
+        ("gpt-6.2-sol-fast", 4.0, 20.0, 0.2, 5.0, 5.0),
+        ("gpt-6.2-sol-ultrafast", 6.0, 30.0, 0.3, 7.5, 7.5),
         ("gpt-6-cyber", 20.0, 100.0, 2.0, 25.0, 25.0),
         ("gpt-5.6-cyber", 12.5, 75.0, 1.25, 15.625, 15.625),
         ("gpt-5.5-cyber", 12.5, 75.0, 1.25, 12.5, 12.5),
@@ -99,6 +106,7 @@ struct ModelPricesTests {
         ("gemini-4-argon", 2.0, 10.0, 0.1, 2.0, 2.0),
         ("google/gemini-4-carbon", 2.0, 10.0, 0.1, 2.0, 2.0),
         ("gemini-4-hydrogen", 1.5, 7.5, 0.075, 1.5, 1.5),
+        ("google/gemini-4-neon", 3.0, 15.0, 0.15, 3.0, 3.0),
         ("gemini-3.5-flash", 1.5, 9.0, 0.15, 1.5, 1.5),
         ("gemini-3.6-flash", 0.75, 3.75, 0.075, 0.75, 0.75),
         ("gemini-3.7-flash", 0.75, 3.75, 0.075, 0.75, 0.75),
@@ -144,6 +152,7 @@ struct ModelPricesTests {
         ("Gemini 4 Argon", 2.0, 10.0, 0.1),
         ("Gemini 4 Carbon", 2.0, 10.0, 0.1),
         ("Gemini 4 Hydrogen", 1.5, 7.5, 0.075),
+        ("Gemini 4 Neon", 3.0, 15.0, 0.15),
         ("GLM 5.2", 1.4, 4.4, 0.26),
         ("GLM 5.3", 1.4, 4.4, 0.26),
         ("GLM 5.3 Flash", 0.15, 0.5, 0.029),
@@ -202,6 +211,49 @@ struct ModelPricesTests {
         #expect(sol == ModelPrice(input: 4, output: 20, cacheRead: 0.4, cacheWrite5m: 5, cacheWrite1h: 5))
         let sonnet = try #require(ModelPrices.price(for: "claude-sonnet-5"))
         #expect(sonnet == ModelPrice(input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4))
+    }
+
+    @Test(arguments: [
+        ("gpt-6.2-astra-ultrafast", "2027-02-28", 24.0, 120.0, 1.2, 30.0),
+        ("gpt-6.2-astra-ultrafast", "2027-03-01", 48.0, 240.0, 2.4, 60.0),
+        ("gpt-6.2-sol-ultrafast", "2027-02-28", 6.0, 30.0, 0.3, 7.5),
+        ("gpt-6.2-sol-ultrafast", "2027-03-01", 12.0, 60.0, 0.6, 15.0),
+        ("gemini-4-carbon", "2026-11-30", 2.0, 10.0, 0.1, 2.0),
+        ("google/gemini-4-argon", "2026-12-01", 4.0, 20.0, 0.2, 4.0),
+        ("gemini-3.8-flash", "2026-12-31", 0.75, 3.75, 0.075, 0.75),
+        ("gemini-3.6-flash", "2027-01-01", 1.5, 7.5, 0.15, 1.5),
+    ])
+    func promotionsEndOnTheirDay(
+        model: String,
+        day: String,
+        input: Double,
+        output: Double,
+        read: Double,
+        write: Double
+    ) throws {
+        let price = try #require(ModelPrices.price(for: model, on: #require(DayKey(day))))
+        #expect(price == ModelPrice(
+            input: input,
+            output: output,
+            cacheRead: read,
+            cacheWrite5m: write,
+            cacheWrite1h: write
+        ))
+    }
+
+    @Test func rowsArePricedOnTheirOwnDay() throws {
+        let before = try DailyUsage(day: #require(DayKey("2027-02-28")), providerID: "codex",
+                                    model: "gpt-6.2-sol-ultrafast", requests: 1,
+                                    tokens: TokenCount(output: 1_000_000))
+        var after = before
+        after.day = try #require(DayKey("2027-03-01"))
+        #expect(ModelPrices.cost(of: before) == 30)
+        #expect(ModelPrices.cost(of: after) == 60)
+
+        let cursor = try DailyUsage(day: #require(DayKey("2026-12-01")), providerID: "cursor",
+                                    model: "gemini-3.6-flash", requests: 1,
+                                    tokens: TokenCount(output: 1_000_000))
+        #expect(ModelPrices.cost(of: cursor) == 7.5)
     }
 
     @Test func unknownModelsStayUnpriced() {
