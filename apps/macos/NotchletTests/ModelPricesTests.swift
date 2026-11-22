@@ -213,6 +213,49 @@ struct ModelPricesTests {
         #expect(sonnet == ModelPrice(input: 2, output: 10, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 4))
     }
 
+    @Test(arguments: [
+        ("gpt-6.2-astra-ultrafast", "2027-02-28", 24.0, 120.0, 1.2, 30.0),
+        ("gpt-6.2-astra-ultrafast", "2027-03-01", 48.0, 240.0, 2.4, 60.0),
+        ("gpt-6.2-sol-ultrafast", "2027-02-28", 6.0, 30.0, 0.3, 7.5),
+        ("gpt-6.2-sol-ultrafast", "2027-03-01", 12.0, 60.0, 0.6, 15.0),
+        ("gemini-4-carbon", "2026-11-30", 2.0, 10.0, 0.1, 2.0),
+        ("google/gemini-4-argon", "2026-12-01", 4.0, 20.0, 0.2, 4.0),
+        ("gemini-3.8-flash", "2026-12-31", 0.75, 3.75, 0.075, 0.75),
+        ("gemini-3.6-flash", "2027-01-01", 1.5, 7.5, 0.15, 1.5),
+    ])
+    func promotionsEndOnTheirDay(
+        model: String,
+        day: String,
+        input: Double,
+        output: Double,
+        read: Double,
+        write: Double
+    ) throws {
+        let price = try #require(ModelPrices.price(for: model, on: #require(DayKey(day))))
+        #expect(price == ModelPrice(
+            input: input,
+            output: output,
+            cacheRead: read,
+            cacheWrite5m: write,
+            cacheWrite1h: write
+        ))
+    }
+
+    @Test func rowsArePricedOnTheirOwnDay() throws {
+        let before = try DailyUsage(day: #require(DayKey("2027-02-28")), providerID: "codex",
+                                    model: "gpt-6.2-sol-ultrafast", requests: 1,
+                                    tokens: TokenCount(output: 1_000_000))
+        var after = before
+        after.day = try #require(DayKey("2027-03-01"))
+        #expect(ModelPrices.cost(of: before) == 30)
+        #expect(ModelPrices.cost(of: after) == 60)
+
+        let cursor = try DailyUsage(day: #require(DayKey("2026-12-01")), providerID: "cursor",
+                                    model: "gemini-3.6-flash", requests: 1,
+                                    tokens: TokenCount(output: 1_000_000))
+        #expect(ModelPrices.cost(of: cursor) == 7.5)
+    }
+
     @Test func unknownModelsStayUnpriced() {
         #expect(ModelPrices.price(for: "codex-auto-review") == nil)
         #expect(ModelPrices.price(for: "gpt-5.7-mini") == nil)

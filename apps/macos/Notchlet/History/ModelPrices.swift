@@ -58,10 +58,14 @@ nonisolated struct ModelPrice: Hashable, Sendable {
 /// https://developers.openai.com/api/docs/pricing
 /// https://platform.claude.com/docs/en/about-claude/pricing
 nonisolated enum ModelPrices {
-    static func price(for model: String, providerID: String? = nil) -> ModelPrice? {
+    /// Without a day, the rate before any scheduled change.
+    static func price(for model: String, providerID: String? = nil, on day: DayKey? = nil) -> ModelPrice? {
         let name = normalize(model)
         if providerID == "cursor", let price = cursorTable[name] {
             return price
+        }
+        if let day, let later = laterRates[name], day >= later.from {
+            return later.price
         }
         return table[name]
     }
@@ -71,7 +75,8 @@ nonisolated enum ModelPrices {
         if let reported = row.reportedCost {
             return reported
         }
-        guard let model = row.model, let price = price(for: model, providerID: row.providerID) else { return nil }
+        guard let model = row.model,
+              let price = price(for: model, providerID: row.providerID, on: row.day) else { return nil }
         return price.cost(of: row.tokens)
     }
 
@@ -173,7 +178,7 @@ nonisolated enum ModelPrices {
         "gpt-6.1-sol-ultrafast": .openAI(input: 12, output: 60, cacheRead: 0.6, cacheWrite: 15),
         "gpt-6.1-terra": .openAI(input: 1, output: 5, cacheRead: 0.05, cacheWrite: 1.25),
         "gpt-6.1-terra-fast": .openAI(input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5),
-        // GPT-6.2 Ultrafast is 3x Standard through February 28, 2027, then 6x.
+        // GPT-6.2 Ultrafast is 3x Standard until March 1, 2027. `laterRates` holds the 6x after.
         "gpt-6.2-astra": .openAI(input: 8, output: 40, cacheRead: 0.4, cacheWrite: 10),
         "gpt-6.2-astra-fast": .openAI(input: 16, output: 80, cacheRead: 0.8, cacheWrite: 20),
         "gpt-6.2-astra-ultrafast": .openAI(input: 24, output: 120, cacheRead: 1.2, cacheWrite: 30),
@@ -189,8 +194,8 @@ nonisolated enum ModelPrices {
 
         // Google text rates checked November 22, 2026. Storage time is absent from the logs.
         // https://ai.google.dev/gemini-api/docs/pricing
-        // Flash 3.6 through 3.8 promotional rates run through December 31, 2026,
-        // Argon's and Carbon's through November 30, 2026. All double after.
+        // Argon, Carbon and Flash 3.6 through 3.8 are on promotional rates.
+        // `laterRates` holds what they cost after.
         "gemini-4-argon": ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2, cacheWrite1h: 2),
         "gemini-4-carbon": ModelPrice(input: 2, output: 10, cacheRead: 0.1, cacheWrite5m: 2, cacheWrite1h: 2),
         "gemini-4-neon": ModelPrice(input: 3, output: 15, cacheRead: 0.15, cacheWrite5m: 3, cacheWrite1h: 3),
@@ -247,6 +252,27 @@ nonisolated enum ModelPrices {
         "composer-2.5": .cursor(input: 0.5, output: 2.5, cacheRead: 0.2, cacheWrite: 0.5),
         "composer-2.5-fast": .cursor(input: 3, output: 15, cacheRead: 0.5, cacheWrite: 3),
     ]
+
+    /// Promotions with a published end. Usage from `from` on pays `price`, so
+    /// days billed at the promotional rate keep it once the promotion is over.
+    /// Days are local and the vendors' cutoffs are not, so usage on the day of
+    /// a change can land on the wrong side.
+    private static let laterRates: [String: (from: DayKey, price: ModelPrice)] = {
+        let december = DayKey(year: 2026, month: 12, day: 1)
+        let january = DayKey(year: 2027, month: 1, day: 1)
+        let march = DayKey(year: 2027, month: 3, day: 1)
+        let gemini4 = ModelPrice(input: 4, output: 20, cacheRead: 0.2, cacheWrite5m: 4, cacheWrite1h: 4)
+        let flash = ModelPrice(input: 1.5, output: 7.5, cacheRead: 0.15, cacheWrite5m: 1.5, cacheWrite1h: 1.5)
+        return [
+            "gpt-6.2-astra-ultrafast": (march, .openAI(input: 48, output: 240, cacheRead: 2.4, cacheWrite: 60)),
+            "gpt-6.2-sol-ultrafast": (march, .openAI(input: 12, output: 60, cacheRead: 0.6, cacheWrite: 15)),
+            "gemini-4-argon": (december, gemini4),
+            "gemini-4-carbon": (december, gemini4),
+            "gemini-3.6-flash": (january, flash),
+            "gemini-3.7-flash": (january, flash),
+            "gemini-3.8-flash": (january, flash),
+        ]
+    }()
 
     /// Cursor rates can differ from the vendor's API. Scope these to Cursor history.
     /// Checked November 22, 2026: https://cursor.com/docs/models-and-pricing
