@@ -2,12 +2,10 @@
 
 ## Unreleased
 
-- Add GPT-6.2 Astra and GPT-6.2 Sol pricing, including Fast and Ultrafast,
-  plus Gemini 4 Neon.
-
 ## 0.7.2
 
-- Add Gemini 4 Hydrogen pricing.
+- Add GPT-6.2 Astra and GPT-6.2 Sol pricing, including Fast and Ultrafast,
+  plus Gemini 4 Neon and Gemini 4 Hydrogen.
 - Token counts just under a million or a billion now read 1M or 1B instead
   of 1000K or 1000M.
 - Keep the copy of a duplicated usage event that carries a cost, so spend is
